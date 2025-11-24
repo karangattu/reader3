@@ -220,7 +220,7 @@
         // Pass the spine data from python to JS
         const spineMap = {
             {% for ch in book.spine %}
-            "{{ ch.href }}": {{ ch.order }},
+            "{{ ch.href }}": {{ loop.index0 }},
             {% endfor %}
         };
 

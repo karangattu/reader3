@@ -34,15 +34,18 @@ MIT
 To build a standalone executable for your platform (Windows or macOS):
 
 1. Ensure dependencies are installed:
+
    ```bash
    uv sync
    ```
 
 2. Run the build script:
+
    ```bash
    uv run python build_executable.py
    ```
 
 The executable will be created in the `dist` directory.
+
 - On macOS, it will be `dist/Reader3.app`
 - On Windows, it will be `dist/Reader3.exe`
