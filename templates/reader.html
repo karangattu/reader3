@@ -145,6 +145,25 @@
             {% endfor %}
         };
 
+        // Save sidebar scroll position before navigation
+        function saveScrollPosition() {
+            const sidebar = document.getElementById('sidebar');
+            if (sidebar) {
+                sessionStorage.setItem('sidebarScrollPos', sidebar.scrollTop);
+            }
+        }
+
+        // Restore sidebar scroll position after page load
+        function restoreScrollPosition() {
+            const sidebar = document.getElementById('sidebar');
+            if (sidebar) {
+                const scrollPos = sessionStorage.getItem('sidebarScrollPos');
+                if (scrollPos !== null) {
+                    sidebar.scrollTop = parseInt(scrollPos, 10);
+                }
+            }
+        }
+
         function findAndGo(filename) {
             // The TOC usually has specific filenames e.g. "text/part001.html"
             // Sometimes it has anchors "text/part001.html#header"
@@ -155,6 +174,7 @@
             const idx = spineMap[cleanFile];
 
             if (idx !== undefined) {
+                saveScrollPosition();
                 let url = "/read/{{ book_id }}/" + idx;
                 // If there was an anchor, we could try to scroll to it,
                 // but simple page loads often lose anchor position without extra JS.
@@ -204,6 +224,17 @@
                 toggleBtn.setAttribute('aria-pressed', String(isCollapsed));
             }
         }
+
+        // Restore scroll position when page loads
+        window.addEventListener('load', restoreScrollPosition);
+
+        // Save scroll position on navigation buttons (Previous/Next)
+        document.addEventListener('DOMContentLoaded', function() {
+            const navButtons = document.querySelectorAll('.nav-btn:not(.disabled)');
+            navButtons.forEach(button => {
+                button.addEventListener('click', saveScrollPosition);
+            });
+        });
     </script>
 </body>
 </html>
