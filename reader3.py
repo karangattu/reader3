@@ -65,6 +65,7 @@ class Book:
     source_file: str
     processed_at: str
     version: str = "3.0"
+    is_pdf: bool = False  # Flag to indicate if this is a PDF book
 
 
 # --- Utilities ---
@@ -171,6 +172,86 @@ def extract_metadata_robust(book_obj) -> BookMetadata:
 
 
 # --- Main Conversion Logic ---
+
+def process_pdf(pdf_path: str, output_dir: str) -> Book:
+    import fitz  # PyMuPDF
+
+    print(f"Loading {pdf_path}...")
+    doc = fitz.open(pdf_path)
+    
+    # Extract Metadata
+    metadata = BookMetadata(
+        title=doc.metadata.get('title') or os.path.basename(pdf_path),
+        language="en",
+        authors=[doc.metadata.get('author')] if doc.metadata.get('author') else [],
+        publisher=doc.metadata.get('producer'),
+        date=doc.metadata.get('creationDate')
+    )
+
+    # Prepare Output Directories
+    if os.path.exists(output_dir):
+        shutil.rmtree(output_dir)
+    images_dir = os.path.join(output_dir, 'images')
+    os.makedirs(images_dir, exist_ok=True)
+
+    spine_chapters = []
+    toc_structure = []
+    image_map = {}
+
+    print("Processing PDF pages...")
+    
+    # Heuristic for header/footer: 
+    # We'll ignore text in the top 5% and bottom 5% of the page height.
+    # This is a rough approximation but works for many standard books.
+    
+    for i, page in enumerate(doc):
+        rect = page.rect
+        height = rect.height
+        
+        # Define crop box (exclude top/bottom 7%)
+        # We can be a bit aggressive to ensure we miss headers/footers
+        clip_rect = fitz.Rect(0, height * 0.07, rect.width, height * 0.93)
+        
+        # Extract HTML/Text from the clipped area
+        # 'html' output from pymupdf is good but might be messy. 
+        # 'text' is safer for "just contents".
+        # Let's try to get HTML for formatting (bold/italic) but restricted to clip.
+        
+        # Note: get_text("html", clip=...) is supported in newer pymupdf
+        page_html = page.get_text("html", clip=clip_rect)
+        page_text = page.get_text("text", clip=clip_rect)
+        
+        # Clean up the HTML a bit (it wraps in div/p usually)
+        soup = BeautifulSoup(page_html, 'html.parser')
+        
+        # Create a simple chapter for this page
+        chapter_id = f"page_{i+1}"
+        chapter_title = f"Page {i+1}"
+        
+        # Add every page to the TOC for PDF navigation
+        toc_structure.append(TOCEntry(title=chapter_title, href=chapter_id, file_href=chapter_id, anchor=""))
+
+        chapter = ChapterContent(
+            id=chapter_id,
+            href=chapter_id,
+            title=chapter_title,
+            content=str(soup), # stored as HTML
+            text=page_text,
+            order=i
+        )
+        spine_chapters.append(chapter)
+
+    final_book = Book(
+        metadata=metadata,
+        spine=spine_chapters,
+        toc=toc_structure,
+        images=image_map,
+        source_file=os.path.basename(pdf_path),
+        processed_at=datetime.now().isoformat(),
+        is_pdf=True
+    )
+    
+    return final_book
 
 def process_epub(epub_path: str, output_dir: str) -> Book:
 

@@ -1,27 +1,110 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Library</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #f4f4f9; margin: 0; padding: 40px; }
-        .container { max-width: 800px; margin: 0 auto; }
-        h1 { color: #333; border-bottom: 2px solid #ddd; padding-bottom: 10px; }
-        .book-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; margin-top: 30px; }
-        .book-card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); transition: transform 0.2s; }
-        .book-title { font-size: 1.2em; font-weight: bold; color: #2c3e50; margin-bottom: 10px; }
-        .book-meta { color: #666; font-size: 0.9em; margin-bottom: 15px; }
-        .btn { display: inline-block; background: #3498db; color: white; text-decoration: none; padding: 8px 15px; border-radius: 4px; font-size: 0.9em; }
-        .btn:hover { background: #2980b9; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: #f4f4f9;
+            margin: 0;
+            padding: 40px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #ddd;
+            padding-bottom: 10px;
+        }
+
+        .book-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        .book-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s;
+        }
+
+        .book-title {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+
+        .book-meta {
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 15px;
+        }
+
+        .book-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 12px;
+        }
+
+        .btn {
+            display: inline-block;
+            background: #3498db;
+            color: white;
+            text-decoration: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            border: none;
+            cursor: pointer;
+            flex: 1;
+            text-align: center;
+        }
+
+        .btn:hover {
+            background: #2980b9;
+        }
+
+        .btn-delete {
+            background: #e74c3c;
+            flex: 0 0 auto;
+            padding: 8px 12px;
+        }
+
+        .btn-delete:hover {
+            background: #c0392b;
+        }
     </style>
 </head>
+
 <body>
     <div class="container">
         <h1>Library</h1>
 
+        <div class="upload-section"
+            style="background: white; padding: 20px; border-radius: 8px; margin-bottom: 30px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+            <h3 style="margin-top: 0;">Add a Book</h3>
+            <form action="/upload" method="post" enctype="multipart/form-data"
+                style="display: flex; gap: 10px; align-items: center;"
+                onsubmit="document.getElementById('upload-btn').innerText='Processing...'; document.getElementById('upload-btn').disabled=true;">
+                <input type="file" name="file" accept=".epub,.pdf" required style="flex-grow: 1; padding: 5px;">
+                <button type="submit" class="btn" id="upload-btn">Upload Book</button>
+            </form>
+        </div>
+
         {% if not books %}
-            <p>No processed books found. Run <code>reader3.py</code> on an epub first.</p>
+        <p>No books found. Upload an EPUB file to get started.</p>
         {% endif %}
 
         <div class="book-grid">
@@ -32,10 +115,37 @@
                     {{ book.author }}<br>
                     {{ book.chapters }} sections
                 </div>
-                <a href="/read/{{ book.id }}/0" class="btn">Read Book</a>
+                <div class="book-actions">
+                    <a href="/read/{{ book.id }}/0" class="btn">Read</a>
+                    <button type="button" class="btn btn-delete" onclick="deleteBook('{{ book.id }}', '{{ book.title }}')">
+                        Delete
+                    </button>
+                </div>
             </div>
             {% endfor %}
         </div>
     </div>
+
+    <script>
+        function deleteBook(bookId, bookTitle) {
+            if (!confirm(`Are you sure you want to delete "${bookTitle}"? This cannot be undone.`)) {
+                return;
+            }
+            fetch(`/delete/${bookId}`, { method: 'DELETE' })
+                .then(response => {
+                    if (response.ok) {
+                        location.reload();
+                    } else {
+                        alert('Failed to delete the book.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error deleting the book.');
+                });
+        }
+    </script>
+    </div>
 </body>
+
 </html>

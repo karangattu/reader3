@@ -7,31 +7,41 @@
     <style>
         /* Layout */
         body { margin: 0; padding: 0; display: flex; height: 100vh; overflow: hidden; font-family: "Georgia", serif; background: #fff; }
+        body.sidebar-collapsed #sidebar { width: 0; padding: 0; border-right: none; transform: translateX(-100%); opacity: 0; pointer-events: none; }
+        body.sidebar-collapsed #main { width: 100%; }
 
         /* Sidebar */
-        #sidebar { width: 300px; background: #f8f9fa; border-right: 1px solid #e9ecef; overflow-y: auto; padding: 20px; flex-shrink: 0; }
+        #sidebar { width: 300px; background: #f8f9fa; border-right: 1px solid #e9ecef; overflow-y: auto; padding: 20px; flex-shrink: 0; transition: width 0.2s ease, transform 0.2s ease, opacity 0.2s ease; }
         .nav-header { font-family: -apple-system, sans-serif; font-weight: bold; color: #495057; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #dee2e6; }
         .nav-home { display: block; margin-bottom: 20px; color: #3498db; text-decoration: none; font-family: -apple-system, sans-serif; font-size: 0.9em; }
+
+        #sidebar-toggle { position: fixed; top: 15px; left: 15px; z-index: 1000; border: 1px solid #495057; background: rgba(255, 255, 255, 0.9); color: #495057; padding: 6px 12px; border-radius: 4px; font-family: -apple-system, sans-serif; font-size: 0.85em; cursor: pointer; transition: background 0.15s, color 0.15s; }
+        #sidebar-toggle:hover { background: #495057; color: #fff; }
 
         /* TOC Tree */
         ul.toc-list { list-style: none; padding-left: 0; margin: 0; }
         ul.toc-list ul { padding-left: 20px; } /* Indent children */
         li.toc-item { margin-bottom: 8px; }
-        a.toc-link { text-decoration: none; color: #495057; font-size: 0.95em; display: block; padding: 4px 0; line-height: 1.4; }
-        a.toc-link:hover { color: #000; text-decoration: underline; }
-        a.toc-link.active { color: #d63384; font-weight: bold; }
+        a.toc-link { text-decoration: none; color: #495057; font-size: 0.95em; display: block; padding: 8px 10px; line-height: 1.4; border-radius: 4px; transition: background-color 0.15s; }
+        a.toc-link:hover { color: #000; text-decoration: underline; background-color: #e9ecef; }
+        a.toc-link.active { color: #fff; font-weight: bold; background: linear-gradient(135deg, #d63384 0%, #c21f6b 100%); box-shadow: 0 2px 4px rgba(214, 51, 132, 0.3); }
 
         /* Main Content */
         #main { flex-grow: 1; overflow-y: auto; position: relative; scroll-behavior: smooth; }
-        .content-container { max-width: 700px; margin: 0 auto; padding: 60px 40px; line-height: 1.8; font-size: 1.15em; color: #212529; }
+        .content-container { max-width: 700px; margin: 0 auto; padding: 60px 40px 60px 40px; line-height: 1.8; font-size: 1.15em; color: #212529; background: #fff; position: relative; z-index: 1; }
+        .content-toolbar { display: flex; justify-content: flex-end; gap: 10px; margin-bottom: 20px; font-family: -apple-system, sans-serif; }
+        .toolbar-btn { border: 1px solid #adb5bd; background: #fff; color: #495057; padding: 8px 14px; border-radius: 4px; cursor: pointer; font-size: 0.9em; transition: background 0.15s, color 0.15s; }
+        .toolbar-btn:hover { background: #495057; color: #fff; }
+        #copy-status { font-family: -apple-system, sans-serif; font-size: 0.85em; color: #198754; text-align: right; min-height: 1.2em; opacity: 0; transition: opacity 0.2s ease-in-out; }
 
         /* Content Styling (Basic normalization for the book HTML) */
+        .book-content { position: relative; z-index: 1; }
         .book-content img { max-width: 100%; height: auto; display: block; margin: 20px auto; }
         .book-content h1, .book-content h2, .book-content h3 { font-family: -apple-system, sans-serif; margin-top: 1.5em; color: #333; }
         .book-content p { margin-bottom: 1.5em; text-align: justify; }
 
         /* Navigation Footer */
-        .chapter-nav { display: flex; justify-content: space-between; margin-top: 60px; padding-top: 20px; border-top: 1px solid #eee; font-family: -apple-system, sans-serif; }
+        .chapter-nav { position: relative; z-index: 10; display: flex; justify-content: space-between; margin-top: 60px; padding-top: 20px; padding-bottom: 20px; border-top: 1px solid #eee; background: #fff; font-family: -apple-system, sans-serif; }
         .nav-btn { text-decoration: none; color: #3498db; font-weight: bold; padding: 10px 20px; border: 1px solid #3498db; border-radius: 4px; transition: all 0.2s; }
         .nav-btn:hover { background: #3498db; color: white; }
         .nav-btn.disabled { opacity: 0.5; pointer-events: none; border-color: #ccc; color: #ccc; }
@@ -39,6 +49,8 @@
     </style>
 </head>
 <body>
+
+    <button id="sidebar-toggle" type="button" onclick="toggleSidebar()" aria-pressed="false" aria-controls="sidebar">Hide Chapters</button>
 
     <!-- SIDEBAR -->
     <div id="sidebar">
@@ -97,10 +109,15 @@
     <!-- MAIN CONTENT -->
     <div id="main">
         <div class="content-container">
-            <div class="book-content">
+            <div class="content-toolbar">
+                <button class="toolbar-btn" type="button" onclick="copyChapterContent()">Copy Chapter</button>
+            </div>
+            <div id="copy-status" aria-live="polite"></div>
+            <div class="book-content" id="book-content">
                 {{ current_chapter.content | safe }}
             </div>
 
+            {% if not is_pdf %}
             <div class="chapter-nav">
                 {% if prev_idx is not none %}
                     <a href="/read/{{ book_id }}/{{ prev_idx }}" class="nav-btn">← Previous</a>
@@ -118,10 +135,85 @@
                     <span class="nav-btn disabled">Next →</span>
                 {% endif %}
             </div>
+            {% else %}
+            <div id="pdf-scroll-indicator" style="text-align: center; color: #999; padding: 20px; font-family: -apple-system, sans-serif; font-size: 0.9em;">
+                <span id="page-count">Page {{ chapter_index + 1 }} of {{ book.spine|length }}</span>
+            </div>
+            {% endif %}
         </div>
     </div>
 
     <script>
+        const isPDF = {{ 'true' if is_pdf else 'false' }};
+        const bookId = "{{ book_id }}";
+        const totalPages = {{ book.spine|length }};
+        let currentPageIndex = {{ chapter_index }};
+        let loadingPages = false;
+        
+        {% if is_pdf %}
+        // Infinite scroll setup for PDFs
+        function loadMorePages() {
+            if (loadingPages || currentPageIndex >= totalPages - 1) {
+                return;
+            }
+            
+            loadingPages = true;
+            const nextStart = currentPageIndex + 1;
+            
+            fetch(`/read/${bookId}/pages/${nextStart}/5`)
+                .then(resp => resp.json())
+                .then(data => {
+                    if (data.pages && data.pages.length > 0) {
+                        const contentDiv = document.getElementById('book-content');
+                        data.pages.forEach(page => {
+                            const pageWrapper = document.createElement('div');
+                            pageWrapper.className = 'pdf-page';
+                            pageWrapper.style.marginBottom = '40px';
+                            pageWrapper.innerHTML = `
+                                <div style="text-align: center; color: #999; font-size: 0.85em; margin-bottom: 20px; font-family: -apple-system, sans-serif;">
+                                    ${page.title}
+                                </div>
+                                ${page.content}
+                            `;
+                            contentDiv.appendChild(pageWrapper);
+                        });
+                        
+                        currentPageIndex = Math.max(...data.pages.map(p => p.index));
+                        updatePageIndicator();
+                    }
+                    loadingPages = false;
+                })
+                .catch(err => {
+                    console.error('Failed to load pages:', err);
+                    loadingPages = false;
+                });
+        }
+        
+        function updatePageIndicator() {
+            const indicator = document.getElementById('page-count');
+            if (indicator) {
+                indicator.textContent = `Page ${currentPageIndex + 1} of ${totalPages}`;
+            }
+        }
+        
+        // Set up infinite scroll listener
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting && !loadingPages) {
+                    loadMorePages();
+                }
+            });
+        }, { rootMargin: '500px' });
+        
+        window.addEventListener('load', () => {
+            const sentinel = document.createElement('div');
+            sentinel.id = 'infinite-scroll-sentinel';
+            sentinel.style.height = '1px';
+            document.getElementById('book-content').parentElement.appendChild(sentinel);
+            observer.observe(sentinel);
+        });
+        {% endif %}
+        
         // Helper to map TOC filenames to Spine Indices
         // Pass the spine data from python to JS
         const spineMap = {
@@ -129,6 +221,25 @@
             "{{ ch.href }}": {{ ch.order }},
             {% endfor %}
         };
+
+        // Save sidebar scroll position before navigation
+        function saveScrollPosition() {
+            const sidebar = document.getElementById('sidebar');
+            if (sidebar) {
+                sessionStorage.setItem('sidebarScrollPos', sidebar.scrollTop);
+            }
+        }
+
+        // Restore sidebar scroll position after page load
+        function restoreScrollPosition() {
+            const sidebar = document.getElementById('sidebar');
+            if (sidebar) {
+                const scrollPos = sessionStorage.getItem('sidebarScrollPos');
+                if (scrollPos !== null) {
+                    sidebar.scrollTop = parseInt(scrollPos, 10);
+                }
+            }
+        }
 
         function findAndGo(filename) {
             // The TOC usually has specific filenames e.g. "text/part001.html"
@@ -140,6 +251,7 @@
             const idx = spineMap[cleanFile];
 
             if (idx !== undefined) {
+                saveScrollPosition();
                 let url = "/read/{{ book_id }}/" + idx;
                 // If there was an anchor, we could try to scroll to it,
                 // but simple page loads often lose anchor position without extra JS.
@@ -149,6 +261,70 @@
                 console.log("Could not find index for", filename);
             }
         }
+
+        async function copyChapterContent() {
+            const contentEl = document.querySelector('.book-content');
+            const statusEl = document.getElementById('copy-status');
+            if (!contentEl || !statusEl) {
+                return;
+            }
+
+            const textToCopy = contentEl.innerText.trim();
+            if (!textToCopy) {
+                statusEl.textContent = 'Nothing to copy.';
+                statusEl.style.opacity = 1;
+                setTimeout(() => statusEl.style.opacity = 0, 1500);
+                return;
+            }
+
+            try {
+                await navigator.clipboard.writeText(textToCopy);
+                statusEl.textContent = 'Chapter copied to clipboard!';
+                statusEl.style.color = '#198754';
+            } catch (err) {
+                console.error('Copy failed', err);
+                statusEl.textContent = 'Clipboard unavailable.';
+                statusEl.style.color = '#dc3545';
+            }
+
+            statusEl.style.opacity = 1;
+            setTimeout(() => statusEl.style.opacity = 0, 2000);
+        }
+
+        function toggleSidebar() {
+            const body = document.body;
+            const toggleBtn = document.getElementById('sidebar-toggle');
+            body.classList.toggle('sidebar-collapsed');
+            const isCollapsed = body.classList.contains('sidebar-collapsed');
+            if (toggleBtn) {
+                toggleBtn.textContent = isCollapsed ? 'Show Chapters' : 'Hide Chapters';
+                toggleBtn.setAttribute('aria-pressed', String(isCollapsed));
+            }
+        }
+
+        // Scroll active chapter into view within the sidebar
+        function scrollActiveChapterIntoView() {
+            const activeLink = document.querySelector('a.toc-link.active');
+            if (activeLink) {
+                activeLink.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        }
+
+        // Restore scroll position when page loads
+        window.addEventListener('load', function() {
+            // First try to restore saved position
+            restoreScrollPosition();
+            // Then ensure active chapter is visible
+            setTimeout(scrollActiveChapterIntoView, 100);
+        });
+
+        // Save scroll position on navigation buttons (Previous/Next)
+        document.addEventListener('DOMContentLoaded', function() {
+            const navButtons = document.querySelectorAll('.nav-btn:not(.disabled)');
+            navButtons.forEach(button => {
+                button.addEventListener('click', saveScrollPosition);
+            });
+        });
     </script>
 </body>
 </html>

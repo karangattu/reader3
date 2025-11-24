@@ -3,18 +3,35 @@ import pickle
 from functools import lru_cache
 from typing import Optional
 
-from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import HTMLResponse, FileResponse
+import shutil
+from fastapi import FastAPI, Request, HTTPException, UploadFile, File
+from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from reader3 import Book, BookMetadata, ChapterContent, TOCEntry
+from reader3 import Book, BookMetadata, ChapterContent, TOCEntry, process_epub, save_to_pickle
+
+import sys
 
 app = FastAPI()
-templates = Jinja2Templates(directory="templates")
+
+# Determine base path for resources (templates)
+if getattr(sys, 'frozen', False):
+    # If run as an executable (PyInstaller)
+    base_resource_path = sys._MEIPASS
+else:
+    # If run as a script
+    base_resource_path = os.path.dirname(os.path.abspath(__file__))
+
+templates_dir = os.path.join(base_resource_path, "templates")
+templates = Jinja2Templates(directory=templates_dir)
 
 # Where are the book folders located?
-BOOKS_DIR = "."
+# If frozen, we want the directory of the executable, not the temp dir
+if getattr(sys, 'frozen', False):
+    BOOKS_DIR = os.path.dirname(sys.executable)
+else:
+    BOOKS_DIR = "."
 
 @lru_cache(maxsize=10)
 def load_book_cached(folder_name: str) -> Optional[Book]:
@@ -55,6 +72,58 @@ async def library_view(request: Request):
 
     return templates.TemplateResponse("library.html", {"request": request, "books": books})
 
+import tempfile
+
+@app.post("/upload")
+async def upload_book(file: UploadFile = File(...)):
+    """Handle EPUB file uploads."""
+
+
+    # Create a temp file to store the upload
+    # We use delete=False so we can close it and then read it in process_epub
+    # We need to preserve the .epub/.pdf extension for some libraries/checks
+    suffix = os.path.splitext(file.filename)[1].lower()
+    if suffix not in ['.epub', '.pdf']:
+        raise HTTPException(status_code=400, detail="Only .epub and .pdf files are supported")
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        shutil.copyfileobj(file.file, tmp)
+        temp_path = tmp.name
+
+    try:
+        # Determine output directory based on original filename
+        safe_filename = os.path.basename(file.filename)
+        out_dir = os.path.splitext(safe_filename)[0] + "_data"
+        # Ensure we use the BOOKS_DIR as the base
+        full_out_dir = os.path.join(BOOKS_DIR, out_dir)
+        
+        print(f"Processing {temp_path} -> {full_out_dir}")
+        
+        # Process the Book
+        if suffix == '.pdf':
+            from reader3 import process_pdf
+            book_obj = process_pdf(temp_path, full_out_dir)
+        else:
+            book_obj = process_epub(temp_path, full_out_dir)
+            
+        save_to_pickle(book_obj, full_out_dir)
+        
+        # Clear cache for this book if it existed
+        load_book_cached.cache_clear()
+        
+    except Exception as e:
+        print(f"Error processing book: {e}")
+        # Clean up partial data if failed
+        if 'full_out_dir' in locals() and os.path.exists(full_out_dir):
+            shutil.rmtree(full_out_dir)
+        raise HTTPException(status_code=500, detail=f"Failed to process book: {str(e)}")
+    finally:
+        # Clean up temp file
+        if 'temp_path' in locals() and os.path.exists(temp_path):
+            os.remove(temp_path)
+
+    return RedirectResponse(url="/", status_code=303)
+
 @app.get("/read/{book_id}", response_class=HTMLResponse)
 async def redirect_to_first_chapter(book_id: str):
     """Helper to just go to chapter 0."""
@@ -83,8 +152,39 @@ async def read_chapter(request: Request, book_id: str, chapter_index: int):
         "chapter_index": chapter_index,
         "book_id": book_id,
         "prev_idx": prev_idx,
-        "next_idx": next_idx
+        "next_idx": next_idx,
+        "is_pdf": book.is_pdf
     })
+
+@app.get("/read/{book_id}/pages/{start}/{count}")
+async def get_pages(book_id: str, start: int, count: int):
+    """
+    Fetches multiple pages for infinite scrolling (PDF only).
+    Returns JSON with array of page content.
+    """
+    book = load_book_cached(book_id)
+    if not book:
+        raise HTTPException(status_code=404, detail="Book not found")
+    
+    if not book.is_pdf:
+        raise HTTPException(status_code=400, detail="Infinite scroll only for PDFs")
+    
+    total = len(book.spine)
+    if start >= total:
+        return {"pages": []}
+    
+    end = min(start + count, total)
+    pages = []
+    
+    for i in range(start, end):
+        chapter = book.spine[i]
+        pages.append({
+            "index": i,
+            "title": chapter.title,
+            "content": chapter.content
+        })
+    
+    return {"pages": pages, "total": total}
 
 @app.get("/read/{book_id}/images/{image_name}")
 async def serve_image(book_id: str, image_name: str):
@@ -103,6 +203,31 @@ async def serve_image(book_id: str, image_name: str):
         raise HTTPException(status_code=404, detail="Image not found")
 
     return FileResponse(img_path)
+
+@app.delete("/delete/{book_id}")
+async def delete_book(book_id: str):
+    """
+    Deletes a book folder and all its contents.
+    """
+    # Security: ensure book_id is clean and ends with _data
+    safe_book_id = os.path.basename(book_id)
+    if not safe_book_id.endswith("_data"):
+        raise HTTPException(status_code=400, detail="Invalid book ID")
+
+    book_path = os.path.join(BOOKS_DIR, safe_book_id)
+
+    if not os.path.exists(book_path):
+        raise HTTPException(status_code=404, detail="Book not found")
+
+    try:
+        # Remove the entire book directory
+        shutil.rmtree(book_path)
+        # Clear the cache
+        load_book_cached.cache_clear()
+        return {"status": "deleted"}
+    except Exception as e:
+        print(f"Error deleting book {safe_book_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete book: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn

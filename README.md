@@ -8,20 +8,39 @@ This project was 90% vibe coded just to illustrate how one can very easily [read
 
 ## Usage
 
-The project uses [uv](https://docs.astral.sh/uv/). So for example, download [Dracula EPUB3](https://www.gutenberg.org/ebooks/345) to this directory as `dracula.epub`, then:
+## Usage
 
-```bash
-uv run reader3.py dracula.epub
-```
+1. **Run the App**:
+   - If you built the executable, just double-click `Reader3` (or `Reader3.app`).
+   - Or run from source: `uv run python launcher.py`
 
-This creates the directory `dracula_data`, which registers the book to your local library. We can then run the server:
+2. **Add Books**:
+   - The browser will open automatically.
+   - Click "Upload EPUB" to select a book from your computer.
+   - The book will be processed and added to your library.
 
-```bash
-uv run server.py
-```
-
-And visit [localhost:8123](http://localhost:8123/) to see your current Library. You can easily add more books, or delete them from your library by deleting the folder. It's not supposed to be complicated or complex.
+3. **Read**:
+   - Click "Read Book" to start reading.
+   - Copy-paste text to your LLM as needed.
 
 ## License
 
 MIT
+
+## Building Executable
+
+To build a standalone executable for your platform (Windows or macOS):
+
+1. Ensure dependencies are installed:
+   ```bash
+   uv sync
+   ```
+
+2. Run the build script:
+   ```bash
+   uv run python build_executable.py
+   ```
+
+The executable will be created in the `dist` directory.
+- On macOS, it will be `dist/Reader3.app`
+- On Windows, it will be `dist/Reader3.exe`
