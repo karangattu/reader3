@@ -27,11 +27,22 @@ templates_dir = os.path.join(base_resource_path, "templates")
 templates = Jinja2Templates(directory=templates_dir)
 
 # Where are the book folders located?
-# If frozen, we want the directory of the executable, not the temp dir
-if getattr(sys, 'frozen', False):
-    BOOKS_DIR = os.path.dirname(sys.executable)
+# Use environment variable if set (by launcher.py for macOS .app bundles),
+# otherwise fall back to executable directory or current directory
+if os.environ.get('READER3_BOOKS_DIR'):
+    BOOKS_DIR = os.environ['READER3_BOOKS_DIR']
+elif getattr(sys, 'frozen', False):
+    # Fallback: get the directory containing the .app bundle on macOS
+    executable_path = sys.executable
+    if '.app/Contents/MacOS' in executable_path:
+        app_bundle_path = os.path.dirname(os.path.dirname(os.path.dirname(executable_path)))
+        BOOKS_DIR = os.path.dirname(app_bundle_path)
+    else:
+        BOOKS_DIR = os.path.dirname(executable_path)
 else:
     BOOKS_DIR = "."
+
+print(f"Books directory: {BOOKS_DIR}")
 
 @lru_cache(maxsize=10)
 def load_book_cached(folder_name: str) -> Optional[Book]:
@@ -59,7 +70,8 @@ async def library_view(request: Request):
     # Scan directory for folders ending in '_data' that have a book.pkl
     if os.path.exists(BOOKS_DIR):
         for item in os.listdir(BOOKS_DIR):
-            if item.endswith("_data") and os.path.isdir(item):
+            item_path = os.path.join(BOOKS_DIR, item)
+            if item.endswith("_data") and os.path.isdir(item_path):
                 # Try to load it to get the title
                 book = load_book_cached(item)
                 if book:
@@ -70,7 +82,9 @@ async def library_view(request: Request):
                         "chapters": len(book.spine)
                     })
 
-    return templates.TemplateResponse("library.html", {"request": request, "books": books})
+    return templates.TemplateResponse(
+        "library.html", {"request": request, "books": books}
+    )
 
 import tempfile
 
