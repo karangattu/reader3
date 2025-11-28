@@ -33,6 +33,17 @@
         "start_offset": 10,
         "end_offset": 25,
         "created_at": "2025-11-28T11:08:28.888819"
+      },
+      {
+        "id": "12384c2b43e7",
+        "book_id": "test_book_highlights_123",
+        "chapter_index": 1,
+        "text": "Highlighted text",
+        "color": "yellow",
+        "note": null,
+        "start_offset": 10,
+        "end_offset": 25,
+        "created_at": "2025-11-28T14:59:31.300912"
       }
     ],
     "test_book_highlight_colors": [
@@ -156,6 +167,61 @@
         "start_offset": 0,
         "end_offset": 0,
         "created_at": "2025-11-28T11:08:28.894909"
+      },
+      {
+        "id": "7e21d8da8575",
+        "book_id": "test_book_highlight_colors",
+        "chapter_index": 0,
+        "text": "Text with yellow",
+        "color": "yellow",
+        "note": null,
+        "start_offset": 0,
+        "end_offset": 0,
+        "created_at": "2025-11-28T14:59:31.302710"
+      },
+      {
+        "id": "8c1f6ebce957",
+        "book_id": "test_book_highlight_colors",
+        "chapter_index": 0,
+        "text": "Text with green",
+        "color": "green",
+        "note": null,
+        "start_offset": 0,
+        "end_offset": 0,
+        "created_at": "2025-11-28T14:59:31.303822"
+      },
+      {
+        "id": "abfc01080997",
+        "book_id": "test_book_highlight_colors",
+        "chapter_index": 0,
+        "text": "Text with blue",
+        "color": "blue",
+        "note": null,
+        "start_offset": 0,
+        "end_offset": 0,
+        "created_at": "2025-11-28T14:59:31.304921"
+      },
+      {
+        "id": "b7cf4b193537",
+        "book_id": "test_book_highlight_colors",
+        "chapter_index": 0,
+        "text": "Text with pink",
+        "color": "pink",
+        "note": null,
+        "start_offset": 0,
+        "end_offset": 0,
+        "created_at": "2025-11-28T14:59:31.306094"
+      },
+      {
+        "id": "2fc7cf042b2b",
+        "book_id": "test_book_highlight_colors",
+        "chapter_index": 0,
+        "text": "Text with purple",
+        "color": "purple",
+        "note": null,
+        "start_offset": 0,
+        "end_offset": 0,
+        "created_at": "2025-11-28T14:59:31.307211"
       }
     ],
     "test_book_delete_highlight": []
@@ -188,6 +254,15 @@
         "title": "Test bookmark",
         "note": "Test note",
         "created_at": "2025-11-28T11:08:28.880580"
+      },
+      {
+        "id": "e01bd07df397",
+        "book_id": "test_book_bookmarks_123",
+        "chapter_index": 2,
+        "scroll_position": 0.5,
+        "title": "Test bookmark",
+        "note": "Test note",
+        "created_at": "2025-11-28T14:59:31.292419"
       }
     ],
     "test_book_get_bookmarks": [
@@ -217,6 +292,15 @@
         "title": "Test",
         "note": "",
         "created_at": "2025-11-28T11:08:28.882502"
+      },
+      {
+        "id": "1909eda3d882",
+        "book_id": "test_book_get_bookmarks",
+        "chapter_index": 0,
+        "scroll_position": 0.1,
+        "title": "Test",
+        "note": "",
+        "created_at": "2025-11-28T14:59:31.294386"
       }
     ],
     "test_book_delete_bookmark": [],
@@ -247,6 +331,15 @@
         "title": "Export test",
         "note": "Note",
         "created_at": "2025-11-28T11:08:28.904962"
+      },
+      {
+        "id": "2ae616dfc218",
+        "book_id": "test_book_export",
+        "chapter_index": 0,
+        "scroll_position": 0.5,
+        "title": "Export test",
+        "note": "Note",
+        "created_at": "2025-11-28T14:59:31.317247"
       }
     ]
   },
@@ -255,7 +348,7 @@
       "book_id": "test_book_progress_123",
       "chapter_index": 5,
       "scroll_position": 0.45,
-      "last_read": "2025-11-28T11:08:28.876845",
+      "last_read": "2025-11-28T14:59:31.288377",
       "total_chapters": 10,
       "reading_time_seconds": 0
     }

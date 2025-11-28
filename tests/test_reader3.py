@@ -2,8 +2,6 @@
 Tests for Reader3 core functionality.
 """
 
-import pytest
-from dataclasses import dataclass
 from reader3 import (
     Book,
     BookMetadata,
