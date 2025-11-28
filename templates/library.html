@@ -109,6 +109,59 @@
             background: #c0392b;
             box-shadow: 0 4px 8px rgba(231, 76, 60, 0.3);
         }
+
+        /* Search */
+        .search-bar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .search-input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1em;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .search-input:focus {
+            border-color: #3498db;
+        }
+        .search-btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        .search-btn:hover {
+            background: #2980b9;
+        }
+        .search-results {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+        .search-result {
+            padding: 15px 20px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .search-result:last-child { border-bottom: none; }
+        .search-result:hover { background: #f5f5f5; }
+        .search-result-book { font-weight: 600; color: #333; margin-bottom: 4px; }
+        .search-result-chapter { font-size: 0.85em; color: #888; margin-bottom: 6px; }
+        .search-result-context { font-size: 0.9em; color: #555; }
+        .search-result-context mark { background: #ffeb3b; padding: 0 2px; border-radius: 2px; }
+        .no-results { text-align: center; padding: 30px; color: #999; }
+        .reading-progress-bar { height: 4px; background: #e0e0e0; border-radius: 2px; margin-top: 10px; overflow: hidden; }
+        .reading-progress-fill { height: 100%; background: linear-gradient(90deg, #3498db, #9b59b6); transition: width 0.3s; }
     </style>
 </head>
 
@@ -117,6 +170,13 @@
         <div class="library-header">
             <h1>Library</h1>
         </div>
+
+        <!-- Global Search -->
+        <div class="search-bar">
+            <input type="text" class="search-input" id="global-search" placeholder="Search across all books..." onkeydown="if(event.key==='Enter')performGlobalSearch()">
+            <button class="search-btn" onclick="performGlobalSearch()">🔍 Search</button>
+        </div>
+        <div id="search-results-container" style="display: none;"></div>
 
         <div class="upload-section"
             style="background: white; padding: 20px; border-radius: 8px; margin-bottom: 30px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); border: 1px solid #f0f0f0;">
@@ -140,6 +200,9 @@
                 <div class="book-meta">
                     {{ book.author }}<br>
                     {{ book.chapters }} sections
+                </div>
+                <div class="reading-progress-bar" id="progress-{{ book.id }}">
+                    <div class="reading-progress-fill" style="width: 0%;"></div>
                 </div>
                 <div class="book-actions">
                     <a href="/read/{{ book.id }}/0" class="btn">Read</a>
@@ -170,6 +233,91 @@
                     alert('Error deleting the book.');
                 });
         }
+        
+        // Global search across all books
+        async function performGlobalSearch() {
+            const query = document.getElementById('global-search').value.trim();
+            if (!query) return;
+            
+            const container = document.getElementById('search-results-container');
+            container.style.display = 'block';
+            container.innerHTML = '<div class="search-results"><div class="no-results">Searching...</div></div>';
+            
+            try {
+                const response = await fetch(`/api/search?query=${encodeURIComponent(query)}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    renderGlobalSearchResults(data.results, query);
+                }
+            } catch (error) {
+                console.error('Search failed:', error);
+                container.innerHTML = '<div class="search-results"><div class="no-results">Search failed</div></div>';
+            }
+        }
+        
+        function renderGlobalSearchResults(results, query) {
+            const container = document.getElementById('search-results-container');
+            
+            if (results.length === 0) {
+                container.innerHTML = '<div class="search-results"><div class="no-results">No results found</div></div>';
+                return;
+            }
+            
+            const regex = new RegExp(`(${escapeRegex(query)})`, 'gi');
+            
+            container.innerHTML = `
+                <div class="search-results">
+                    <div style="padding: 10px 20px; background: #f5f5f5; font-size: 0.9em; color: #666; display: flex; justify-content: space-between; align-items: center;">
+                        <span>${results.length} result${results.length > 1 ? 's' : ''} found</span>
+                        <button onclick="clearSearch()" style="border: none; background: none; cursor: pointer; color: #999;">✕ Clear</button>
+                    </div>
+                    ${results.map(r => `
+                        <div class="search-result" onclick="window.location.href='/read/${r.book_id}/0'">
+                            <div class="search-result-book">${r.book_title || r.book_id}</div>
+                            <div class="search-result-chapter">${r.chapter_title || 'Chapter ' + (r.chapter_index + 1)}</div>
+                            <div class="search-result-context">${r.context.replace(regex, '<mark>$1</mark>')}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+        
+        function clearSearch() {
+            document.getElementById('global-search').value = '';
+            document.getElementById('search-results-container').style.display = 'none';
+        }
+        
+        function escapeRegex(string) {
+            return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        }
+        
+        // Load reading progress for all books
+        async function loadReadingProgress() {
+            const books = document.querySelectorAll('.book-card');
+            for (const card of books) {
+                const progressBar = card.querySelector('.reading-progress-bar');
+                if (!progressBar) continue;
+                
+                const bookId = progressBar.id.replace('progress-', '');
+                try {
+                    const response = await fetch(`/api/progress/${encodeURIComponent(bookId)}`);
+                    if (response.ok) {
+                        const progress = await response.json();
+                        if (progress && progress.progress_percent > 0) {
+                            const fill = progressBar.querySelector('.reading-progress-fill');
+                            if (fill) {
+                                fill.style.width = progress.progress_percent + '%';
+                            }
+                        }
+                    }
+                } catch (error) {
+                    // Ignore errors for individual books
+                }
+            }
+        }
+        
+        // Load progress on page load
+        document.addEventListener('DOMContentLoaded', loadReadingProgress);
     </script>
     </div>
 </body>

@@ -88,9 +88,89 @@
         #copy-toast.success { background: #27ae60; }
         #copy-toast.error { background: #e74c3c; }
 
+        /* Highlights */
+        .highlight-yellow { background-color: rgba(255, 235, 59, 0.4); }
+        .highlight-green { background-color: rgba(76, 175, 80, 0.3); }
+        .highlight-blue { background-color: rgba(33, 150, 243, 0.3); }
+        .highlight-pink { background-color: rgba(233, 30, 99, 0.3); }
+        .highlight-purple { background-color: rgba(156, 39, 176, 0.3); }
+        .highlight-mark { cursor: pointer; border-radius: 2px; transition: all 0.2s; }
+        .highlight-mark:hover { filter: brightness(0.9); }
+        
+        /* Highlight color picker in toolbar */
+        .highlight-colors { display: flex; gap: 4px; align-items: center; }
+        .highlight-color-btn { width: 20px; height: 20px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; transition: all 0.2s; }
+        .highlight-color-btn:hover { transform: scale(1.2); }
+        .highlight-color-btn.yellow { background: #ffeb3b; }
+        .highlight-color-btn.green { background: #4caf50; }
+        .highlight-color-btn.blue { background: #2196f3; }
+        .highlight-color-btn.pink { background: #e91e63; }
+        .highlight-color-btn.purple { background: #9c27b0; }
+        
+        /* Bookmarks panel */
+        #bookmarks-panel { position: fixed; top: 60px; right: -350px; width: 320px; height: calc(100vh - 80px); background: #fff; border-left: 1px solid #ddd; box-shadow: -4px 0 12px rgba(0,0,0,0.1); z-index: 999; transition: right 0.3s ease; overflow-y: auto; padding: 20px; font-family: -apple-system, sans-serif; }
+        #bookmarks-panel.visible { right: 0; }
+        .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid #eee; }
+        .panel-title { font-size: 1.1em; font-weight: 600; color: #333; }
+        .panel-close { background: none; border: none; font-size: 1.5em; cursor: pointer; color: #999; }
+        .panel-tabs { display: flex; gap: 10px; margin-bottom: 15px; }
+        .panel-tab { padding: 8px 16px; border: none; background: #f0f0f0; border-radius: 20px; cursor: pointer; font-size: 0.85em; transition: all 0.2s; }
+        .panel-tab.active { background: #3498db; color: #fff; }
+        .bookmark-item, .highlight-item { padding: 12px; background: #f9f9f9; border-radius: 6px; margin-bottom: 10px; position: relative; }
+        .bookmark-item:hover, .highlight-item:hover { background: #f0f0f0; }
+        .bookmark-title { font-weight: 500; color: #333; margin-bottom: 4px; cursor: pointer; }
+        .bookmark-meta { font-size: 0.8em; color: #888; }
+        .bookmark-note { font-size: 0.85em; color: #666; margin-top: 6px; font-style: italic; }
+        .bookmark-actions { position: absolute; top: 8px; right: 8px; display: flex; gap: 4px; }
+        .bookmark-action-btn { background: none; border: none; cursor: pointer; font-size: 0.9em; opacity: 0.6; }
+        .bookmark-action-btn:hover { opacity: 1; }
+        .highlight-text { font-size: 0.9em; color: #555; margin-bottom: 6px; padding: 8px; border-radius: 4px; }
+        
+        /* Search modal */
+        #search-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1100; }
+        #search-modal.visible { display: flex; justify-content: center; align-items: flex-start; padding-top: 80px; }
+        .search-container { background: #fff; width: 600px; max-width: 90%; max-height: 80vh; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.3); overflow: hidden; }
+        .search-header { padding: 20px; border-bottom: 1px solid #eee; }
+        .search-input-wrapper { display: flex; gap: 10px; }
+        .search-input { flex: 1; padding: 12px 16px; border: 2px solid #ddd; border-radius: 8px; font-size: 1em; outline: none; transition: border-color 0.2s; }
+        .search-input:focus { border-color: #3498db; }
+        .search-btn { background: #3498db; color: #fff; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-weight: 500; }
+        .search-btn:hover { background: #2980b9; }
+        .search-results { max-height: 60vh; overflow-y: auto; padding: 10px 20px 20px; }
+        .search-result { padding: 15px; border-bottom: 1px solid #eee; cursor: pointer; transition: background 0.2s; }
+        .search-result:hover { background: #f5f5f5; }
+        .search-result-title { font-weight: 500; color: #333; margin-bottom: 4px; }
+        .search-result-chapter { font-size: 0.85em; color: #888; margin-bottom: 6px; }
+        .search-result-context { font-size: 0.9em; color: #555; }
+        .search-result-context mark { background: #ffeb3b; padding: 0 2px; border-radius: 2px; }
+        .search-history { padding: 10px 0; }
+        .search-history-title { font-size: 0.85em; color: #888; margin-bottom: 10px; }
+        .search-history-item { display: inline-block; padding: 6px 12px; background: #f0f0f0; border-radius: 20px; margin: 4px; cursor: pointer; font-size: 0.85em; }
+        .search-history-item:hover { background: #e0e0e0; }
+        
+        /* Reading progress indicator */
+        #reading-progress { position: fixed; top: 0; left: 0; width: 100%; height: 3px; background: #e0e0e0; z-index: 1000; }
+        #reading-progress-bar { height: 100%; background: linear-gradient(90deg, #3498db, #9b59b6); transition: width 0.1s; width: 0%; }
+        
+        /* Resume reading banner */
+        #resume-banner { display: none; position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #fff; padding: 15px 25px; border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); z-index: 100; font-family: -apple-system, sans-serif; }
+        #resume-banner.visible { display: flex; align-items: center; gap: 15px; }
+        .resume-text { font-size: 0.9em; color: #555; }
+        .resume-btn { background: #3498db; color: #fff; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; font-size: 0.85em; }
+        .resume-dismiss { background: none; border: none; color: #999; cursor: pointer; font-size: 1.2em; }
+        
+        /* Lazy load placeholder for images */
+        .lazy-image { background: #f0f0f0; min-height: 200px; display: flex; align-items: center; justify-content: center; color: #999; }
+        .lazy-image.loaded { min-height: auto; background: none; }
+
     </style>
 </head>
 <body class="{{ 'is-pdf' if is_pdf else '' }}">
+
+    <!-- Reading progress bar at top -->
+    <div id="reading-progress">
+        <div id="reading-progress-bar"></div>
+    </div>
 
     <!-- PDF progress bar -->
     {% if is_pdf %}
@@ -102,6 +182,14 @@
     <!-- Selection floating toolbar -->
     <div id="selection-toolbar">
         <span class="selection-count" id="selection-char-count"></span>
+        <div class="highlight-colors">
+            <button class="highlight-color-btn yellow" onclick="highlightSelection('yellow')" title="Highlight yellow"></button>
+            <button class="highlight-color-btn green" onclick="highlightSelection('green')" title="Highlight green"></button>
+            <button class="highlight-color-btn blue" onclick="highlightSelection('blue')" title="Highlight blue"></button>
+            <button class="highlight-color-btn pink" onclick="highlightSelection('pink')" title="Highlight pink"></button>
+            <button class="highlight-color-btn purple" onclick="highlightSelection('purple')" title="Highlight purple"></button>
+        </div>
+        <button onclick="addBookmark()" title="Bookmark this passage">🔖 Bookmark</button>
         <button onclick="copySelectedText()" title="Copy selected text">📋 Copy</button>
         <button onclick="appendToClipboard()" title="Add to existing clipboard">➕ Add to Batch</button>
         <button onclick="clearSelection()" title="Clear selection">✕</button>
@@ -109,6 +197,46 @@
     
     <!-- Copy toast notification -->
     <div id="copy-toast"></div>
+    
+    <!-- Resume reading banner -->
+    <div id="resume-banner">
+        <span class="resume-text">Continue reading from where you left off?</span>
+        <button class="resume-btn" onclick="resumeReading()">Resume</button>
+        <button class="resume-dismiss" onclick="dismissResume()">✕</button>
+    </div>
+    
+    <!-- Bookmarks/Highlights Panel -->
+    <div id="bookmarks-panel">
+        <div class="panel-header">
+            <span class="panel-title">📚 Your Notes</span>
+            <button class="panel-close" onclick="toggleBookmarksPanel()">✕</button>
+        </div>
+        <div class="panel-tabs">
+            <button class="panel-tab active" onclick="showPanelTab('bookmarks')">Bookmarks</button>
+            <button class="panel-tab" onclick="showPanelTab('highlights')">Highlights</button>
+        </div>
+        <div id="bookmarks-list"></div>
+        <div id="highlights-list" style="display:none;"></div>
+        <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #eee;">
+            <button onclick="exportNotes('json')" style="padding: 8px 16px; margin-right: 8px; border: 1px solid #ddd; background: #fff; border-radius: 4px; cursor: pointer;">Export JSON</button>
+            <button onclick="exportNotes('markdown')" style="padding: 8px 16px; border: 1px solid #ddd; background: #fff; border-radius: 4px; cursor: pointer;">Export Markdown</button>
+        </div>
+    </div>
+    
+    <!-- Search Modal -->
+    <div id="search-modal">
+        <div class="search-container">
+            <div class="search-header">
+                <div class="search-input-wrapper">
+                    <input type="text" class="search-input" id="search-input" placeholder="Search in this book..." onkeydown="if(event.key==='Enter')performSearch()">
+                    <button class="search-btn" onclick="performSearch()">🔍 Search</button>
+                </div>
+            </div>
+            <div class="search-results" id="search-results">
+                <div class="search-history" id="search-history"></div>
+            </div>
+        </div>
+    </div>
     
     <!-- PDF floating page indicator -->
     {% if is_pdf %}
@@ -125,6 +253,12 @@
     <div id="sidebar">
         <a href="/" class="nav-home">← Back to Library</a>
         <div class="nav-header">{{ book.metadata.title }}</div>
+        
+        <!-- Quick actions toolbar -->
+        <div style="display: flex; gap: 8px; padding: 10px 15px; border-bottom: 1px solid #eee;">
+            <button onclick="openSearch()" style="flex: 1; padding: 8px; border: 1px solid #ddd; background: #fff; border-radius: 4px; cursor: pointer; font-size: 0.85em;" title="Search (Ctrl/⌘+F)">🔍 Search</button>
+            <button onclick="toggleBookmarksPanel()" style="flex: 1; padding: 8px; border: 1px solid #ddd; background: #fff; border-radius: 4px; cursor: pointer; font-size: 0.85em;" title="Bookmarks & Highlights">📚 Notes</button>
+        </div>
 
         <!-- Recursive Macro for TOC -->
         {% macro render_toc(items) %}
@@ -234,6 +368,550 @@
         // Batch clipboard for collecting multiple text selections
         let batchClipboard = [];
         let isSelectionMode = false;
+        
+        // User data: bookmarks, highlights, reading progress
+        let userBookmarks = [];
+        let userHighlights = [];
+        let savedProgress = null;
+        let searchHistory = [];
+        
+        // ===== USER DATA API FUNCTIONS =====
+        
+        async function loadUserData() {
+            try {
+                // Load bookmarks
+                const bookmarksRes = await fetch(`/api/bookmarks/${encodeURIComponent(bookId)}`);
+                if (bookmarksRes.ok) {
+                    const bookmarksData = await bookmarksRes.json();
+                    userBookmarks = bookmarksData.bookmarks || [];
+                }
+                
+                // Load highlights
+                const highlightsRes = await fetch(`/api/highlights/${encodeURIComponent(bookId)}`);
+                if (highlightsRes.ok) {
+                    const highlightsData = await highlightsRes.json();
+                    userHighlights = highlightsData.highlights || [];
+                    applyHighlights();
+                }
+                
+                // Load reading progress
+                const progressRes = await fetch(`/api/progress/${encodeURIComponent(bookId)}`);
+                if (progressRes.ok) {
+                    savedProgress = await progressRes.json();
+                    checkShowResumeBanner();
+                }
+                
+                // Load search history
+                const historyRes = await fetch('/api/search/history');
+                if (historyRes.ok) {
+                    const historyData = await historyRes.json();
+                    searchHistory = (historyData.history || []).slice(0, 10);
+                }
+                
+                // Render panels
+                renderBookmarksList();
+                renderHighlightsList();
+                renderSearchHistory();
+            } catch (error) {
+                console.error('Failed to load user data:', error);
+            }
+        }
+        
+        // ===== READING PROGRESS =====
+        
+        function updateReadingProgress() {
+            const scrollTop = window.scrollY;
+            const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+            const progress = docHeight > 0 ? (scrollTop / docHeight) * 100 : 0;
+            
+            const progressBar = document.getElementById('reading-progress-bar');
+            if (progressBar) {
+                progressBar.style.width = progress + '%';
+            }
+            
+            return progress;
+        }
+        
+        let progressSaveTimeout = null;
+        async function saveReadingProgress() {
+            if (progressSaveTimeout) clearTimeout(progressSaveTimeout);
+            
+            progressSaveTimeout = setTimeout(async () => {
+                const progress = updateReadingProgress();
+                const scrollPosition = window.scrollY;
+                
+                try {
+                    await fetch(`/api/progress/${encodeURIComponent(bookId)}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            chapter_index: currentPageIndex,
+                            scroll_position: scrollPosition,
+                            progress_percent: progress
+                        })
+                    });
+                } catch (error) {
+                    console.error('Failed to save progress:', error);
+                }
+            }, 1000);
+        }
+        
+        function checkShowResumeBanner() {
+            if (savedProgress && savedProgress.scroll_position > 100) {
+                const banner = document.getElementById('resume-banner');
+                if (banner) {
+                    banner.classList.add('visible');
+                }
+            }
+        }
+        
+        function resumeReading() {
+            if (savedProgress) {
+                window.scrollTo({ top: savedProgress.scroll_position, behavior: 'smooth' });
+            }
+            dismissResume();
+        }
+        
+        function dismissResume() {
+            const banner = document.getElementById('resume-banner');
+            if (banner) {
+                banner.classList.remove('visible');
+            }
+        }
+        
+        // ===== BOOKMARKS =====
+        
+        async function addBookmark() {
+            const selection = window.getSelection();
+            const text = selection.toString().trim();
+            
+            if (!text) {
+                showToast('Select text to bookmark', 'error');
+                return;
+            }
+            
+            const note = prompt('Add a note (optional):');
+            
+            try {
+                const response = await fetch(`/api/bookmarks/${encodeURIComponent(bookId)}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        chapter_index: currentPageIndex,
+                        scroll_position: window.scrollY / document.documentElement.scrollHeight,
+                        title: text.substring(0, 100),
+                        note: note || ''
+                    })
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    // Reload bookmarks to get full data
+                    await loadBookmarksFromServer();
+                    renderBookmarksList();
+                    showToast('Bookmark added! 🔖');
+                    hideSelectionToolbar();
+                } else {
+                    showToast('Failed to add bookmark', 'error');
+                }
+            } catch (error) {
+                console.error('Failed to add bookmark:', error);
+                showToast('Failed to add bookmark', 'error');
+            }
+        }
+        
+        async function loadBookmarksFromServer() {
+            try {
+                const response = await fetch(`/api/bookmarks/${encodeURIComponent(bookId)}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    userBookmarks = data.bookmarks || [];
+                }
+            } catch (error) {
+                console.error('Failed to load bookmarks:', error);
+            }
+        }
+        
+        async function deleteBookmark(id) {
+            try {
+                await fetch(`/api/bookmarks/${encodeURIComponent(bookId)}/${id}`, {
+                    method: 'DELETE'
+                });
+                userBookmarks = userBookmarks.filter(b => b.id !== id);
+                renderBookmarksList();
+                showToast('Bookmark removed');
+            } catch (error) {
+                console.error('Failed to delete bookmark:', error);
+            }
+        }
+        
+        function goToBookmark(bookmark) {
+            // scroll_position is 0-1, convert to pixels
+            const scrollPos = bookmark.scroll_position * document.documentElement.scrollHeight;
+            window.scrollTo({ top: scrollPos, behavior: 'smooth' });
+            toggleBookmarksPanel();
+        }
+        
+        function renderBookmarksList() {
+            const list = document.getElementById('bookmarks-list');
+            if (!list) return;
+            
+            if (userBookmarks.length === 0) {
+                list.innerHTML = '<p style="color: #999; font-size: 0.9em; text-align: center; padding: 20px;">No bookmarks yet. Select text and click 🔖 to add one.</p>';
+                return;
+            }
+            
+            list.innerHTML = userBookmarks.map(b => `
+                <div class="bookmark-item">
+                    <div class="bookmark-actions">
+                        <button class="bookmark-action-btn" onclick="deleteBookmark('${b.id}')" title="Delete">🗑️</button>
+                    </div>
+                    <div class="bookmark-title" onclick="goToBookmark(${JSON.stringify(b).replace(/"/g, '&quot;')})">"${escapeHtml(b.title || 'Bookmark')}"</div>
+                    <div class="bookmark-meta">Chapter ${b.chapter_index + 1} • ${new Date(b.created_at).toLocaleDateString()}</div>
+                    ${b.note ? `<div class="bookmark-note">${escapeHtml(b.note)}</div>` : ''}
+                </div>
+            `).join('');
+        }
+        
+        // ===== HIGHLIGHTS =====
+        
+        async function highlightSelection(color) {
+            const selection = window.getSelection();
+            const text = selection.toString().trim();
+            
+            if (!text) {
+                showToast('Select text to highlight', 'error');
+                return;
+            }
+            
+            // Get selection range info for restoration
+            const range = selection.getRangeAt(0);
+            const startContainer = getXPath(range.startContainer);
+            const endContainer = getXPath(range.endContainer);
+            
+            try {
+                const response = await fetch(`/api/highlights/${encodeURIComponent(bookId)}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        chapter_index: currentPageIndex,
+                        text: text.substring(0, 1000),
+                        color: color,
+                        start_offset: range.startOffset,
+                        end_offset: range.endOffset,
+                        note: ''
+                    })
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    // Reload highlights to get full data
+                    await loadHighlightsFromServer();
+                    
+                    // Apply visual highlight
+                    applyHighlightToRange(range, color, result.id);
+                    
+                    renderHighlightsList();
+                    showToast(`Highlighted in ${color}! ✨`);
+                    hideSelectionToolbar();
+                    selection.removeAllRanges();
+                } else {
+                    showToast('Failed to add highlight', 'error');
+                }
+            } catch (error) {
+                console.error('Failed to add highlight:', error);
+                showToast('Failed to add highlight', 'error');
+            }
+        }
+        
+        async function loadHighlightsFromServer() {
+            try {
+                const response = await fetch(`/api/highlights/${encodeURIComponent(bookId)}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    userHighlights = data.highlights || [];
+                }
+            } catch (error) {
+                console.error('Failed to load highlights:', error);
+            }
+        }
+        
+        function applyHighlightToRange(range, color, id) {
+            const span = document.createElement('span');
+            span.className = `highlight-mark highlight-${color}`;
+            span.dataset.highlightId = id;
+            span.onclick = () => showHighlightMenu(id);
+            
+            try {
+                range.surroundContents(span);
+            } catch (e) {
+                // Complex selection - fall back to simple text marking
+                const text = range.toString();
+                const mark = document.createElement('mark');
+                mark.className = `highlight-mark highlight-${color}`;
+                mark.dataset.highlightId = id;
+                mark.textContent = text;
+                range.deleteContents();
+                range.insertNode(mark);
+            }
+        }
+        
+        function applyHighlights() {
+            // Re-apply highlights on page load
+            userHighlights.forEach(h => {
+                if (h.chapter_index !== currentPageIndex) return;
+                
+                // Find and highlight the text
+                const content = document.getElementById('content');
+                if (!content) return;
+                
+                const textToFind = h.text.substring(0, 50);
+                const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT);
+                
+                while (walker.nextNode()) {
+                    const node = walker.currentNode;
+                    const idx = node.textContent.indexOf(textToFind);
+                    if (idx !== -1) {
+                        const range = document.createRange();
+                        range.setStart(node, idx);
+                        range.setEnd(node, Math.min(idx + h.text.length, node.textContent.length));
+                        applyHighlightToRange(range, h.color, h.id);
+                        break;
+                    }
+                }
+            });
+        }
+        
+        function showHighlightMenu(id) {
+            if (confirm('Delete this highlight?')) {
+                deleteHighlight(id);
+            }
+        }
+        
+        async function deleteHighlight(id) {
+            try {
+                await fetch(`/api/highlights/${encodeURIComponent(bookId)}/${id}`, {
+                    method: 'DELETE'
+                });
+                
+                // Remove visual highlight
+                const el = document.querySelector(`[data-highlight-id="${id}"]`);
+                if (el) {
+                    const parent = el.parentNode;
+                    parent.replaceChild(document.createTextNode(el.textContent), el);
+                    parent.normalize();
+                }
+                
+                userHighlights = userHighlights.filter(h => h.id !== id);
+                renderHighlightsList();
+                showToast('Highlight removed');
+            } catch (error) {
+                console.error('Failed to delete highlight:', error);
+            }
+        }
+        
+        function renderHighlightsList() {
+            const list = document.getElementById('highlights-list');
+            if (!list) return;
+            
+            if (userHighlights.length === 0) {
+                list.innerHTML = '<p style="color: #999; font-size: 0.9em; text-align: center; padding: 20px;">No highlights yet. Select text and choose a color to highlight.</p>';
+                return;
+            }
+            
+            list.innerHTML = userHighlights.map(h => `
+                <div class="highlight-item">
+                    <div class="bookmark-actions">
+                        <button class="bookmark-action-btn" onclick="deleteHighlight('${h.id}')" title="Delete">🗑️</button>
+                    </div>
+                    <div class="highlight-text highlight-${h.color}">"${escapeHtml((h.text || '').substring(0, 150))}${(h.text || '').length > 150 ? '...' : ''}"</div>
+                    <div class="bookmark-meta">Chapter ${h.chapter_index + 1} • ${new Date(h.created_at).toLocaleDateString()}</div>
+                </div>
+            `).join('');
+        }
+        
+        // ===== BOOKMARKS PANEL =====
+        
+        function toggleBookmarksPanel() {
+            const panel = document.getElementById('bookmarks-panel');
+            if (panel) {
+                panel.classList.toggle('visible');
+            }
+        }
+        
+        function showPanelTab(tab) {
+            const tabs = document.querySelectorAll('.panel-tab');
+            tabs.forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            const bookmarksList = document.getElementById('bookmarks-list');
+            const highlightsList = document.getElementById('highlights-list');
+            
+            if (tab === 'bookmarks') {
+                bookmarksList.style.display = 'block';
+                highlightsList.style.display = 'none';
+            } else {
+                bookmarksList.style.display = 'none';
+                highlightsList.style.display = 'block';
+            }
+        }
+        
+        async function exportNotes(format) {
+            try {
+                const response = await fetch(`/api/export/${encodeURIComponent(bookId)}?format=${format}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    const content = data.content;
+                    const filename = `${bookId}_notes.${format === 'markdown' ? 'md' : 'json'}`;
+                    
+                    const blob = new Blob([content], { type: 'text/plain' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = filename;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    
+                    showToast('Notes exported! 📁');
+                }
+            } catch (error) {
+                console.error('Export failed:', error);
+                showToast('Export failed', 'error');
+            }
+        }
+        
+        // ===== SEARCH =====
+        
+        function openSearch() {
+            const modal = document.getElementById('search-modal');
+            if (modal) {
+                modal.classList.add('visible');
+                document.getElementById('search-input').focus();
+            }
+        }
+        
+        function closeSearch() {
+            const modal = document.getElementById('search-modal');
+            if (modal) {
+                modal.classList.remove('visible');
+            }
+        }
+        
+        async function performSearch() {
+            const query = document.getElementById('search-input').value.trim();
+            if (!query) return;
+            
+            const resultsContainer = document.getElementById('search-results');
+            resultsContainer.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">Searching...</p>';
+            
+            try {
+                const response = await fetch(`/api/search?query=${encodeURIComponent(query)}&book_id=${encodeURIComponent(bookId)}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    // Add to history
+                    if (!searchHistory.includes(query)) {
+                        searchHistory.unshift(query);
+                        searchHistory = searchHistory.slice(0, 10);
+                    }
+                    
+                    renderSearchResults(data.results, query);
+                }
+            } catch (error) {
+                console.error('Search failed:', error);
+                resultsContainer.innerHTML = '<p style="text-align: center; color: #e74c3c; padding: 20px;">Search failed</p>';
+            }
+        }
+        
+        function renderSearchResults(results, query) {
+            const container = document.getElementById('search-results');
+            
+            if (results.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">No results found</p>';
+                return;
+            }
+            
+            const regex = new RegExp(`(${escapeRegex(query)})`, 'gi');
+            
+            container.innerHTML = results.map(r => `
+                <div class="search-result" onclick="goToSearchResult('${r.chapter_href}', '${encodeURIComponent(query)}')">
+                    <div class="search-result-chapter">${r.chapter_title || 'Chapter ' + (r.chapter_index + 1)}</div>
+                    <div class="search-result-context">${r.context.replace(regex, '<mark>$1</mark>')}</div>
+                </div>
+            `).join('');
+        }
+        
+        function goToSearchResult(href, query) {
+            closeSearch();
+            // Find and scroll to the text
+            const content = document.getElementById('content');
+            if (content) {
+                const decodedQuery = decodeURIComponent(query);
+                const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT);
+                
+                while (walker.nextNode()) {
+                    const node = walker.currentNode;
+                    if (node.textContent.toLowerCase().includes(decodedQuery.toLowerCase())) {
+                        const range = document.createRange();
+                        range.selectNode(node);
+                        const rect = range.getBoundingClientRect();
+                        window.scrollTo({ top: window.scrollY + rect.top - 100, behavior: 'smooth' });
+                        
+                        // Temporary highlight
+                        const span = document.createElement('span');
+                        span.style.background = '#ffeb3b';
+                        span.style.transition = 'background 2s';
+                        range.surroundContents(span);
+                        setTimeout(() => span.style.background = 'transparent', 2000);
+                        break;
+                    }
+                }
+            }
+        }
+        
+        function searchFromHistory(query) {
+            document.getElementById('search-input').value = query;
+            performSearch();
+        }
+        
+        function renderSearchHistory() {
+            const container = document.getElementById('search-history');
+            if (!container || searchHistory.length === 0) return;
+            
+            container.innerHTML = `
+                <div class="search-history-title">Recent searches</div>
+                ${searchHistory.map(h => `<span class="search-history-item" onclick="searchFromHistory('${escapeHtml(h.query || h)}')">${escapeHtml(h.query || h)}</span>`).join('')}
+            `;
+        }
+        
+        // ===== UTILITY FUNCTIONS =====
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        function escapeRegex(string) {
+            return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        }
+        
+        function getXPath(node) {
+            if (node.nodeType === Node.TEXT_NODE) {
+                return getXPath(node.parentNode) + '/text()';
+            }
+            if (node === document.body) return '/html/body';
+            
+            let position = 1;
+            let sibling = node.previousSibling;
+            while (sibling) {
+                if (sibling.nodeType === Node.ELEMENT_NODE && sibling.tagName === node.tagName) {
+                    position++;
+                }
+                sibling = sibling.previousSibling;
+            }
+            return getXPath(node.parentNode) + '/' + node.tagName.toLowerCase() + '[' + position + ']';
+        }
         
         // Toast notification system
         function showToast(message, type = 'success') {
@@ -793,6 +1471,12 @@
             restoreScrollPosition();
             // Then ensure active chapter is visible
             setTimeout(scrollActiveChapterIntoView, 100);
+            
+            // Load user data (bookmarks, highlights, progress)
+            loadUserData();
+            
+            // Update reading progress bar on scroll
+            updateReadingProgress();
         });
 
         // Save scroll position on navigation buttons (Previous/Next)
@@ -800,6 +1484,38 @@
             const navButtons = document.querySelectorAll('.nav-btn:not(.disabled)');
             navButtons.forEach(button => {
                 button.addEventListener('click', saveScrollPosition);
+            });
+            
+            // Add scroll listener for reading progress
+            window.addEventListener('scroll', () => {
+                updateReadingProgress();
+                saveReadingProgress();
+            });
+            
+            // Close search modal on escape
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    closeSearch();
+                    const panel = document.getElementById('bookmarks-panel');
+                    if (panel) panel.classList.remove('visible');
+                }
+                // Ctrl/Cmd + F for search
+                if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+                    e.preventDefault();
+                    openSearch();
+                }
+                // Ctrl/Cmd + B for bookmarks
+                if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+                    e.preventDefault();
+                    toggleBookmarksPanel();
+                }
+            });
+            
+            // Close search modal when clicking outside
+            document.getElementById('search-modal').addEventListener('click', (e) => {
+                if (e.target.id === 'search-modal') {
+                    closeSearch();
+                }
             });
         });
     </script>

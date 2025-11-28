@@ -1,15 +1,21 @@
 import os
 import pickle
+import re
 from functools import lru_cache
-from typing import Optional
+from typing import Optional, List
 
 import shutil
 from fastapi import FastAPI, Request, HTTPException, UploadFile, File
-from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
 
 from reader3 import Book, BookMetadata, ChapterContent, TOCEntry, process_epub, save_to_pickle
+from user_data import (
+    UserDataManager, Highlight, Bookmark, ReadingProgress, 
+    SearchQuery, generate_id
+)
 
 import sys
 
@@ -41,6 +47,9 @@ elif getattr(sys, 'frozen', False):
         BOOKS_DIR = os.path.dirname(executable_path)
 else:
     BOOKS_DIR = "."
+
+# Initialize user data manager
+user_data_manager = UserDataManager(BOOKS_DIR)
 
 print(f"Books directory: {BOOKS_DIR}")
 print(f"Templates directory: {templates_dir}")
@@ -242,10 +251,330 @@ async def delete_book(book_id: str):
         shutil.rmtree(book_path)
         # Clear the cache
         load_book_cached.cache_clear()
+        # Clean up user data for this book
+        user_data_manager.cleanup_book_data(safe_book_id)
         return {"status": "deleted"}
     except Exception as e:
         print(f"Error deleting book {safe_book_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to delete book: {str(e)}")
+
+
+# ============================================================================
+# Reading Progress API
+# ============================================================================
+
+@app.get("/api/progress/{book_id}")
+async def get_reading_progress(book_id: str):
+    """Get reading progress for a book."""
+    progress = user_data_manager.get_progress(book_id)
+    if progress:
+        return {
+            "book_id": progress.book_id,
+            "chapter_index": progress.chapter_index,
+            "scroll_position": progress.scroll_position,
+            "last_read": progress.last_read,
+            "total_chapters": progress.total_chapters,
+            "reading_time_seconds": progress.reading_time_seconds
+        }
+    return {"book_id": book_id, "chapter_index": 0, "scroll_position": 0.0}
+
+
+@app.post("/api/progress/{book_id}")
+async def save_reading_progress(book_id: str, request: Request):
+    """Save reading progress for a book."""
+    data = await request.json()
+    
+    progress = ReadingProgress(
+        book_id=book_id,
+        chapter_index=data.get("chapter_index", 0),
+        scroll_position=data.get("scroll_position", 0.0),
+        total_chapters=data.get("total_chapters", 0),
+        reading_time_seconds=data.get("reading_time_seconds", 0)
+    )
+    user_data_manager.save_progress(progress)
+    return {"status": "saved"}
+
+
+# ============================================================================
+# Bookmarks API
+# ============================================================================
+
+@app.get("/api/bookmarks/{book_id}")
+async def get_bookmarks(book_id: str):
+    """Get all bookmarks for a book."""
+    bookmarks = user_data_manager.get_bookmarks(book_id)
+    return {
+        "book_id": book_id,
+        "bookmarks": [
+            {
+                "id": b.id,
+                "chapter_index": b.chapter_index,
+                "scroll_position": b.scroll_position,
+                "title": b.title,
+                "note": b.note,
+                "created_at": b.created_at
+            }
+            for b in bookmarks
+        ]
+    }
+
+
+@app.post("/api/bookmarks/{book_id}")
+async def add_bookmark(book_id: str, request: Request):
+    """Add a bookmark."""
+    data = await request.json()
+    
+    bookmark = Bookmark(
+        id=generate_id(),
+        book_id=book_id,
+        chapter_index=data.get("chapter_index", 0),
+        scroll_position=data.get("scroll_position", 0.0),
+        title=data.get("title", "Bookmark"),
+        note=data.get("note")
+    )
+    user_data_manager.add_bookmark(bookmark)
+    return {
+        "id": bookmark.id,
+        "status": "created"
+    }
+
+
+@app.delete("/api/bookmarks/{book_id}/{bookmark_id}")
+async def delete_bookmark(book_id: str, bookmark_id: str):
+    """Delete a bookmark."""
+    if user_data_manager.delete_bookmark(book_id, bookmark_id):
+        return {"status": "deleted"}
+    raise HTTPException(status_code=404, detail="Bookmark not found")
+
+
+@app.put("/api/bookmarks/{book_id}/{bookmark_id}")
+async def update_bookmark(book_id: str, bookmark_id: str, request: Request):
+    """Update a bookmark's note."""
+    data = await request.json()
+    note = data.get("note", "")
+    
+    if user_data_manager.update_bookmark_note(book_id, bookmark_id, note):
+        return {"status": "updated"}
+    raise HTTPException(status_code=404, detail="Bookmark not found")
+
+
+# ============================================================================
+# Highlights API
+# ============================================================================
+
+@app.get("/api/highlights/{book_id}")
+async def get_highlights(book_id: str, chapter: int = None):
+    """Get highlights for a book, optionally filtered by chapter."""
+    highlights = user_data_manager.get_highlights(book_id, chapter)
+    return {
+        "book_id": book_id,
+        "highlights": [
+            {
+                "id": h.id,
+                "chapter_index": h.chapter_index,
+                "text": h.text,
+                "color": h.color,
+                "note": h.note,
+                "start_offset": h.start_offset,
+                "end_offset": h.end_offset,
+                "created_at": h.created_at
+            }
+            for h in highlights
+        ]
+    }
+
+
+@app.post("/api/highlights/{book_id}")
+async def add_highlight(book_id: str, request: Request):
+    """Add a highlight."""
+    data = await request.json()
+    
+    highlight = Highlight(
+        id=generate_id(),
+        book_id=book_id,
+        chapter_index=data.get("chapter_index", 0),
+        text=data.get("text", ""),
+        color=data.get("color", "yellow"),
+        note=data.get("note"),
+        start_offset=data.get("start_offset", 0),
+        end_offset=data.get("end_offset", 0)
+    )
+    user_data_manager.add_highlight(highlight)
+    return {
+        "id": highlight.id,
+        "status": "created"
+    }
+
+
+@app.delete("/api/highlights/{book_id}/{highlight_id}")
+async def delete_highlight(book_id: str, highlight_id: str):
+    """Delete a highlight."""
+    if user_data_manager.delete_highlight(book_id, highlight_id):
+        return {"status": "deleted"}
+    raise HTTPException(status_code=404, detail="Highlight not found")
+
+
+@app.put("/api/highlights/{book_id}/{highlight_id}")
+async def update_highlight(book_id: str, highlight_id: str, request: Request):
+    """Update a highlight's note."""
+    data = await request.json()
+    note = data.get("note", "")
+    
+    if user_data_manager.update_highlight_note(book_id, highlight_id, note):
+        return {"status": "updated"}
+    raise HTTPException(status_code=404, detail="Highlight not found")
+
+
+# ============================================================================
+# Search API
+# ============================================================================
+
+@app.get("/api/search")
+async def search_books(q: str, book_id: str = None):
+    """
+    Search for text across all books or within a specific book.
+    Returns matching passages with context.
+    """
+    if not q or len(q) < 2:
+        return {"results": [], "query": q}
+    
+    results = []
+    query_lower = q.lower()
+    
+    # Determine which books to search
+    if book_id:
+        book_ids = [book_id]
+    else:
+        # Search all books
+        book_ids = []
+        if os.path.exists(BOOKS_DIR):
+            for item in os.listdir(BOOKS_DIR):
+                item_path = os.path.join(BOOKS_DIR, item)
+                if item.endswith("_data") and os.path.isdir(item_path):
+                    book_ids.append(item)
+    
+    for bid in book_ids:
+        book = load_book_cached(bid)
+        if not book:
+            continue
+        
+        for idx, chapter in enumerate(book.spine):
+            # Search in plain text
+            text = chapter.text if hasattr(chapter, 'text') else ""
+            text_lower = text.lower()
+            
+            # Find all occurrences
+            start = 0
+            while True:
+                pos = text_lower.find(query_lower, start)
+                if pos == -1:
+                    break
+                
+                # Extract context (100 chars before and after)
+                context_start = max(0, pos - 100)
+                context_end = min(len(text), pos + len(q) + 100)
+                context = text[context_start:context_end]
+                
+                # Add ellipsis if truncated
+                if context_start > 0:
+                    context = "..." + context
+                if context_end < len(text):
+                    context = context + "..."
+                
+                results.append({
+                    "book_id": bid,
+                    "book_title": book.metadata.title,
+                    "chapter_index": idx,
+                    "chapter_title": chapter.title,
+                    "context": context,
+                    "position": pos
+                })
+                
+                start = pos + 1
+                
+                # Limit results per chapter
+                if len([r for r in results if r["book_id"] == bid and r["chapter_index"] == idx]) >= 5:
+                    break
+        
+        # Limit total results
+        if len(results) >= 50:
+            break
+    
+    # Record search in history
+    search_query = SearchQuery(
+        query=q,
+        book_id=book_id,
+        results_count=len(results)
+    )
+    user_data_manager.add_search(search_query)
+    
+    return {
+        "query": q,
+        "results": results,
+        "total": len(results)
+    }
+
+
+@app.get("/api/search/history")
+async def get_search_history(limit: int = 20):
+    """Get recent search history."""
+    history = user_data_manager.get_search_history(limit)
+    return {
+        "history": [
+            {
+                "query": h.query,
+                "book_id": h.book_id,
+                "timestamp": h.timestamp,
+                "results_count": h.results_count
+            }
+            for h in history
+        ]
+    }
+
+
+@app.delete("/api/search/history")
+async def clear_search_history():
+    """Clear search history."""
+    user_data_manager.clear_search_history()
+    return {"status": "cleared"}
+
+
+# ============================================================================
+# Export API
+# ============================================================================
+
+@app.get("/api/export/{book_id}")
+async def export_book_data(book_id: str, format: str = "json"):
+    """Export highlights and bookmarks for a book."""
+    if format not in ["json", "markdown"]:
+        raise HTTPException(status_code=400, detail="Format must be 'json' or 'markdown'")
+    
+    content = user_data_manager.export_book_data(book_id, format)
+    
+    if format == "markdown":
+        return PlainTextResponse(
+            content,
+            media_type="text/markdown",
+            headers={"Content-Disposition": f"attachment; filename={book_id}_notes.md"}
+        )
+    else:
+        return PlainTextResponse(
+            content,
+            media_type="application/json",
+            headers={"Content-Disposition": f"attachment; filename={book_id}_notes.json"}
+        )
+
+
+@app.get("/api/export")
+async def export_all_data():
+    """Export all user data."""
+    content = user_data_manager.export_all_data()
+    return PlainTextResponse(
+        content,
+        media_type="application/json",
+        headers={"Content-Disposition": "attachment; filename=reader3_backup.json"}
+    )
+
 
 if __name__ == "__main__":
     import uvicorn
