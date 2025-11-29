@@ -11,7 +11,6 @@ from fastapi.responses import (
     RedirectResponse,
     PlainTextResponse,
 )
-from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from reader3 import (
@@ -63,11 +62,6 @@ else:
 
 # Initialize user data manager
 user_data_manager = UserDataManager(BOOKS_DIR)
-
-# Mount static files for PWA assets
-static_dir = os.path.join(base_resource_path, "static")
-if os.path.exists(static_dir):
-    app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 print(f"Books directory: {BOOKS_DIR}")
 print(f"Templates directory: {templates_dir}")

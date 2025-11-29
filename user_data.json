@@ -44,17 +44,6 @@
         "start_offset": 10,
         "end_offset": 25,
         "created_at": "2025-11-28T14:59:31.300912"
-      },
-      {
-        "id": "20960a806b32",
-        "book_id": "test_book_highlights_123",
-        "chapter_index": 1,
-        "text": "Highlighted text",
-        "color": "yellow",
-        "note": null,
-        "start_offset": 10,
-        "end_offset": 25,
-        "created_at": "2025-11-28T18:37:15.272892"
       }
     ],
     "test_book_highlight_colors": [
@@ -233,61 +222,6 @@
         "start_offset": 0,
         "end_offset": 0,
         "created_at": "2025-11-28T14:59:31.307211"
-      },
-      {
-        "id": "cea4ac31e36a",
-        "book_id": "test_book_highlight_colors",
-        "chapter_index": 0,
-        "text": "Text with yellow",
-        "color": "yellow",
-        "note": null,
-        "start_offset": 0,
-        "end_offset": 0,
-        "created_at": "2025-11-28T18:37:15.275114"
-      },
-      {
-        "id": "bbf4bc6bbac3",
-        "book_id": "test_book_highlight_colors",
-        "chapter_index": 0,
-        "text": "Text with green",
-        "color": "green",
-        "note": null,
-        "start_offset": 0,
-        "end_offset": 0,
-        "created_at": "2025-11-28T18:37:15.276565"
-      },
-      {
-        "id": "2aa3dece19ed",
-        "book_id": "test_book_highlight_colors",
-        "chapter_index": 0,
-        "text": "Text with blue",
-        "color": "blue",
-        "note": null,
-        "start_offset": 0,
-        "end_offset": 0,
-        "created_at": "2025-11-28T18:37:15.278086"
-      },
-      {
-        "id": "044d3ceed3c6",
-        "book_id": "test_book_highlight_colors",
-        "chapter_index": 0,
-        "text": "Text with pink",
-        "color": "pink",
-        "note": null,
-        "start_offset": 0,
-        "end_offset": 0,
-        "created_at": "2025-11-28T18:37:15.279568"
-      },
-      {
-        "id": "0d07c4208656",
-        "book_id": "test_book_highlight_colors",
-        "chapter_index": 0,
-        "text": "Text with purple",
-        "color": "purple",
-        "note": null,
-        "start_offset": 0,
-        "end_offset": 0,
-        "created_at": "2025-11-28T18:37:15.281194"
       }
     ],
     "test_book_delete_highlight": []
@@ -329,15 +263,6 @@
         "title": "Test bookmark",
         "note": "Test note",
         "created_at": "2025-11-28T14:59:31.292419"
-      },
-      {
-        "id": "d858db959562",
-        "book_id": "test_book_bookmarks_123",
-        "chapter_index": 2,
-        "scroll_position": 0.5,
-        "title": "Test bookmark",
-        "note": "Test note",
-        "created_at": "2025-11-28T18:37:15.262412"
       }
     ],
     "test_book_get_bookmarks": [
@@ -376,15 +301,6 @@
         "title": "Test",
         "note": "",
         "created_at": "2025-11-28T14:59:31.294386"
-      },
-      {
-        "id": "c96bdf90fe86",
-        "book_id": "test_book_get_bookmarks",
-        "chapter_index": 0,
-        "scroll_position": 0.1,
-        "title": "Test",
-        "note": "",
-        "created_at": "2025-11-28T18:37:15.264885"
       }
     ],
     "test_book_delete_bookmark": [],
@@ -424,15 +340,6 @@
         "title": "Export test",
         "note": "Note",
         "created_at": "2025-11-28T14:59:31.317247"
-      },
-      {
-        "id": "51d2366eca4f",
-        "book_id": "test_book_export",
-        "chapter_index": 0,
-        "scroll_position": 0.5,
-        "title": "Export test",
-        "note": "Note",
-        "created_at": "2025-11-28T18:37:15.294431"
       }
     ]
   },
@@ -441,11 +348,18 @@
       "book_id": "test_book_progress_123",
       "chapter_index": 5,
       "scroll_position": 0.45,
-      "last_read": "2025-11-28T18:37:15.258030",
+      "last_read": "2025-11-28T14:59:31.288377",
       "total_chapters": 10,
       "reading_time_seconds": 0
     }
   },
-  "search_history": [],
+  "search_history": [
+    {
+      "query": "snake",
+      "book_id": null,
+      "timestamp": "2025-11-28T15:06:14.705876",
+      "results_count": 102
+    }
+  ],
   "version": "1.0"
 }
