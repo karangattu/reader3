@@ -2,6 +2,28 @@
 
 All notable changes to Reader3 will be documented in this file.
 
+## [1.3.0] - 2025-01-17
+
+### Added
+- **Keyboard Navigation** — Navigate chapters with ← → arrow keys, toggle sidebar with S, space to scroll down, and more
+- **Keyboard Help Tooltip** — Press ? to see all available keyboard shortcuts
+- **Chapter Progress Indicators** — Visual progress bars for each chapter in the sidebar TOC
+- **Estimated Reading Time** — Display reading time estimates for each chapter (assumes 200 WPM)
+- **Empty State Illustrations** — Friendly SVG illustrations for empty bookmarks, highlights, search results, and library
+- **Chapter Progress API** — New endpoints for tracking per-chapter reading progress
+- **17 New Tests** — Comprehensive test coverage for chapter progress and reading time features
+
+### Fixed
+- **Real-time Progress Tracking** — Fixed progress not updating while scrolling (scroll events now properly target #main element)
+- **Library Progress Display** — Fixed book progress always showing 0% in library view by calculating from chapter progress
+
+### Technical
+- Added `/api/chapter-progress/{book_id}` GET endpoint
+- Added `/api/chapter-progress/{book_id}/{chapter_index}` POST endpoint
+- Added `/api/reading-times/{book_id}` GET endpoint
+- Modified `/api/progress/{book_id}` to return calculated `progress_percent`
+- Added `chapter_progress` field to user data with `get_chapter_progress()` and `save_chapter_progress()` methods
+
 ## [1.2.0] - 2025-11-28
 
 ### Added
