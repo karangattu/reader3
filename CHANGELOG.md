@@ -2,6 +2,73 @@
 
 All notable changes to Reader3 will be documented in this file.
 
+## [1.5.0] - 2025-06-01
+
+### Added - Enhanced EPUB Reading Experience 📚
+
+#### Dictionary & Definitions
+- **Double-click Word Lookup** — Double-click any word in EPUB content to instantly get its definition
+- **Free Dictionary API Integration** — Fetches definitions, pronunciation, part of speech, and examples
+- **Contextual Definitions** — Shows the sentence context where you looked up the word
+- **Save to Vocabulary** — One-click save words to your personal vocabulary list
+
+#### Personal Vocabulary List
+- **Word Collection** — Build a vocabulary list from words you look up while reading
+- **Book Context** — Each saved word includes the book and context where you found it
+- **Search Vocabulary** — Full-text search across all saved words and definitions
+- **Learning Progress** — Track mastery level for each word (1-5 scale)
+- **Export Ready** — Vocabulary integrates with the enhanced export system
+
+#### Enhanced Annotations System
+- **Rich Note-Taking** — Add detailed notes and annotations to any text selection
+- **Annotation Types** — Support for notes, highlights, bookmarks, and questions
+- **Tag System** — Organize annotations with custom tags for easy retrieval
+- **Search Annotations** — Full-text search across all your annotations and notes
+- **Export to Markdown** — Export all annotations to beautifully formatted Markdown
+- **Chapter-based Organization** — View and filter annotations by chapter
+
+#### Reading Session History
+- **Session Tracking** — Automatically tracks when and how long you read each book
+- **Reading Statistics** — Total reading time, sessions count, average session length
+- **Per-book Stats** — See reading patterns for individual books
+- **Recent Activity** — View your recent reading sessions with dates and duration
+
+### New API Endpoints
+- `POST /api/sessions/start` — Start a new reading session
+- `PUT /api/sessions/{session_id}/end` — End a reading session
+- `GET /api/sessions` — Get reading session history (filterable by book)
+- `GET /api/reading-stats` — Get comprehensive reading statistics
+- `GET /api/dictionary/{word}` — Look up word definition
+- `GET /api/vocabulary` — Get vocabulary words (filterable by book)
+- `POST /api/vocabulary` — Add word to vocabulary
+- `DELETE /api/vocabulary/{word_id}` — Delete vocabulary word
+- `PUT /api/vocabulary/{word_id}/mastery` — Update word mastery level
+- `GET /api/vocabulary/search` — Search vocabulary
+- `GET /api/annotations/{book_id}` — Get annotations for a book
+- `POST /api/annotations/{book_id}` — Add annotation
+- `PUT /api/annotations/{book_id}/{annotation_id}` — Update annotation
+- `DELETE /api/annotations/{book_id}/{annotation_id}` — Delete annotation
+- `GET /api/annotations/{book_id}/search` — Search annotations
+- `GET /api/export/{book_id}/annotations` — Export annotations to Markdown/JSON
+
+### New Data Structures
+- `ReadingSession` — Tracks session ID, book info, chapter, start/end times, duration
+- `VocabularyWord` — Stores word, definition, example, context, mastery level, review count
+- `Annotation` — Stores text, notes, type, position, tags, timestamps
+
+### Frontend Enhancements
+- **Dictionary Popup** — Beautiful floating popup with word definitions
+- **Vocabulary Panel** — Sidebar panel to browse and search saved words
+- **Annotations Panel** — Full-featured panel for viewing/searching annotations
+- **Session History Panel** — View reading history and statistics
+- **New Sidebar Buttons** — Quick access to Dictionary 📖, Notes 📝, and Stats 📊
+
+### Tests
+- Added 28 new tests for reading sessions, vocabulary, and annotations
+- Total: 195 tests passing
+
+---
+
 ## [1.4.0] - 2025-11-30
 
 ### Added - Premium PDF Features 📄

@@ -908,3 +908,567 @@ class TestEdgeCases:
             assert id_ not in ids
             ids.add(id_)
         assert len(ids) == 100
+
+
+# ============================================================================
+# NEW FEATURES TESTS
+# ============================================================================
+
+from user_data import ReadingSession, VocabularyWord, Annotation
+
+
+class TestReadingSessions:
+    """Tests for reading session functionality."""
+
+    def test_start_reading_session(self, manager):
+        """Test starting a reading session."""
+        session = ReadingSession(
+            id=generate_id(),
+            book_id="book1",
+            book_title="Test Book",
+            chapter_index=0,
+            chapter_title="Chapter 1"
+        )
+        result = manager.start_reading_session(session)
+        
+        assert result.book_id == "book1"
+        assert result.book_title == "Test Book"
+        assert result.chapter_index == 0
+        assert result.chapter_title == "Chapter 1"
+
+    def test_end_reading_session(self, manager):
+        """Test ending a reading session."""
+        session = ReadingSession(
+            id="test_session_123",
+            book_id="book1",
+            book_title="Test Book",
+            chapter_index=0,
+            chapter_title="Chapter 1"
+        )
+        manager.start_reading_session(session)
+        
+        success = manager.end_reading_session(
+            session_id="test_session_123",
+            duration_seconds=300,
+            pages_read=5,
+            scroll_position=0.75
+        )
+        
+        assert success is True
+        sessions = manager.get_reading_sessions("book1")
+        assert len(sessions) == 1
+        assert sessions[0].duration_seconds == 300
+        assert sessions[0].pages_read == 5
+        assert sessions[0].scroll_position == 0.75
+        assert sessions[0].end_time is not None
+
+    def test_end_nonexistent_session(self, manager):
+        """Test ending a session that doesn't exist."""
+        success = manager.end_reading_session(
+            session_id="nonexistent",
+            duration_seconds=100,
+            pages_read=1,
+            scroll_position=0.5
+        )
+        assert success is False
+
+    def test_get_reading_sessions_all(self, manager):
+        """Test getting all reading sessions."""
+        for i in range(3):
+            session = ReadingSession(
+                id=generate_id(),
+                book_id=f"book{i}",
+                book_title=f"Book {i}",
+                chapter_index=0,
+                chapter_title="Chapter 1"
+            )
+            manager.start_reading_session(session)
+        
+        sessions = manager.get_reading_sessions()
+        assert len(sessions) == 3
+
+    def test_get_reading_sessions_by_book(self, manager):
+        """Test getting sessions filtered by book."""
+        for i in range(2):
+            session = ReadingSession(
+                id=generate_id(),
+                book_id="book1",
+                book_title="Book 1",
+                chapter_index=i,
+                chapter_title=f"Chapter {i}"
+            )
+            manager.start_reading_session(session)
+        
+        session3 = ReadingSession(
+            id=generate_id(),
+            book_id="book2",
+            book_title="Book 2",
+            chapter_index=0,
+            chapter_title="Chapter 1"
+        )
+        manager.start_reading_session(session3)
+        
+        sessions = manager.get_reading_sessions("book1")
+        assert len(sessions) == 2
+        assert all(s.book_id == "book1" for s in sessions)
+
+    def test_get_reading_stats(self, manager):
+        """Test getting reading statistics."""
+        session = ReadingSession(
+            id="stat_test",
+            book_id="book1",
+            book_title="Test Book",
+            chapter_index=0,
+            chapter_title="Chapter 1"
+        )
+        manager.start_reading_session(session)
+        manager.end_reading_session(
+            session_id="stat_test",
+            duration_seconds=1800,  # 30 minutes
+            pages_read=10,
+            scroll_position=1.0
+        )
+        
+        stats = manager.get_reading_stats()
+        assert stats['total_time_seconds'] == 1800
+        assert stats['total_pages'] == 10
+        assert stats['session_count'] == 1
+
+    def test_session_limit(self, manager):
+        """Test that sessions are limited to 100."""
+        for i in range(105):
+            session = ReadingSession(
+                id=generate_id(),
+                book_id="book1",
+                book_title="Test",
+                chapter_index=0,
+                chapter_title="Chapter"
+            )
+            manager.start_reading_session(session)
+        
+        sessions = manager.get_reading_sessions(limit=200)
+        assert len(sessions) <= 100
+
+
+class TestVocabulary:
+    """Tests for vocabulary/dictionary functionality."""
+
+    def test_add_vocabulary_word(self, manager):
+        """Test adding a word to vocabulary."""
+        word = VocabularyWord(
+            id=generate_id(),
+            book_id="book1",
+            word="ephemeral",
+            definition="lasting for a very short time",
+            phonetic="/ɪˈfem(ə)rəl/",
+            part_of_speech="adjective",
+            example="fashion is ephemeral",
+            chapter_index=5,
+            context="The ephemeral nature of fame"
+        )
+        result = manager.add_vocabulary_word(word)
+        
+        assert result.word == "ephemeral"
+        assert result.definition == "lasting for a very short time"
+        assert result.part_of_speech == "adjective"
+
+    def test_get_vocabulary_by_book(self, manager):
+        """Test getting vocabulary for a specific book."""
+        word1 = VocabularyWord(
+            id=generate_id(),
+            book_id="book1",
+            word="test",
+            definition="a test word"
+        )
+        word2 = VocabularyWord(
+            id=generate_id(),
+            book_id="book2",
+            word="other",
+            definition="another word"
+        )
+        manager.add_vocabulary_word(word1)
+        manager.add_vocabulary_word(word2)
+        
+        vocab = manager.get_vocabulary("book1")
+        assert len(vocab) == 1
+        assert vocab[0].word == "test"
+
+    def test_get_all_vocabulary(self, manager):
+        """Test getting all vocabulary across books."""
+        for i in range(3):
+            word = VocabularyWord(
+                id=generate_id(),
+                book_id=f"book{i}",
+                word=f"word{i}",
+                definition=f"definition {i}"
+            )
+            manager.add_vocabulary_word(word)
+        
+        vocab = manager.get_vocabulary()
+        assert len(vocab) == 3
+
+    def test_duplicate_word_increments_count(self, manager):
+        """Test that adding duplicate word increments review count."""
+        word = VocabularyWord(
+            id=generate_id(),
+            book_id="book1",
+            word="duplicate",
+            definition="a test word"
+        )
+        manager.add_vocabulary_word(word)
+        
+        # Add same word again
+        word2 = VocabularyWord(
+            id=generate_id(),
+            book_id="book1",
+            word="duplicate",
+            definition="different definition"
+        )
+        result = manager.add_vocabulary_word(word2)
+        
+        vocab = manager.get_vocabulary("book1")
+        assert len(vocab) == 1  # Still just one word
+        assert vocab[0].reviewed_count >= 1
+
+    def test_delete_vocabulary_word(self, manager):
+        """Test deleting a vocabulary word."""
+        word = VocabularyWord(
+            id="test_word_id",
+            book_id="book1",
+            word="delete_me",
+            definition="to be deleted"
+        )
+        manager.add_vocabulary_word(word)
+        
+        success = manager.delete_vocabulary_word("book1", "test_word_id")
+        assert success is True
+        
+        vocab = manager.get_vocabulary("book1")
+        assert len(vocab) == 0
+
+    def test_delete_nonexistent_word(self, manager):
+        """Test deleting a word that doesn't exist."""
+        success = manager.delete_vocabulary_word("book1", "nonexistent")
+        assert success is False
+
+    def test_search_vocabulary(self, manager):
+        """Test searching vocabulary."""
+        words = [
+            VocabularyWord(
+                id=generate_id(),
+                book_id="book1",
+                word="ephemeral",
+                definition="lasting for a very short time"
+            ),
+            VocabularyWord(
+                id=generate_id(),
+                book_id="book1",
+                word="perpetual",
+                definition="never ending or changing"
+            ),
+            VocabularyWord(
+                id=generate_id(),
+                book_id="book1",
+                word="time",
+                definition="the indefinite continued progress"
+            )
+        ]
+        for w in words:
+            manager.add_vocabulary_word(w)
+        
+        # Search by word
+        results = manager.search_vocabulary("time")
+        assert len(results) >= 2  # "time" word + "lasting for a very short time"
+        
+        # Search by definition
+        results = manager.search_vocabulary("lasting")
+        assert len(results) >= 1
+
+
+class TestAnnotations:
+    """Tests for annotation functionality."""
+
+    def test_add_annotation(self, manager):
+        """Test adding an annotation."""
+        annotation = Annotation(
+            id=generate_id(),
+            book_id="book1",
+            chapter_index=3,
+            note_text="This is an important passage",
+            tags=["important", "review"]
+        )
+        result = manager.add_annotation(annotation)
+        
+        assert result.note_text == "This is an important passage"
+        assert "important" in result.tags
+        assert result.chapter_index == 3
+
+    def test_add_annotation_with_highlight(self, manager):
+        """Test adding annotation linked to a highlight."""
+        annotation = Annotation(
+            id=generate_id(),
+            book_id="book1",
+            chapter_index=0,
+            note_text="Note about highlighted text",
+            highlight_id="highlight_123"
+        )
+        result = manager.add_annotation(annotation)
+        
+        assert result.highlight_id == "highlight_123"
+
+    def test_get_annotations_by_book(self, manager):
+        """Test getting annotations for a book."""
+        for i in range(3):
+            annotation = Annotation(
+                id=generate_id(),
+                book_id="book1",
+                chapter_index=i,
+                note_text=f"Note {i}"
+            )
+            manager.add_annotation(annotation)
+        
+        annotations = manager.get_annotations("book1")
+        assert len(annotations) == 3
+
+    def test_get_annotations_by_chapter(self, manager):
+        """Test getting annotations filtered by chapter."""
+        for i in range(3):
+            annotation = Annotation(
+                id=generate_id(),
+                book_id="book1",
+                chapter_index=i % 2,  # Chapters 0, 1, 0
+                note_text=f"Note {i}"
+            )
+            manager.add_annotation(annotation)
+        
+        annotations = manager.get_annotations("book1", chapter_index=0)
+        assert len(annotations) == 2
+
+    def test_update_annotation(self, manager):
+        """Test updating an annotation."""
+        annotation = Annotation(
+            id="update_test",
+            book_id="book1",
+            chapter_index=0,
+            note_text="Original note",
+            tags=["old"]
+        )
+        manager.add_annotation(annotation)
+        
+        success = manager.update_annotation(
+            book_id="book1",
+            annotation_id="update_test",
+            note_text="Updated note",
+            tags=["new", "updated"]
+        )
+        
+        assert success is True
+        annotations = manager.get_annotations("book1")
+        assert annotations[0].note_text == "Updated note"
+        assert "updated" in annotations[0].tags
+
+    def test_update_nonexistent_annotation(self, manager):
+        """Test updating an annotation that doesn't exist."""
+        success = manager.update_annotation(
+            book_id="book1",
+            annotation_id="nonexistent",
+            note_text="New text"
+        )
+        assert success is False
+
+    def test_delete_annotation(self, manager):
+        """Test deleting an annotation."""
+        annotation = Annotation(
+            id="delete_test",
+            book_id="book1",
+            chapter_index=0,
+            note_text="To be deleted"
+        )
+        manager.add_annotation(annotation)
+        
+        success = manager.delete_annotation("book1", "delete_test")
+        assert success is True
+        
+        annotations = manager.get_annotations("book1")
+        assert len(annotations) == 0
+
+    def test_delete_nonexistent_annotation(self, manager):
+        """Test deleting an annotation that doesn't exist."""
+        success = manager.delete_annotation("book1", "nonexistent")
+        assert success is False
+
+    def test_search_annotations(self, manager):
+        """Test searching annotations by text and tags."""
+        annotations = [
+            Annotation(
+                id=generate_id(),
+                book_id="book1",
+                chapter_index=0,
+                note_text="This is about quantum physics",
+                tags=["science", "physics"]
+            ),
+            Annotation(
+                id=generate_id(),
+                book_id="book1",
+                chapter_index=1,
+                note_text="Biology chapter notes",
+                tags=["science", "biology"]
+            ),
+            Annotation(
+                id=generate_id(),
+                book_id="book1",
+                chapter_index=2,
+                note_text="Historical overview",
+                tags=["history"]
+            )
+        ]
+        for a in annotations:
+            manager.add_annotation(a)
+        
+        # Search by text
+        results = manager.search_annotations("book1", "quantum")
+        assert len(results) == 1
+        
+        # Search by tag
+        results = manager.search_annotations("book1", "science")
+        assert len(results) == 2
+
+    def test_export_annotations_markdown(self, manager):
+        """Test exporting annotations to markdown."""
+        annotation = Annotation(
+            id=generate_id(),
+            book_id="book1",
+            chapter_index=0,
+            note_text="Important passage",
+            tags=["review", "exam"]
+        )
+        manager.add_annotation(annotation)
+        
+        highlight = Highlight(
+            id=generate_id(),
+            book_id="book1",
+            chapter_index=0,
+            text="Highlighted text here",
+            color="yellow",
+            note="Note on highlight"
+        )
+        manager.add_highlight(highlight)
+        
+        markdown = manager.export_annotations_markdown("book1")
+        
+        assert "# Annotations and Notes" in markdown
+        assert "Important passage" in markdown
+        assert "#review" in markdown or "review" in markdown
+
+
+class TestDataCleanup:
+    """Tests for data cleanup functionality."""
+
+    def test_cleanup_book_data_vocabulary(self, manager):
+        """Test that cleanup removes vocabulary."""
+        word = VocabularyWord(
+            id=generate_id(),
+            book_id="cleanup_test",
+            word="test",
+            definition="a test"
+        )
+        manager.add_vocabulary_word(word)
+        
+        manager.cleanup_book_data("cleanup_test")
+        
+        vocab = manager.get_vocabulary("cleanup_test")
+        assert len(vocab) == 0
+
+    def test_cleanup_book_data_annotations(self, manager):
+        """Test that cleanup removes annotations."""
+        annotation = Annotation(
+            id=generate_id(),
+            book_id="cleanup_test",
+            chapter_index=0,
+            note_text="Test note"
+        )
+        manager.add_annotation(annotation)
+        
+        manager.cleanup_book_data("cleanup_test")
+        
+        annotations = manager.get_annotations("cleanup_test")
+        assert len(annotations) == 0
+
+    def test_cleanup_book_data_sessions(self, manager):
+        """Test that cleanup removes reading sessions."""
+        session = ReadingSession(
+            id=generate_id(),
+            book_id="cleanup_test",
+            book_title="Test",
+            chapter_index=0,
+            chapter_title="Chapter"
+        )
+        manager.start_reading_session(session)
+        
+        manager.cleanup_book_data("cleanup_test")
+        
+        sessions = manager.get_reading_sessions("cleanup_test")
+        assert len(sessions) == 0
+
+
+class TestDataPersistence:
+    """Tests for data persistence with new features."""
+
+    def test_vocabulary_persistence(self, temp_data_dir):
+        """Test that vocabulary persists across manager instances."""
+        manager1 = UserDataManager(temp_data_dir)
+        word = VocabularyWord(
+            id="persist_test",
+            book_id="book1",
+            word="persistent",
+            definition="continuing to exist"
+        )
+        manager1.add_vocabulary_word(word)
+        
+        # New manager instance
+        manager2 = UserDataManager(temp_data_dir)
+        manager2._data = None  # Force reload
+        vocab = manager2.get_vocabulary("book1")
+        
+        assert len(vocab) == 1
+        assert vocab[0].word == "persistent"
+
+    def test_annotations_persistence(self, temp_data_dir):
+        """Test that annotations persist across manager instances."""
+        manager1 = UserDataManager(temp_data_dir)
+        annotation = Annotation(
+            id="persist_annot",
+            book_id="book1",
+            chapter_index=0,
+            note_text="Persisted note",
+            tags=["test"]
+        )
+        manager1.add_annotation(annotation)
+        
+        # New manager instance
+        manager2 = UserDataManager(temp_data_dir)
+        manager2._data = None  # Force reload
+        annotations = manager2.get_annotations("book1")
+        
+        assert len(annotations) == 1
+        assert annotations[0].note_text == "Persisted note"
+
+    def test_sessions_persistence(self, temp_data_dir):
+        """Test that reading sessions persist across manager instances."""
+        manager1 = UserDataManager(temp_data_dir)
+        session = ReadingSession(
+            id="persist_session",
+            book_id="book1",
+            book_title="Test Book",
+            chapter_index=0,
+            chapter_title="Chapter 1"
+        )
+        manager1.start_reading_session(session)
+        
+        # New manager instance
+        manager2 = UserDataManager(temp_data_dir)
+        manager2._data = None  # Force reload
+        sessions = manager2.get_reading_sessions("book1")
+        
+        assert len(sessions) == 1
+        assert sessions[0].book_title == "Test Book"

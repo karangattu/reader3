@@ -58,14 +58,63 @@ class SearchQuery:
 
 
 @dataclass
+class ReadingSession:
+    """A reading session for tracking reading history."""
+    id: str
+    book_id: str
+    book_title: str
+    chapter_index: int
+    chapter_title: str
+    start_time: str = field(default_factory=lambda: datetime.now().isoformat())
+    end_time: Optional[str] = None
+    duration_seconds: int = 0
+    pages_read: int = 0
+    scroll_position: float = 0.0
+
+
+@dataclass
+class VocabularyWord:
+    """A saved word from dictionary lookups."""
+    id: str
+    book_id: str
+    word: str
+    definition: str
+    phonetic: Optional[str] = None
+    part_of_speech: Optional[str] = None
+    example: Optional[str] = None
+    chapter_index: int = 0
+    context: str = ""  # Sentence where word was found
+    created_at: str = field(default_factory=lambda: datetime.now().isoformat())
+    reviewed_count: int = 0
+
+
+@dataclass
+class Annotation:
+    """A text annotation/note attached to a highlight or bookmark."""
+    id: str
+    book_id: str
+    chapter_index: int
+    note_text: str
+    highlight_id: Optional[str] = None  # Link to a highlight
+    bookmark_id: Optional[str] = None  # Link to a bookmark
+    position_offset: int = 0
+    created_at: str = field(default_factory=lambda: datetime.now().isoformat())
+    updated_at: str = field(default_factory=lambda: datetime.now().isoformat())
+    tags: List[str] = field(default_factory=list)
+
+
+@dataclass
 class UserData:
     """All user data for Reader3."""
-    highlights: Dict[str, List[Highlight]] = field(default_factory=dict)  # book_id -> highlights
-    bookmarks: Dict[str, List[Bookmark]] = field(default_factory=dict)  # book_id -> bookmarks
-    progress: Dict[str, ReadingProgress] = field(default_factory=dict)  # book_id -> progress
-    chapter_progress: Dict[str, Dict[int, float]] = field(default_factory=dict)  # book_id -> {chapter_index -> percent}
+    highlights: Dict[str, List[Highlight]] = field(default_factory=dict)
+    bookmarks: Dict[str, List[Bookmark]] = field(default_factory=dict)
+    progress: Dict[str, ReadingProgress] = field(default_factory=dict)
+    chapter_progress: Dict[str, Dict[int, float]] = field(default_factory=dict)
     search_history: List[SearchQuery] = field(default_factory=list)
-    version: str = "1.0"
+    reading_sessions: List[ReadingSession] = field(default_factory=list)
+    vocabulary: Dict[str, List[VocabularyWord]] = field(default_factory=dict)
+    annotations: Dict[str, List[Annotation]] = field(default_factory=dict)
+    version: str = "1.1"
 
 
 def generate_id() -> str:
@@ -124,7 +173,18 @@ class UserDataManager:
                 search_history=[
                     SearchQuery(**q) for q in raw.get('search_history', [])
                 ],
-                version=raw.get('version', '1.0')
+                reading_sessions=[
+                    ReadingSession(**s) for s in raw.get('reading_sessions', [])
+                ],
+                vocabulary={
+                    book_id: [VocabularyWord(**w) for w in words]
+                    for book_id, words in raw.get('vocabulary', {}).items()
+                },
+                annotations={
+                    book_id: [Annotation(**a) for a in annots]
+                    for book_id, annots in raw.get('annotations', {}).items()
+                },
+                version=raw.get('version', '1.1')
             )
         except Exception as e:
             print(f"Error loading user data: {e}")
@@ -155,6 +215,15 @@ class UserDataManager:
             },
             'chapter_progress': self._data.chapter_progress,
             'search_history': [asdict(q) for q in self._data.search_history],
+            'reading_sessions': [asdict(s) for s in self._data.reading_sessions],
+            'vocabulary': {
+                book_id: [asdict(w) for w in words]
+                for book_id, words in self._data.vocabulary.items()
+            },
+            'annotations': {
+                book_id: [asdict(a) for a in annots]
+                for book_id, annots in self._data.annotations.items()
+            },
             'version': self._data.version
         }
         
@@ -407,6 +476,14 @@ class UserDataManager:
                 book_id: asdict(p)
                 for book_id, p in data.progress.items()
             },
+            'vocabulary': {
+                book_id: [asdict(w) for w in words]
+                for book_id, words in data.vocabulary.items()
+            },
+            'annotations': {
+                book_id: [asdict(a) for a in annots]
+                for book_id, annots in data.annotations.items()
+            },
         }
         
         return json.dumps(export_data, indent=2, ensure_ascii=False)
@@ -429,6 +506,276 @@ class UserDataManager:
         if book_id in data.chapter_progress:
             del data.chapter_progress[book_id]
             changed = True
+        if book_id in data.vocabulary:
+            del data.vocabulary[book_id]
+            changed = True
+        if book_id in data.annotations:
+            del data.annotations[book_id]
+            changed = True
+        
+        # Remove reading sessions for this book
+        original_sessions = len(data.reading_sessions)
+        data.reading_sessions = [
+            s for s in data.reading_sessions if s.book_id != book_id
+        ]
+        if len(data.reading_sessions) < original_sessions:
+            changed = True
         
         if changed:
             self.save()
+
+    # ========== Reading Sessions ==========
+    
+    def start_reading_session(self, session: ReadingSession) -> ReadingSession:
+        """Start a new reading session."""
+        data = self.load()
+        data.reading_sessions.insert(0, session)
+        # Keep only last 100 sessions
+        data.reading_sessions = data.reading_sessions[:100]
+        self.save()
+        return session
+    
+    def end_reading_session(self, session_id: str, 
+                            duration_seconds: int,
+                            pages_read: int,
+                            scroll_position: float) -> bool:
+        """End a reading session with final statistics."""
+        data = self.load()
+        for session in data.reading_sessions:
+            if session.id == session_id:
+                session.end_time = datetime.now().isoformat()
+                session.duration_seconds = duration_seconds
+                session.pages_read = pages_read
+                session.scroll_position = scroll_position
+                self.save()
+                return True
+        return False
+    
+    def get_reading_sessions(self, book_id: str = None, 
+                             limit: int = 20) -> List[ReadingSession]:
+        """Get reading sessions, optionally filtered by book."""
+        data = self.load()
+        sessions = data.reading_sessions
+        if book_id:
+            sessions = [s for s in sessions if s.book_id == book_id]
+        return sessions[:limit]
+    
+    def get_reading_stats(self, book_id: str = None) -> dict:
+        """Get reading statistics."""
+        data = self.load()
+        sessions = data.reading_sessions
+        if book_id:
+            sessions = [s for s in sessions if s.book_id == book_id]
+        
+        total_time = sum(s.duration_seconds for s in sessions)
+        total_pages = sum(s.pages_read for s in sessions)
+        session_count = len(sessions)
+        
+        # Calculate streak (consecutive days)
+        streak = 0
+        if sessions:
+            from datetime import timedelta
+            today = datetime.now().date()
+            dates_read = set()
+            for s in sessions:
+                try:
+                    date = datetime.fromisoformat(s.start_time).date()
+                    dates_read.add(date)
+                except Exception:
+                    pass
+            
+            current_date = today
+            while current_date in dates_read:
+                streak += 1
+                current_date -= timedelta(days=1)
+        
+        return {
+            'total_time_seconds': total_time,
+            'total_pages': total_pages,
+            'session_count': session_count,
+            'streak_days': streak,
+            'avg_session_minutes': round(total_time / 60 / session_count, 1) 
+                                   if session_count > 0 else 0
+        }
+
+    # ========== Vocabulary ==========
+    
+    def add_vocabulary_word(self, word: VocabularyWord) -> VocabularyWord:
+        """Add a word to vocabulary."""
+        data = self.load()
+        if word.book_id not in data.vocabulary:
+            data.vocabulary[word.book_id] = []
+        
+        # Check if word already exists for this book
+        existing = [w for w in data.vocabulary[word.book_id] 
+                    if w.word.lower() == word.word.lower()]
+        if existing:
+            # Update existing word
+            existing[0].reviewed_count += 1
+            self.save()
+            return existing[0]
+        
+        data.vocabulary[word.book_id].append(word)
+        self.save()
+        return word
+    
+    def get_vocabulary(self, book_id: str = None) -> List[VocabularyWord]:
+        """Get vocabulary words, optionally filtered by book."""
+        data = self.load()
+        if book_id:
+            return data.vocabulary.get(book_id, [])
+        # Return all words across all books
+        all_words = []
+        for words in data.vocabulary.values():
+            all_words.extend(words)
+        return sorted(all_words, key=lambda w: w.created_at, reverse=True)
+    
+    def delete_vocabulary_word(self, book_id: str, word_id: str) -> bool:
+        """Delete a vocabulary word."""
+        data = self.load()
+        if book_id not in data.vocabulary:
+            return False
+        
+        original_len = len(data.vocabulary[book_id])
+        data.vocabulary[book_id] = [
+            w for w in data.vocabulary[book_id] if w.id != word_id
+        ]
+        
+        if len(data.vocabulary[book_id]) < original_len:
+            self.save()
+            return True
+        return False
+    
+    def search_vocabulary(self, query: str) -> List[VocabularyWord]:
+        """Search vocabulary by word or definition."""
+        data = self.load()
+        query_lower = query.lower()
+        results = []
+        for words in data.vocabulary.values():
+            for w in words:
+                if (query_lower in w.word.lower() or 
+                    query_lower in w.definition.lower()):
+                    results.append(w)
+        return results
+
+    # ========== Annotations ==========
+    
+    def add_annotation(self, annotation: Annotation) -> Annotation:
+        """Add an annotation."""
+        data = self.load()
+        if annotation.book_id not in data.annotations:
+            data.annotations[annotation.book_id] = []
+        data.annotations[annotation.book_id].append(annotation)
+        self.save()
+        return annotation
+    
+    def get_annotations(self, book_id: str, 
+                        chapter_index: int = None) -> List[Annotation]:
+        """Get annotations for a book, optionally filtered by chapter."""
+        data = self.load()
+        annotations = data.annotations.get(book_id, [])
+        if chapter_index is not None:
+            annotations = [a for a in annotations 
+                           if a.chapter_index == chapter_index]
+        return annotations
+    
+    def update_annotation(self, book_id: str, annotation_id: str,
+                          note_text: str, tags: List[str] = None) -> bool:
+        """Update an annotation."""
+        data = self.load()
+        if book_id not in data.annotations:
+            return False
+        
+        for a in data.annotations[book_id]:
+            if a.id == annotation_id:
+                a.note_text = note_text
+                a.updated_at = datetime.now().isoformat()
+                if tags is not None:
+                    a.tags = tags
+                self.save()
+                return True
+        return False
+    
+    def delete_annotation(self, book_id: str, annotation_id: str) -> bool:
+        """Delete an annotation."""
+        data = self.load()
+        if book_id not in data.annotations:
+            return False
+        
+        original_len = len(data.annotations[book_id])
+        data.annotations[book_id] = [
+            a for a in data.annotations[book_id] if a.id != annotation_id
+        ]
+        
+        if len(data.annotations[book_id]) < original_len:
+            self.save()
+            return True
+        return False
+    
+    def search_annotations(self, book_id: str, query: str) -> List[Annotation]:
+        """Search annotations by text or tags."""
+        data = self.load()
+        annotations = data.annotations.get(book_id, [])
+        query_lower = query.lower()
+        
+        return [
+            a for a in annotations 
+            if query_lower in a.note_text.lower() or 
+               any(query_lower in tag.lower() for tag in a.tags)
+        ]
+    
+    def export_annotations_markdown(self, book_id: str) -> str:
+        """Export annotations to Markdown format."""
+        data = self.load()
+        annotations = data.annotations.get(book_id, [])
+        highlights = data.highlights.get(book_id, [])
+        
+        lines = [
+            f"# Annotations and Notes",
+            f"",
+            f"**Book ID:** {book_id}",
+            f"**Exported:** {datetime.now().isoformat()}",
+            f"",
+        ]
+        
+        # Group by chapter
+        by_chapter = {}
+        for a in annotations:
+            if a.chapter_index not in by_chapter:
+                by_chapter[a.chapter_index] = {'annotations': [], 'highlights': []}
+            by_chapter[a.chapter_index]['annotations'].append(a)
+        
+        for h in highlights:
+            if h.chapter_index not in by_chapter:
+                by_chapter[h.chapter_index] = {'annotations': [], 'highlights': []}
+            by_chapter[h.chapter_index]['highlights'].append(h)
+        
+        for chapter_idx in sorted(by_chapter.keys()):
+            chapter_data = by_chapter[chapter_idx]
+            lines.append(f"## Chapter {chapter_idx + 1}")
+            lines.append("")
+            
+            # Highlights with notes
+            for h in chapter_data['highlights']:
+                color_emoji = {
+                    'yellow': '🟡', 'green': '🟢', 'blue': '🔵',
+                    'pink': '🔴', 'purple': '🟣'
+                }.get(h.color, '⚪')
+                lines.append(f"{color_emoji} **Highlight:**")
+                lines.append(f"> {h.text}")
+                if h.note:
+                    lines.append(f"")
+                    lines.append(f"*Note: {h.note}*")
+                lines.append("")
+            
+            # Standalone annotations
+            for a in chapter_data['annotations']:
+                tags_str = ' '.join(f'`#{t}`' for t in a.tags) if a.tags else ''
+                lines.append(f"📝 **Note** {tags_str}")
+                lines.append(f"")
+                lines.append(f"{a.note_text}")
+                lines.append(f"")
+                lines.append(f"*Created: {a.created_at}*")
+                lines.append("")
+        
+        return "\n".join(lines)

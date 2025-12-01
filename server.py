@@ -26,6 +26,9 @@ from user_data import (
     Bookmark,
     ReadingProgress,
     SearchQuery,
+    ReadingSession,
+    VocabularyWord,
+    Annotation,
     generate_id,
 )
 
@@ -1043,6 +1046,311 @@ async def get_pdf_text_layer(book_id: str, page_num: int):
         "height": page_data.height,
         "text_blocks": blocks
     }
+
+
+# ============================================================================
+# Reading Sessions API
+# ============================================================================
+
+
+@app.post("/api/sessions/start")
+async def start_reading_session(request: Request):
+    """Start a new reading session."""
+    data = await request.json()
+    
+    session = ReadingSession(
+        id=generate_id(),
+        book_id=data.get("book_id", ""),
+        book_title=data.get("book_title", ""),
+        chapter_index=data.get("chapter_index", 0),
+        chapter_title=data.get("chapter_title", ""),
+    )
+    user_data_manager.start_reading_session(session)
+    return {"session_id": session.id, "status": "started"}
+
+
+@app.post("/api/sessions/{session_id}/end")
+async def end_reading_session(session_id: str, request: Request):
+    """End a reading session."""
+    data = await request.json()
+    
+    success = user_data_manager.end_reading_session(
+        session_id=session_id,
+        duration_seconds=data.get("duration_seconds", 0),
+        pages_read=data.get("pages_read", 0),
+        scroll_position=data.get("scroll_position", 0.0)
+    )
+    
+    if success:
+        return {"status": "ended"}
+    raise HTTPException(status_code=404, detail="Session not found")
+
+
+@app.get("/api/sessions")
+async def get_reading_sessions(book_id: str = None, limit: int = 20):
+    """Get reading sessions."""
+    sessions = user_data_manager.get_reading_sessions(book_id, limit)
+    return {
+        "sessions": [
+            {
+                "id": s.id,
+                "book_id": s.book_id,
+                "book_title": s.book_title,
+                "chapter_index": s.chapter_index,
+                "chapter_title": s.chapter_title,
+                "start_time": s.start_time,
+                "end_time": s.end_time,
+                "duration_seconds": s.duration_seconds,
+                "pages_read": s.pages_read,
+            }
+            for s in sessions
+        ]
+    }
+
+
+@app.get("/api/sessions/stats")
+async def get_reading_stats(book_id: str = None):
+    """Get reading statistics."""
+    stats = user_data_manager.get_reading_stats(book_id)
+    return stats
+
+
+# ============================================================================
+# Vocabulary/Dictionary API
+# ============================================================================
+
+
+@app.post("/api/vocabulary/{book_id}")
+async def add_vocabulary_word(book_id: str, request: Request):
+    """Add a word to vocabulary."""
+    data = await request.json()
+    
+    word = VocabularyWord(
+        id=generate_id(),
+        book_id=book_id,
+        word=data.get("word", ""),
+        definition=data.get("definition", ""),
+        phonetic=data.get("phonetic"),
+        part_of_speech=data.get("part_of_speech"),
+        example=data.get("example"),
+        chapter_index=data.get("chapter_index", 0),
+        context=data.get("context", ""),
+    )
+    saved_word = user_data_manager.add_vocabulary_word(word)
+    return {"id": saved_word.id, "status": "saved"}
+
+
+@app.get("/api/vocabulary/{book_id}")
+async def get_vocabulary(book_id: str):
+    """Get vocabulary words for a book."""
+    words = user_data_manager.get_vocabulary(book_id)
+    return {
+        "book_id": book_id,
+        "words": [
+            {
+                "id": w.id,
+                "word": w.word,
+                "definition": w.definition,
+                "phonetic": w.phonetic,
+                "part_of_speech": w.part_of_speech,
+                "example": w.example,
+                "chapter_index": w.chapter_index,
+                "context": w.context,
+                "created_at": w.created_at,
+                "reviewed_count": w.reviewed_count,
+            }
+            for w in words
+        ]
+    }
+
+
+@app.get("/api/vocabulary")
+async def get_all_vocabulary():
+    """Get all vocabulary words across all books."""
+    words = user_data_manager.get_vocabulary()
+    return {
+        "words": [
+            {
+                "id": w.id,
+                "book_id": w.book_id,
+                "word": w.word,
+                "definition": w.definition,
+                "phonetic": w.phonetic,
+                "part_of_speech": w.part_of_speech,
+                "example": w.example,
+                "chapter_index": w.chapter_index,
+                "context": w.context,
+                "created_at": w.created_at,
+                "reviewed_count": w.reviewed_count,
+            }
+            for w in words
+        ]
+    }
+
+
+@app.delete("/api/vocabulary/{book_id}/{word_id}")
+async def delete_vocabulary_word(book_id: str, word_id: str):
+    """Delete a vocabulary word."""
+    if user_data_manager.delete_vocabulary_word(book_id, word_id):
+        return {"status": "deleted"}
+    raise HTTPException(status_code=404, detail="Word not found")
+
+
+@app.get("/api/vocabulary/search")
+async def search_vocabulary(q: str):
+    """Search vocabulary words."""
+    if not q or len(q) < 2:
+        return {"results": [], "query": q}
+    
+    words = user_data_manager.search_vocabulary(q)
+    return {
+        "query": q,
+        "results": [
+            {
+                "id": w.id,
+                "book_id": w.book_id,
+                "word": w.word,
+                "definition": w.definition,
+                "phonetic": w.phonetic,
+                "part_of_speech": w.part_of_speech,
+            }
+            for w in words
+        ]
+    }
+
+
+# ============================================================================
+# Annotations API
+# ============================================================================
+
+
+@app.post("/api/annotations/{book_id}")
+async def add_annotation(book_id: str, request: Request):
+    """Add an annotation."""
+    data = await request.json()
+    
+    annotation = Annotation(
+        id=generate_id(),
+        book_id=book_id,
+        chapter_index=data.get("chapter_index", 0),
+        note_text=data.get("note_text", ""),
+        highlight_id=data.get("highlight_id"),
+        bookmark_id=data.get("bookmark_id"),
+        position_offset=data.get("position_offset", 0),
+        tags=data.get("tags", []),
+    )
+    user_data_manager.add_annotation(annotation)
+    return {"id": annotation.id, "status": "created"}
+
+
+@app.get("/api/annotations/{book_id}")
+async def get_annotations(book_id: str, chapter: int = None):
+    """Get annotations for a book."""
+    annotations = user_data_manager.get_annotations(book_id, chapter)
+    return {
+        "book_id": book_id,
+        "annotations": [
+            {
+                "id": a.id,
+                "chapter_index": a.chapter_index,
+                "note_text": a.note_text,
+                "highlight_id": a.highlight_id,
+                "bookmark_id": a.bookmark_id,
+                "position_offset": a.position_offset,
+                "tags": a.tags,
+                "created_at": a.created_at,
+                "updated_at": a.updated_at,
+            }
+            for a in annotations
+        ]
+    }
+
+
+@app.put("/api/annotations/{book_id}/{annotation_id}")
+async def update_annotation(book_id: str, annotation_id: str, request: Request):
+    """Update an annotation."""
+    data = await request.json()
+    
+    success = user_data_manager.update_annotation(
+        book_id=book_id,
+        annotation_id=annotation_id,
+        note_text=data.get("note_text", ""),
+        tags=data.get("tags")
+    )
+    
+    if success:
+        return {"status": "updated"}
+    raise HTTPException(status_code=404, detail="Annotation not found")
+
+
+@app.delete("/api/annotations/{book_id}/{annotation_id}")
+async def delete_annotation(book_id: str, annotation_id: str):
+    """Delete an annotation."""
+    if user_data_manager.delete_annotation(book_id, annotation_id):
+        return {"status": "deleted"}
+    raise HTTPException(status_code=404, detail="Annotation not found")
+
+
+@app.get("/api/annotations/{book_id}/search")
+async def search_annotations(book_id: str, q: str):
+    """Search annotations by text or tags."""
+    if not q or len(q) < 2:
+        return {"results": [], "query": q}
+    
+    annotations = user_data_manager.search_annotations(book_id, q)
+    return {
+        "query": q,
+        "results": [
+            {
+                "id": a.id,
+                "chapter_index": a.chapter_index,
+                "note_text": a.note_text,
+                "tags": a.tags,
+                "created_at": a.created_at,
+            }
+            for a in annotations
+        ]
+    }
+
+
+@app.get("/api/annotations/{book_id}/export")
+async def export_annotations(book_id: str, format: str = "markdown"):
+    """Export annotations to Markdown."""
+    if format == "markdown":
+        content = user_data_manager.export_annotations_markdown(book_id)
+        return PlainTextResponse(
+            content,
+            media_type="text/markdown",
+            headers={
+                "Content-Disposition": 
+                    f"attachment; filename={book_id}_annotations.md"
+            }
+        )
+    else:
+        # JSON export
+        annotations = user_data_manager.get_annotations(book_id)
+        import json
+        content = json.dumps(
+            {"annotations": [
+                {
+                    "id": a.id,
+                    "chapter_index": a.chapter_index,
+                    "note_text": a.note_text,
+                    "tags": a.tags,
+                    "created_at": a.created_at,
+                }
+                for a in annotations
+            ]},
+            indent=2
+        )
+        return PlainTextResponse(
+            content,
+            media_type="application/json",
+            headers={
+                "Content-Disposition":
+                    f"attachment; filename={book_id}_annotations.json"
+            }
+        )
 
 
 if __name__ == "__main__":

@@ -194,6 +194,92 @@
         .resume-btn { background: #3498db; color: #fff; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; font-size: 0.85em; }
         .resume-dismiss { background: none; border: none; color: #999; cursor: pointer; font-size: 1.2em; }
         
+        /* Dictionary/Definition popup */
+        #dictionary-popup { display: none; position: fixed; z-index: 1200; background: #fff; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.25); min-width: 300px; max-width: 400px; font-family: -apple-system, sans-serif; overflow: hidden; }
+        #dictionary-popup.visible { display: block; }
+        .dict-header { background: #f8f9fa; padding: 15px 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+        .dict-word { font-size: 1.3em; font-weight: 600; color: #333; }
+        .dict-phonetic { font-size: 0.9em; color: #888; margin-left: 10px; font-style: italic; }
+        .dict-close { background: none; border: none; font-size: 1.5em; cursor: pointer; color: #999; line-height: 1; }
+        .dict-close:hover { color: #333; }
+        .dict-content { padding: 20px; max-height: 300px; overflow-y: auto; }
+        .dict-part-of-speech { font-size: 0.85em; color: #3498db; font-weight: 500; text-transform: italic; margin-bottom: 8px; }
+        .dict-definition { font-size: 0.95em; color: #333; line-height: 1.6; margin-bottom: 12px; }
+        .dict-example { font-size: 0.9em; color: #666; font-style: italic; padding: 10px 15px; background: #f8f9fa; border-radius: 6px; margin-bottom: 15px; border-left: 3px solid #3498db; }
+        .dict-actions { display: flex; gap: 10px; padding-top: 15px; border-top: 1px solid #eee; margin-top: 10px; }
+        .dict-btn { flex: 1; padding: 10px; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9em; transition: all 0.2s; }
+        .dict-btn-primary { background: #3498db; color: #fff; }
+        .dict-btn-primary:hover { background: #2980b9; }
+        .dict-btn-secondary { background: #f0f0f0; color: #555; }
+        .dict-btn-secondary:hover { background: #e0e0e0; }
+        .dict-loading { text-align: center; padding: 30px; color: #888; }
+        .dict-error { text-align: center; padding: 30px; color: #e74c3c; }
+        
+        /* Vocabulary panel */
+        #vocabulary-panel { position: fixed; top: 60px; right: -400px; width: 380px; height: calc(100vh - 80px); background: #fff; border-left: 1px solid #ddd; box-shadow: -4px 0 12px rgba(0,0,0,0.1); z-index: 999; transition: right 0.3s ease; overflow: hidden; font-family: -apple-system, sans-serif; display: flex; flex-direction: column; }
+        #vocabulary-panel.visible { right: 0; }
+        .vocab-header { padding: 20px; border-bottom: 1px solid #eee; }
+        .vocab-search { width: 100%; padding: 10px 15px; border: 1px solid #ddd; border-radius: 6px; font-size: 0.9em; margin-top: 10px; }
+        .vocab-list { flex: 1; overflow-y: auto; padding: 10px 20px; }
+        .vocab-item { padding: 15px; background: #f8f9fa; border-radius: 8px; margin-bottom: 10px; position: relative; }
+        .vocab-word { font-weight: 600; color: #333; font-size: 1.1em; }
+        .vocab-pos { font-size: 0.8em; color: #3498db; margin-left: 8px; font-style: italic; }
+        .vocab-def { font-size: 0.9em; color: #555; margin-top: 6px; line-height: 1.5; }
+        .vocab-context { font-size: 0.85em; color: #888; font-style: italic; margin-top: 8px; padding: 8px; background: #fff; border-radius: 4px; }
+        .vocab-meta { font-size: 0.75em; color: #aaa; margin-top: 8px; }
+        .vocab-delete { position: absolute; top: 10px; right: 10px; background: none; border: none; cursor: pointer; font-size: 0.9em; opacity: 0.5; }
+        .vocab-delete:hover { opacity: 1; }
+        .vocab-stats { padding: 15px 20px; background: #f8f9fa; border-top: 1px solid #eee; font-size: 0.85em; color: #666; }
+        
+        /* Annotations panel */
+        #annotations-panel { position: fixed; top: 60px; right: -400px; width: 380px; height: calc(100vh - 80px); background: #fff; border-left: 1px solid #ddd; box-shadow: -4px 0 12px rgba(0,0,0,0.1); z-index: 999; transition: right 0.3s ease; overflow: hidden; font-family: -apple-system, sans-serif; display: flex; flex-direction: column; }
+        #annotations-panel.visible { right: 0; }
+        .annot-header { padding: 20px; border-bottom: 1px solid #eee; }
+        .annot-tabs { display: flex; gap: 10px; margin-top: 15px; }
+        .annot-tab { flex: 1; padding: 8px; border: none; background: #f0f0f0; border-radius: 6px; cursor: pointer; font-size: 0.85em; transition: all 0.2s; }
+        .annot-tab.active { background: #3498db; color: #fff; }
+        .annot-search { width: 100%; padding: 10px 15px; border: 1px solid #ddd; border-radius: 6px; font-size: 0.9em; margin-top: 10px; }
+        .annot-list { flex: 1; overflow-y: auto; padding: 10px 20px; }
+        .annot-item { padding: 15px; background: #f8f9fa; border-radius: 8px; margin-bottom: 10px; position: relative; }
+        .annot-chapter { font-size: 0.8em; color: #3498db; font-weight: 500; margin-bottom: 6px; }
+        .annot-text { font-size: 0.95em; color: #333; line-height: 1.5; }
+        .annot-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+        .annot-tag { font-size: 0.75em; background: #e8f4fc; color: #3498db; padding: 3px 8px; border-radius: 12px; }
+        .annot-meta { font-size: 0.75em; color: #aaa; margin-top: 8px; }
+        .annot-actions { position: absolute; top: 10px; right: 10px; display: flex; gap: 6px; }
+        .annot-actions button { background: none; border: none; cursor: pointer; font-size: 0.85em; opacity: 0.5; }
+        .annot-actions button:hover { opacity: 1; }
+        .annot-export { padding: 15px 20px; background: #f8f9fa; border-top: 1px solid #eee; }
+        .annot-export-btn { width: 100%; padding: 10px; background: #27ae60; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9em; }
+        .annot-export-btn:hover { background: #219a52; }
+        
+        /* Add note modal */
+        #add-note-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1150; justify-content: center; align-items: center; }
+        #add-note-modal.visible { display: flex; }
+        .note-modal-content { background: #fff; width: 500px; max-width: 90%; border-radius: 12px; overflow: hidden; }
+        .note-modal-header { padding: 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+        .note-modal-header h3 { margin: 0; font-size: 1.1em; color: #333; }
+        .note-modal-body { padding: 20px; }
+        .note-textarea { width: 100%; height: 150px; padding: 15px; border: 1px solid #ddd; border-radius: 8px; font-size: 0.95em; resize: vertical; font-family: inherit; }
+        .note-tags-input { width: 100%; padding: 10px 15px; border: 1px solid #ddd; border-radius: 6px; font-size: 0.9em; margin-top: 15px; }
+        .note-modal-footer { padding: 15px 20px; border-top: 1px solid #eee; display: flex; justify-content: flex-end; gap: 10px; }
+        
+        /* Session history panel */
+        #session-history-panel { position: fixed; top: 60px; right: -400px; width: 380px; height: calc(100vh - 80px); background: #fff; border-left: 1px solid #ddd; box-shadow: -4px 0 12px rgba(0,0,0,0.1); z-index: 999; transition: right 0.3s ease; overflow: hidden; font-family: -apple-system, sans-serif; display: flex; flex-direction: column; }
+        #session-history-panel.visible { right: 0; }
+        .session-stats { padding: 20px; background: linear-gradient(135deg, #3498db, #9b59b6); color: #fff; }
+        .session-stats-title { font-size: 0.85em; opacity: 0.9; margin-bottom: 10px; }
+        .session-stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
+        .stat-item { text-align: center; }
+        .stat-value { font-size: 1.5em; font-weight: 600; }
+        .stat-label { font-size: 0.75em; opacity: 0.8; }
+        .session-list { flex: 1; overflow-y: auto; padding: 10px 20px; }
+        .session-item { padding: 15px; background: #f8f9fa; border-radius: 8px; margin-bottom: 10px; cursor: pointer; transition: all 0.2s; }
+        .session-item:hover { background: #f0f0f0; transform: translateX(5px); }
+        .session-book { font-weight: 500; color: #333; margin-bottom: 4px; }
+        .session-chapter { font-size: 0.85em; color: #666; }
+        .session-time { font-size: 0.8em; color: #888; margin-top: 8px; display: flex; justify-content: space-between; }
+        
         /* Lazy load placeholder for images */
         .lazy-image { background: #f0f0f0; min-height: 200px; display: flex; align-items: center; justify-content: center; color: #999; }
         .lazy-image.loaded { min-height: auto; background: none; }
@@ -242,6 +328,7 @@
             <button class="highlight-color-btn purple" onclick="highlightSelection('purple')" title="Highlight purple"></button>
         </div>
         <button onclick="addBookmark()" title="Bookmark this passage">🔖 Bookmark</button>
+        <button onclick="openAddNoteModal()" title="Add a note">📝 Note</button>
         <button onclick="copySelectedText()" title="Copy selected text">📋 Copy</button>
         <button onclick="appendToClipboard()" title="Add to existing clipboard">➕ Add to Batch</button>
         <button onclick="clearSelection()" title="Clear selection">✕</button>
@@ -313,6 +400,121 @@
         </div>
     </div>
     
+    <!-- Dictionary Popup -->
+    <div id="dictionary-popup">
+        <div class="dict-header">
+            <div>
+                <span class="dict-word" id="dict-word"></span>
+                <span class="dict-phonetic" id="dict-phonetic"></span>
+            </div>
+            <button class="dict-close" onclick="closeDictionary()">✕</button>
+        </div>
+        <div class="dict-content" id="dict-content">
+            <div class="dict-loading">Loading definition...</div>
+        </div>
+    </div>
+    
+    <!-- Vocabulary Panel -->
+    <div id="vocabulary-panel">
+        <div class="vocab-header">
+            <div class="panel-header" style="padding: 0; border: none;">
+                <span class="panel-title">📖 Vocabulary</span>
+                <button class="panel-close" onclick="toggleVocabularyPanel()">✕</button>
+            </div>
+            <input type="text" class="vocab-search" id="vocab-search" placeholder="Search saved words..." oninput="filterVocabulary()">
+        </div>
+        <div class="vocab-list" id="vocab-list">
+            <div class="empty-state">
+                <div class="empty-state-icon">📖</div>
+                <div class="empty-state-text">No saved words yet</div>
+                <div class="empty-state-hint">Double-click any word to look it up and save it</div>
+            </div>
+        </div>
+        <div class="vocab-stats" id="vocab-stats">
+            <strong>0</strong> words saved
+        </div>
+    </div>
+    
+    <!-- Annotations Panel -->
+    <div id="annotations-panel">
+        <div class="annot-header">
+            <div class="panel-header" style="padding: 0; border: none;">
+                <span class="panel-title">📝 Annotations</span>
+                <button class="panel-close" onclick="toggleAnnotationsPanel()">✕</button>
+            </div>
+            <div class="annot-tabs">
+                <button class="annot-tab active" onclick="showAnnotTab('all')">All</button>
+                <button class="annot-tab" onclick="showAnnotTab('chapter')">This Chapter</button>
+                <button class="annot-tab" onclick="showAnnotTab('tags')">By Tag</button>
+            </div>
+            <input type="text" class="annot-search" id="annot-search" placeholder="Search notes..." oninput="filterAnnotations()">
+        </div>
+        <div class="annot-list" id="annot-list">
+            <div class="empty-state">
+                <div class="empty-state-icon">📝</div>
+                <div class="empty-state-text">No annotations yet</div>
+                <div class="empty-state-hint">Add notes to your highlights and bookmarks</div>
+            </div>
+        </div>
+        <div class="annot-export">
+            <button class="annot-export-btn" onclick="exportAnnotations()">📤 Export Annotations</button>
+        </div>
+    </div>
+    
+    <!-- Session History Panel -->
+    <div id="session-history-panel">
+        <div class="session-stats" id="session-stats">
+            <div class="session-stats-title">📊 Your Reading Stats</div>
+            <div class="session-stats-grid">
+                <div class="stat-item">
+                    <div class="stat-value" id="stat-total-time">0h</div>
+                    <div class="stat-label">Total Reading</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="stat-streak">0</div>
+                    <div class="stat-label">Day Streak 🔥</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="stat-sessions">0</div>
+                    <div class="stat-label">Sessions</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="stat-pages">0</div>
+                    <div class="stat-label">Pages Read</div>
+                </div>
+            </div>
+        </div>
+        <div class="panel-header">
+            <span class="panel-title">📚 Reading History</span>
+            <button class="panel-close" onclick="toggleSessionPanel()">✕</button>
+        </div>
+        <div class="session-list" id="session-list">
+            <div class="empty-state">
+                <div class="empty-state-icon">📚</div>
+                <div class="empty-state-text">No reading sessions yet</div>
+                <div class="empty-state-hint">Your reading history will appear here</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Add Note Modal -->
+    <div id="add-note-modal">
+        <div class="note-modal-content">
+            <div class="note-modal-header">
+                <h3>📝 Add Note</h3>
+                <button class="panel-close" onclick="closeNoteModal()">✕</button>
+            </div>
+            <div class="note-modal-body">
+                <textarea class="note-textarea" id="note-textarea" placeholder="Write your note here..."></textarea>
+                <input type="text" class="note-tags-input" id="note-tags-input" placeholder="Tags (comma-separated)">
+            </div>
+            <div class="note-modal-footer">
+                <button class="dict-btn dict-btn-secondary" onclick="closeNoteModal()">Cancel</button>
+                <button class="dict-btn dict-btn-primary" onclick="saveNote()">Save Note</button>
+            </div>
+        </div>
+    </div>
+    
     <!-- PDF floating page indicator -->
     {% if is_pdf %}
     <div id="pdf-page-indicator"></div>
@@ -330,9 +532,14 @@
         <div class="nav-header">{{ book.metadata.title }}</div>
         
         <!-- Quick actions toolbar -->
-        <div style="display: flex; gap: 8px; padding: 10px 15px; border-bottom: 1px solid #eee;">
+        <div style="display: flex; gap: 8px; padding: 10px 15px; border-bottom: 1px solid #eee; flex-wrap: wrap;">
             <button onclick="openSearch()" style="flex: 1; padding: 8px; border: 1px solid #ddd; background: #fff; border-radius: 4px; cursor: pointer; font-size: 0.85em;" title="Search (Ctrl/⌘+F)">🔍 Search</button>
             <button onclick="toggleBookmarksPanel()" style="flex: 1; padding: 8px; border: 1px solid #ddd; background: #fff; border-radius: 4px; cursor: pointer; font-size: 0.85em;" title="Bookmarks & Highlights">📚 Notes</button>
+        </div>
+        <div style="display: flex; gap: 8px; padding: 5px 15px 10px; border-bottom: 1px solid #eee; flex-wrap: wrap;">
+            <button onclick="toggleVocabularyPanel()" style="flex: 1; padding: 8px; border: 1px solid #ddd; background: #fff; border-radius: 4px; cursor: pointer; font-size: 0.85em;" title="Vocabulary List">📖 Vocab</button>
+            <button onclick="toggleAnnotationsPanel()" style="flex: 1; padding: 8px; border: 1px solid #ddd; background: #fff; border-radius: 4px; cursor: pointer; font-size: 0.85em;" title="Annotations">📝 Annot</button>
+            <button onclick="toggleSessionPanel()" style="flex: 1; padding: 8px; border: 1px solid #ddd; background: #fff; border-radius: 4px; cursor: pointer; font-size: 0.85em;" title="Reading History">📊 Stats</button>
         </div>
 
         <!-- Recursive Macro for TOC -->
@@ -452,6 +659,14 @@
         let savedProgress = null;
         let searchHistory = [];
         
+        // New feature data
+        let userVocabulary = [];
+        let userAnnotations = [];
+        let readingSessions = [];
+        let currentSessionId = null;
+        let sessionStartTime = null;
+        let currentNoteContext = null; // For add note modal
+        
         // ===== USER DATA API FUNCTIONS =====
         
         async function loadUserData() {
@@ -485,10 +700,37 @@
                     searchHistory = (historyData.history || []).slice(0, 10);
                 }
                 
+                // Load vocabulary
+                const vocabRes = await fetch(`/api/vocabulary/${encodeURIComponent(bookId)}`);
+                if (vocabRes.ok) {
+                    const vocabData = await vocabRes.json();
+                    userVocabulary = vocabData.words || [];
+                }
+                
+                // Load annotations
+                const annotRes = await fetch(`/api/annotations/${encodeURIComponent(bookId)}`);
+                if (annotRes.ok) {
+                    const annotData = await annotRes.json();
+                    userAnnotations = annotData.annotations || [];
+                }
+                
+                // Load reading sessions
+                const sessionsRes = await fetch('/api/sessions');
+                if (sessionsRes.ok) {
+                    const sessionsData = await sessionsRes.json();
+                    readingSessions = sessionsData.sessions || [];
+                }
+                
                 // Render panels
                 renderBookmarksList();
                 renderHighlightsList();
                 renderSearchHistory();
+                renderVocabularyList();
+                renderAnnotationsList();
+                renderSessionList();
+                
+                // Start new reading session
+                startReadingSession();
             } catch (error) {
                 console.error('Failed to load user data:', error);
             }
@@ -2024,6 +2266,543 @@
             const hours = Math.floor(minutes / 60);
             const mins = minutes % 60;
             return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+        }
+        
+        // ===== READING SESSIONS =====
+        
+        async function startReadingSession() {
+            sessionStartTime = Date.now();
+            try {
+                const response = await fetch('/api/sessions/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        book_id: bookId,
+                        book_title: "{{ book.metadata.title | replace('\"', '\\\"') }}",
+                        chapter_index: currentPageIndex,
+                        chapter_title: "{{ current_chapter.title | replace('\"', '\\\"') }}"
+                    })
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    currentSessionId = data.session_id;
+                }
+            } catch (error) {
+                console.error('Failed to start reading session:', error);
+            }
+        }
+        
+        async function endReadingSession() {
+            if (!currentSessionId || !sessionStartTime) return;
+            
+            const duration = Math.floor((Date.now() - sessionStartTime) / 1000);
+            const scrollPos = document.getElementById('main')?.scrollTop / 
+                             document.getElementById('main')?.scrollHeight || 0;
+            
+            try {
+                await fetch(`/api/sessions/${currentSessionId}/end`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        duration_seconds: duration,
+                        pages_read: isPDF ? 1 : 0,
+                        scroll_position: scrollPos
+                    })
+                });
+            } catch (error) {
+                console.error('Failed to end reading session:', error);
+            }
+        }
+        
+        // End session before page unload
+        window.addEventListener('beforeunload', () => {
+            if (currentSessionId && sessionStartTime) {
+                const duration = Math.floor((Date.now() - sessionStartTime) / 1000);
+                navigator.sendBeacon(
+                    `/api/sessions/${currentSessionId}/end`,
+                    JSON.stringify({
+                        duration_seconds: duration,
+                        pages_read: isPDF ? 1 : 0,
+                        scroll_position: 0
+                    })
+                );
+            }
+        });
+        
+        function toggleSessionPanel() {
+            const panel = document.getElementById('session-history-panel');
+            if (panel) {
+                panel.classList.toggle('visible');
+                if (panel.classList.contains('visible')) {
+                    loadSessionStats();
+                }
+            }
+        }
+        
+        async function loadSessionStats() {
+            try {
+                const response = await fetch('/api/sessions/stats');
+                if (response.ok) {
+                    const stats = await response.json();
+                    
+                    // Format total time
+                    const totalHours = Math.floor(stats.total_time_seconds / 3600);
+                    const totalMins = Math.floor((stats.total_time_seconds % 3600) / 60);
+                    document.getElementById('stat-total-time').textContent = 
+                        totalHours > 0 ? `${totalHours}h ${totalMins}m` : `${totalMins}m`;
+                    
+                    document.getElementById('stat-streak').textContent = stats.streak_days;
+                    document.getElementById('stat-sessions').textContent = stats.session_count;
+                    document.getElementById('stat-pages').textContent = stats.total_pages;
+                }
+            } catch (error) {
+                console.error('Failed to load session stats:', error);
+            }
+        }
+        
+        function renderSessionList() {
+            const list = document.getElementById('session-list');
+            if (!list) return;
+            
+            if (readingSessions.length === 0) {
+                list.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📚</div>
+                        <div class="empty-state-text">No reading sessions yet</div>
+                        <div class="empty-state-hint">Your reading history will appear here</div>
+                    </div>
+                `;
+                return;
+            }
+            
+            list.innerHTML = readingSessions.slice(0, 20).map(s => {
+                const duration = s.duration_seconds || 0;
+                const mins = Math.floor(duration / 60);
+                const date = new Date(s.start_time).toLocaleDateString();
+                const time = new Date(s.start_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                
+                return `
+                    <div class="session-item">
+                        <div class="session-book">${escapeHtml(s.book_title || 'Unknown Book')}</div>
+                        <div class="session-chapter">${escapeHtml(s.chapter_title || 'Chapter ' + (s.chapter_index + 1))}</div>
+                        <div class="session-time">
+                            <span>${date} at ${time}</span>
+                            <span>${mins > 0 ? mins + ' min' : '<1 min'}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        // ===== DICTIONARY & VOCABULARY =====
+        
+        // Double-click handler for dictionary lookup
+        document.addEventListener('dblclick', async function(e) {
+            const selection = window.getSelection();
+            const word = selection.toString().trim();
+            
+            // Only trigger for single words (no spaces)
+            if (word && !word.includes(' ') && word.length > 1 && word.length < 30) {
+                await lookupWord(word, e.clientX, e.clientY);
+            }
+        });
+        
+        async function lookupWord(word, x, y) {
+            const popup = document.getElementById('dictionary-popup');
+            const wordEl = document.getElementById('dict-word');
+            const phoneticEl = document.getElementById('dict-phonetic');
+            const contentEl = document.getElementById('dict-content');
+            
+            // Show popup with loading state
+            wordEl.textContent = word;
+            phoneticEl.textContent = '';
+            contentEl.innerHTML = '<div class="dict-loading">Looking up definition...</div>';
+            
+            // Position popup
+            popup.style.left = `${Math.min(x, window.innerWidth - 420)}px`;
+            popup.style.top = `${Math.min(y + 20, window.innerHeight - 400)}px`;
+            popup.classList.add('visible');
+            
+            try {
+                // Use Free Dictionary API
+                const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`);
+                
+                if (!response.ok) {
+                    contentEl.innerHTML = `
+                        <div class="dict-error">
+                            <p>No definition found for "${escapeHtml(word)}"</p>
+                            <p style="font-size: 0.85em; color: #888; margin-top: 10px;">Try a different word</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                const data = await response.json();
+                const entry = data[0];
+                
+                // Update phonetic
+                if (entry.phonetic) {
+                    phoneticEl.textContent = entry.phonetic;
+                }
+                
+                // Build definition HTML
+                let html = '';
+                
+                entry.meanings.forEach(meaning => {
+                    html += `<div class="dict-part-of-speech">${meaning.partOfSpeech}</div>`;
+                    
+                    meaning.definitions.slice(0, 2).forEach(def => {
+                        html += `<div class="dict-definition">${escapeHtml(def.definition)}</div>`;
+                        if (def.example) {
+                            html += `<div class="dict-example">"${escapeHtml(def.example)}"</div>`;
+                        }
+                    });
+                });
+                
+                // Get context (sentence containing the word)
+                const context = getWordContext(word);
+                
+                html += `
+                    <div class="dict-actions">
+                        <button class="dict-btn dict-btn-primary" onclick="saveToVocabulary('${escapeHtml(word)}', ${JSON.stringify(entry).replace(/'/g, "\\'")}, '${escapeHtml(context)}')">
+                            📖 Save to Vocabulary
+                        </button>
+                        <button class="dict-btn dict-btn-secondary" onclick="closeDictionary()">
+                            Close
+                        </button>
+                    </div>
+                `;
+                
+                contentEl.innerHTML = html;
+                
+            } catch (error) {
+                console.error('Dictionary lookup failed:', error);
+                contentEl.innerHTML = `
+                    <div class="dict-error">
+                        <p>Failed to look up word</p>
+                        <p style="font-size: 0.85em; color: #888; margin-top: 10px;">Check your internet connection</p>
+                    </div>
+                `;
+            }
+        }
+        
+        function getWordContext(word) {
+            // Try to find the sentence containing the word
+            const content = document.getElementById('book-content');
+            if (!content) return '';
+            
+            const text = content.innerText || '';
+            const sentences = text.split(/[.!?]+/);
+            
+            for (const sentence of sentences) {
+                if (sentence.toLowerCase().includes(word.toLowerCase())) {
+                    return sentence.trim().substring(0, 200);
+                }
+            }
+            return '';
+        }
+        
+        function closeDictionary() {
+            const popup = document.getElementById('dictionary-popup');
+            if (popup) {
+                popup.classList.remove('visible');
+            }
+        }
+        
+        async function saveToVocabulary(word, entryData, context) {
+            const entry = typeof entryData === 'string' ? JSON.parse(entryData) : entryData;
+            
+            // Extract first definition and example
+            let definition = '';
+            let partOfSpeech = '';
+            let example = '';
+            
+            if (entry.meanings && entry.meanings.length > 0) {
+                partOfSpeech = entry.meanings[0].partOfSpeech || '';
+                if (entry.meanings[0].definitions && entry.meanings[0].definitions.length > 0) {
+                    definition = entry.meanings[0].definitions[0].definition || '';
+                    example = entry.meanings[0].definitions[0].example || '';
+                }
+            }
+            
+            try {
+                const response = await fetch(`/api/vocabulary/${encodeURIComponent(bookId)}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        word: word,
+                        definition: definition,
+                        phonetic: entry.phonetic || '',
+                        part_of_speech: partOfSpeech,
+                        example: example,
+                        chapter_index: currentPageIndex,
+                        context: context
+                    })
+                });
+                
+                if (response.ok) {
+                    showToast('Word saved to vocabulary! 📖');
+                    closeDictionary();
+                    
+                    // Reload vocabulary
+                    const vocabRes = await fetch(`/api/vocabulary/${encodeURIComponent(bookId)}`);
+                    if (vocabRes.ok) {
+                        const vocabData = await vocabRes.json();
+                        userVocabulary = vocabData.words || [];
+                        renderVocabularyList();
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to save word:', error);
+                showToast('Failed to save word', 'error');
+            }
+        }
+        
+        function toggleVocabularyPanel() {
+            const panel = document.getElementById('vocabulary-panel');
+            if (panel) {
+                panel.classList.toggle('visible');
+            }
+        }
+        
+        function renderVocabularyList() {
+            const list = document.getElementById('vocab-list');
+            const stats = document.getElementById('vocab-stats');
+            if (!list) return;
+            
+            if (userVocabulary.length === 0) {
+                list.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📖</div>
+                        <div class="empty-state-text">No saved words yet</div>
+                        <div class="empty-state-hint">Double-click any word to look it up and save it</div>
+                    </div>
+                `;
+                if (stats) stats.innerHTML = '<strong>0</strong> words saved';
+                return;
+            }
+            
+            list.innerHTML = userVocabulary.map(w => `
+                <div class="vocab-item">
+                    <button class="vocab-delete" onclick="deleteVocabWord('${w.id}')" title="Delete">🗑️</button>
+                    <div>
+                        <span class="vocab-word">${escapeHtml(w.word)}</span>
+                        <span class="vocab-pos">${escapeHtml(w.part_of_speech || '')}</span>
+                    </div>
+                    <div class="vocab-def">${escapeHtml(w.definition)}</div>
+                    ${w.context ? `<div class="vocab-context">"${escapeHtml(w.context.substring(0, 100))}..."</div>` : ''}
+                    <div class="vocab-meta">Chapter ${w.chapter_index + 1} • ${new Date(w.created_at).toLocaleDateString()}</div>
+                </div>
+            `).join('');
+            
+            if (stats) stats.innerHTML = `<strong>${userVocabulary.length}</strong> words saved`;
+        }
+        
+        function filterVocabulary() {
+            const query = document.getElementById('vocab-search').value.toLowerCase();
+            const items = document.querySelectorAll('.vocab-item');
+            
+            items.forEach(item => {
+                const word = item.querySelector('.vocab-word')?.textContent.toLowerCase() || '';
+                const def = item.querySelector('.vocab-def')?.textContent.toLowerCase() || '';
+                item.style.display = (word.includes(query) || def.includes(query)) ? 'block' : 'none';
+            });
+        }
+        
+        async function deleteVocabWord(wordId) {
+            try {
+                await fetch(`/api/vocabulary/${encodeURIComponent(bookId)}/${wordId}`, {
+                    method: 'DELETE'
+                });
+                userVocabulary = userVocabulary.filter(w => w.id !== wordId);
+                renderVocabularyList();
+                showToast('Word removed');
+            } catch (error) {
+                console.error('Failed to delete word:', error);
+            }
+        }
+        
+        // ===== ANNOTATIONS =====
+        
+        function toggleAnnotationsPanel() {
+            const panel = document.getElementById('annotations-panel');
+            if (panel) {
+                panel.classList.toggle('visible');
+            }
+        }
+        
+        function renderAnnotationsList(filter = 'all') {
+            const list = document.getElementById('annot-list');
+            if (!list) return;
+            
+            let annotations = userAnnotations;
+            
+            // Apply filter
+            if (filter === 'chapter') {
+                annotations = annotations.filter(a => a.chapter_index === currentPageIndex);
+            }
+            
+            if (annotations.length === 0) {
+                list.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📝</div>
+                        <div class="empty-state-text">No annotations ${filter === 'chapter' ? 'in this chapter' : 'yet'}</div>
+                        <div class="empty-state-hint">Add notes to your highlights and bookmarks</div>
+                    </div>
+                `;
+                return;
+            }
+            
+            list.innerHTML = annotations.map(a => `
+                <div class="annot-item">
+                    <div class="annot-actions">
+                        <button onclick="editAnnotation('${a.id}')" title="Edit">✏️</button>
+                        <button onclick="deleteAnnotation('${a.id}')" title="Delete">🗑️</button>
+                    </div>
+                    <div class="annot-chapter">Chapter ${a.chapter_index + 1}</div>
+                    <div class="annot-text">${escapeHtml(a.note_text)}</div>
+                    ${a.tags && a.tags.length > 0 ? `
+                        <div class="annot-tags">
+                            ${a.tags.map(tag => `<span class="annot-tag">#${escapeHtml(tag)}</span>`).join('')}
+                        </div>
+                    ` : ''}
+                    <div class="annot-meta">${new Date(a.created_at).toLocaleDateString()}</div>
+                </div>
+            `).join('');
+        }
+        
+        function showAnnotTab(tab) {
+            const tabs = document.querySelectorAll('.annot-tab');
+            tabs.forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            renderAnnotationsList(tab);
+        }
+        
+        function filterAnnotations() {
+            const query = document.getElementById('annot-search').value.toLowerCase();
+            const items = document.querySelectorAll('.annot-item');
+            
+            items.forEach(item => {
+                const text = item.querySelector('.annot-text')?.textContent.toLowerCase() || '';
+                const tags = item.querySelector('.annot-tags')?.textContent.toLowerCase() || '';
+                item.style.display = (text.includes(query) || tags.includes(query)) ? 'block' : 'none';
+            });
+        }
+        
+        function openAddNoteModal(highlightId = null, bookmarkId = null) {
+            currentNoteContext = { highlightId, bookmarkId };
+            document.getElementById('note-textarea').value = '';
+            document.getElementById('note-tags-input').value = '';
+            document.getElementById('add-note-modal').classList.add('visible');
+            document.getElementById('note-textarea').focus();
+        }
+        
+        function closeNoteModal() {
+            document.getElementById('add-note-modal').classList.remove('visible');
+            currentNoteContext = null;
+        }
+        
+        async function saveNote() {
+            const noteText = document.getElementById('note-textarea').value.trim();
+            const tagsInput = document.getElementById('note-tags-input').value.trim();
+            const tags = tagsInput ? tagsInput.split(',').map(t => t.trim()).filter(t => t) : [];
+            
+            if (!noteText) {
+                showToast('Please enter a note', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/annotations/${encodeURIComponent(bookId)}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        chapter_index: currentPageIndex,
+                        note_text: noteText,
+                        highlight_id: currentNoteContext?.highlightId,
+                        bookmark_id: currentNoteContext?.bookmarkId,
+                        tags: tags
+                    })
+                });
+                
+                if (response.ok) {
+                    showToast('Note saved! 📝');
+                    closeNoteModal();
+                    
+                    // Reload annotations
+                    const annotRes = await fetch(`/api/annotations/${encodeURIComponent(bookId)}`);
+                    if (annotRes.ok) {
+                        const annotData = await annotRes.json();
+                        userAnnotations = annotData.annotations || [];
+                        renderAnnotationsList();
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to save note:', error);
+                showToast('Failed to save note', 'error');
+            }
+        }
+        
+        async function deleteAnnotation(annotationId) {
+            try {
+                await fetch(`/api/annotations/${encodeURIComponent(bookId)}/${annotationId}`, {
+                    method: 'DELETE'
+                });
+                userAnnotations = userAnnotations.filter(a => a.id !== annotationId);
+                renderAnnotationsList();
+                showToast('Annotation deleted');
+            } catch (error) {
+                console.error('Failed to delete annotation:', error);
+            }
+        }
+        
+        function editAnnotation(annotationId) {
+            const annot = userAnnotations.find(a => a.id === annotationId);
+            if (!annot) return;
+            
+            currentNoteContext = { annotationId };
+            document.getElementById('note-textarea').value = annot.note_text;
+            document.getElementById('note-tags-input').value = (annot.tags || []).join(', ');
+            document.getElementById('add-note-modal').classList.add('visible');
+            document.getElementById('note-textarea').focus();
+        }
+        
+        async function exportAnnotations() {
+            try {
+                const response = await fetch(`/api/annotations/${encodeURIComponent(bookId)}/export?format=markdown`);
+                if (response.ok) {
+                    const content = await response.text();
+                    const blob = new Blob([content], { type: 'text/markdown' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${bookId}_annotations.md`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    showToast('Annotations exported! 📤');
+                }
+            } catch (error) {
+                console.error('Export failed:', error);
+                showToast('Export failed', 'error');
+            }
+        }
+        
+        // Add "Add Note" button to selection toolbar
+        function addNoteFromSelection() {
+            const selection = window.getSelection();
+            const selectedText = selection.toString().trim();
+            
+            if (!selectedText) {
+                showToast('Select text first', 'error');
+                return;
+            }
+            
+            // Create a highlight first, then add note
+            highlightSelection('yellow').then(() => {
+                // Open note modal linked to the new highlight
+                openAddNoteModal();
+            });
         }
     </script>
 </body>

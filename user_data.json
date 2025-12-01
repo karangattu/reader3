@@ -209,6 +209,17 @@
         "start_offset": 10,
         "end_offset": 25,
         "created_at": "2025-11-30T10:12:40.859661"
+      },
+      {
+        "id": "810d74def0a7",
+        "book_id": "test_book_highlights_123",
+        "chapter_index": 1,
+        "text": "Highlighted text",
+        "color": "yellow",
+        "note": null,
+        "start_offset": 10,
+        "end_offset": 25,
+        "created_at": "2025-11-30T16:09:21.906732"
       }
     ],
     "test_book_highlight_colors": [
@@ -1212,6 +1223,61 @@
         "start_offset": 0,
         "end_offset": 0,
         "created_at": "2025-11-30T10:12:40.894051"
+      },
+      {
+        "id": "8d67722fef5d",
+        "book_id": "test_book_highlight_colors",
+        "chapter_index": 0,
+        "text": "Text with yellow",
+        "color": "yellow",
+        "note": null,
+        "start_offset": 0,
+        "end_offset": 0,
+        "created_at": "2025-11-30T16:09:21.913995"
+      },
+      {
+        "id": "3025bb0efeec",
+        "book_id": "test_book_highlight_colors",
+        "chapter_index": 0,
+        "text": "Text with green",
+        "color": "green",
+        "note": null,
+        "start_offset": 0,
+        "end_offset": 0,
+        "created_at": "2025-11-30T16:09:21.920871"
+      },
+      {
+        "id": "b12ec5cf16fa",
+        "book_id": "test_book_highlight_colors",
+        "chapter_index": 0,
+        "text": "Text with blue",
+        "color": "blue",
+        "note": null,
+        "start_offset": 0,
+        "end_offset": 0,
+        "created_at": "2025-11-30T16:09:21.927687"
+      },
+      {
+        "id": "4118eb12225b",
+        "book_id": "test_book_highlight_colors",
+        "chapter_index": 0,
+        "text": "Text with pink",
+        "color": "pink",
+        "note": null,
+        "start_offset": 0,
+        "end_offset": 0,
+        "created_at": "2025-11-30T16:09:21.934937"
+      },
+      {
+        "id": "851dd3bb5904",
+        "book_id": "test_book_highlight_colors",
+        "chapter_index": 0,
+        "text": "Text with purple",
+        "color": "purple",
+        "note": null,
+        "start_offset": 0,
+        "end_offset": 0,
+        "created_at": "2025-11-30T16:09:21.941746"
       }
     ],
     "test_book_delete_highlight": [],
@@ -1476,6 +1542,17 @@
         "start_offset": 0,
         "end_offset": 0,
         "created_at": "2025-11-30T10:12:40.999493"
+      },
+      {
+        "id": "a0d10acff920",
+        "book_id": "test_book_invalid_color",
+        "chapter_index": 0,
+        "text": "Invalid color test",
+        "color": "yellow",
+        "note": null,
+        "start_offset": 0,
+        "end_offset": 0,
+        "created_at": "2025-11-30T16:09:22.050321"
       }
     ],
     "test_book_delete_verify_e50f3b33": [
@@ -3387,6 +3464,176 @@
         "end_offset": 0,
         "created_at": "2025-11-30T10:12:41.132682"
       }
+    ],
+    "test_book_delete_verify_1abedb8a": [
+      {
+        "id": "963511f023fc",
+        "book_id": "test_book_delete_verify_1abedb8a",
+        "chapter_index": 0,
+        "text": "Text 2",
+        "color": "green",
+        "note": null,
+        "start_offset": 0,
+        "end_offset": 0,
+        "created_at": "2025-11-30T16:09:21.971276"
+      }
+    ],
+    "test_book_update_color_9369acd7": [
+      {
+        "id": "fa586cdfd618",
+        "book_id": "test_book_update_color_9369acd7",
+        "chapter_index": 0,
+        "text": "Color change test",
+        "color": "green",
+        "note": null,
+        "start_offset": 0,
+        "end_offset": 0,
+        "created_at": "2025-11-30T16:09:21.986983"
+      }
+    ],
+    "test_book_all_colors_bce7868b": [
+      {
+        "id": "536e7da4afa5",
+        "book_id": "test_book_all_colors_bce7868b",
+        "chapter_index": 0,
+        "text": "Multi color test",
+        "color": "yellow",
+        "note": null,
+        "start_offset": 0,
+        "end_offset": 0,
+        "created_at": "2025-11-30T16:09:22.002330"
+      }
+    ],
+    "test_export_highlights_json_5b41b02f": [
+      {
+        "id": "d87556feb847",
+        "book_id": "test_export_highlights_json_5b41b02f",
+        "chapter_index": 0,
+        "text": "First highlighted text",
+        "color": "yellow",
+        "note": null,
+        "start_offset": 0,
+        "end_offset": 0,
+        "created_at": "2025-11-30T16:09:22.093837"
+      },
+      {
+        "id": "17cfe8dec983",
+        "book_id": "test_export_highlights_json_5b41b02f",
+        "chapter_index": 1,
+        "text": "Second highlighted text",
+        "color": "green",
+        "note": null,
+        "start_offset": 0,
+        "end_offset": 0,
+        "created_at": "2025-11-30T16:09:22.100786"
+      }
+    ],
+    "test_export_highlights_md_0fe93dca": [
+      {
+        "id": "fb5a4e472b4f",
+        "book_id": "test_export_highlights_md_0fe93dca",
+        "chapter_index": 0,
+        "text": "Yellow highlight text",
+        "color": "yellow",
+        "note": null,
+        "start_offset": 0,
+        "end_offset": 0,
+        "created_at": "2025-11-30T16:09:22.109268"
+      },
+      {
+        "id": "858d9a297d74",
+        "book_id": "test_export_highlights_md_0fe93dca",
+        "chapter_index": 1,
+        "text": "Green highlight text",
+        "color": "green",
+        "note": "This is a note",
+        "start_offset": 0,
+        "end_offset": 0,
+        "created_at": "2025-11-30T16:09:22.116774"
+      }
+    ],
+    "test_export_both_json_cf003467": [
+      {
+        "id": "938ebf70cbe1",
+        "book_id": "test_export_both_json_cf003467",
+        "chapter_index": 1,
+        "text": "Important passage",
+        "color": "blue",
+        "note": null,
+        "start_offset": 0,
+        "end_offset": 0,
+        "created_at": "2025-11-30T16:09:22.132398"
+      }
+    ],
+    "test_export_both_md_6b6404d2": [
+      {
+        "id": "c2dcf8e5a142",
+        "book_id": "test_export_both_md_6b6404d2",
+        "chapter_index": 3,
+        "text": "Key concept here",
+        "color": "purple",
+        "note": null,
+        "start_offset": 0,
+        "end_offset": 0,
+        "created_at": "2025-11-30T16:09:22.147808"
+      }
+    ],
+    "test_export_colors_4fa2805d": [
+      {
+        "id": "495d17c52fb3",
+        "book_id": "test_export_colors_4fa2805d",
+        "chapter_index": 0,
+        "text": "Text with yellow",
+        "color": "yellow",
+        "note": null,
+        "start_offset": 0,
+        "end_offset": 0,
+        "created_at": "2025-11-30T16:09:22.163969"
+      },
+      {
+        "id": "91914a7c6c2f",
+        "book_id": "test_export_colors_4fa2805d",
+        "chapter_index": 0,
+        "text": "Text with green",
+        "color": "green",
+        "note": null,
+        "start_offset": 0,
+        "end_offset": 0,
+        "created_at": "2025-11-30T16:09:22.171037"
+      },
+      {
+        "id": "e091a5dbe6e4",
+        "book_id": "test_export_colors_4fa2805d",
+        "chapter_index": 0,
+        "text": "Text with blue",
+        "color": "blue",
+        "note": null,
+        "start_offset": 0,
+        "end_offset": 0,
+        "created_at": "2025-11-30T16:09:22.178093"
+      },
+      {
+        "id": "4a68d8c0dd16",
+        "book_id": "test_export_colors_4fa2805d",
+        "chapter_index": 0,
+        "text": "Text with pink",
+        "color": "pink",
+        "note": null,
+        "start_offset": 0,
+        "end_offset": 0,
+        "created_at": "2025-11-30T16:09:22.185104"
+      },
+      {
+        "id": "0c94e20defc0",
+        "book_id": "test_export_colors_4fa2805d",
+        "chapter_index": 0,
+        "text": "Text with purple",
+        "color": "purple",
+        "note": null,
+        "start_offset": 0,
+        "end_offset": 0,
+        "created_at": "2025-11-30T16:09:22.192037"
+      }
     ]
   },
   "bookmarks": {
@@ -3543,6 +3790,15 @@
         "title": "Test bookmark",
         "note": "Test note",
         "created_at": "2025-11-30T10:12:40.829036"
+      },
+      {
+        "id": "20ca7582df2b",
+        "book_id": "test_book_bookmarks_123",
+        "chapter_index": 2,
+        "scroll_position": 0.5,
+        "title": "Test bookmark",
+        "note": "Test note",
+        "created_at": "2025-11-30T16:09:21.875571"
       }
     ],
     "test_book_get_bookmarks": [
@@ -3698,6 +3954,15 @@
         "title": "Test",
         "note": "",
         "created_at": "2025-11-30T10:12:40.836139"
+      },
+      {
+        "id": "61157e40e5d5",
+        "book_id": "test_book_get_bookmarks",
+        "chapter_index": 0,
+        "scroll_position": 0.1,
+        "title": "Test",
+        "note": "",
+        "created_at": "2025-11-30T16:09:21.882970"
       }
     ],
     "test_book_delete_bookmark": [],
@@ -3863,6 +4128,15 @@
         "title": "Export test",
         "note": "Note",
         "created_at": "2025-11-30T10:12:41.024941"
+      },
+      {
+        "id": "2de3194a31b5",
+        "book_id": "test_book_export",
+        "chapter_index": 0,
+        "scroll_position": 0.5,
+        "title": "Export test",
+        "note": "Note",
+        "created_at": "2025-11-30T16:09:22.077447"
       }
     ],
     "test_export_both_json_832d4f25": [
@@ -4106,6 +4380,28 @@
         "note": "Review this later",
         "created_at": "2025-11-30T10:12:41.083622"
       }
+    ],
+    "test_export_both_json_cf003467": [
+      {
+        "id": "f72d77928134",
+        "book_id": "test_export_both_json_cf003467",
+        "chapter_index": 0,
+        "scroll_position": 0.5,
+        "title": "My Bookmark",
+        "note": "Bookmark note",
+        "created_at": "2025-11-30T16:09:22.125413"
+      }
+    ],
+    "test_export_both_md_6b6404d2": [
+      {
+        "id": "0316c81e1b8b",
+        "book_id": "test_export_both_md_6b6404d2",
+        "chapter_index": 2,
+        "scroll_position": 0.75,
+        "title": "Important Section",
+        "note": "Review this later",
+        "created_at": "2025-11-30T16:09:22.140760"
+      }
     ]
   },
   "progress": {
@@ -4113,7 +4409,7 @@
       "book_id": "test_book_progress_123",
       "chapter_index": 5,
       "scroll_position": 0.45,
-      "last_read": "2025-11-30T10:12:40.802740",
+      "last_read": "2025-11-30T16:09:21.849172",
       "total_chapters": 10,
       "reading_time_seconds": 0
     },
@@ -4135,9 +4431,17 @@
     },
     "The Biology of Sharks and Rays by A. Peter Klimley_data": {
       "book_id": "The Biology of Sharks and Rays by A. Peter Klimley_data",
-      "chapter_index": 60,
-      "scroll_position": 0,
-      "last_read": "2025-11-30T10:13:15.629898",
+      "chapter_index": 51,
+      "scroll_position": 26285.142578125,
+      "last_read": "2025-11-30T11:36:23.058763",
+      "total_chapters": 0,
+      "reading_time_seconds": 0
+    },
+    "Can We Talk About Israel (Revised and Updated) A Guide for the Curious_data": {
+      "book_id": "Can We Talk About Israel (Revised and Updated) A Guide for the Curious_data",
+      "chapter_index": 9,
+      "scroll_position": 3492.571533203125,
+      "last_read": "2025-11-30T16:14:03.980819",
       "total_chapters": 0,
       "reading_time_seconds": 0
     }
@@ -4240,8 +4544,51 @@
     },
     "test_book_noincrease_e9cc77c1": {
       "0": 80.0
+    },
+    "test_book_calc_5ae2ac46": {
+      "0": 100,
+      "1": 50.0
+    },
+    "test_book_multi_3fcebcd6": {
+      "0": 25.0,
+      "1": 50.0,
+      "2": 75.0
+    },
+    "test_book_noincrease_61bde477": {
+      "0": 80.0
+    },
+    "Can We Talk About Israel (Revised and Updated) A Guide for the Curious_data": {
+      "9": 30.809558338065674
     }
   },
   "search_history": [],
+  "reading_sessions": [
+    {
+      "id": "ac25bce52c19",
+      "book_id": "Can We Talk About Israel (Revised and Updated) A Guide for the Curious_data",
+      "book_title": "Can We Talk About Israel? (Revised and Updated)",
+      "chapter_index": 9,
+      "chapter_title": "Section 10",
+      "start_time": "2025-11-30T16:10:40.972291",
+      "end_time": null,
+      "duration_seconds": 0,
+      "pages_read": 0,
+      "scroll_position": 0.0
+    },
+    {
+      "id": "324db9bb7b7c",
+      "book_id": "Can We Talk About Israel (Revised and Updated) A Guide for the Curious_data",
+      "book_title": "Can We Talk About Israel? (Revised and Updated)",
+      "chapter_index": 0,
+      "chapter_title": "Section 1",
+      "start_time": "2025-11-30T16:10:37.693708",
+      "end_time": "2025-11-30T16:10:40.838744",
+      "duration_seconds": 3,
+      "pages_read": 0,
+      "scroll_position": 0
+    }
+  ],
+  "vocabulary": {},
+  "annotations": {},
   "version": "1.0"
 }
