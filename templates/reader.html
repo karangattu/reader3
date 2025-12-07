@@ -35,9 +35,11 @@
         ul.toc-list { list-style: none; padding-left: 0; margin: 0; }
         ul.toc-list ul { padding-left: 20px; } /* Indent children */
         li.toc-item { margin-bottom: 8px; }
-        a.toc-link { text-decoration: none; color: #495057; font-size: 0.95em; display: block; padding: 10px 12px; line-height: 1.4; border-radius: 4px; transition: all 0.2s ease; border-left: 3px solid transparent; margin-left: -3px; }
+        a.toc-link { text-decoration: none; color: #495057; font-size: 0.95em; display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; line-height: 1.4; border-radius: 4px; transition: all 0.2s ease; border-left: 3px solid transparent; margin-left: -3px; position: relative; }
         a.toc-link:hover { color: #000; background-color: #f1f3f5; border-left-color: #d63384; }
         a.toc-link.active { color: #fff; font-weight: 600; background: linear-gradient(135deg, #d63384 0%, #c21f6b 100%); box-shadow: 0 2px 6px rgba(214, 51, 132, 0.35); border-left-color: #fff; }
+        a.toc-link.unread { background-color: rgba(150, 150, 150, 0.08); opacity: 0.75; }
+        .toc-chapter-percent { font-size: 0.8em; color: #888; font-weight: normal; flex-shrink: 0; margin-left: 8px; }
         
         /* Chapter progress indicator */
         .toc-item-wrapper { position: relative; }
@@ -70,7 +72,18 @@
         .toolbar-btn:hover { background: #495057; color: #fff; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); }
         .toolbar-btn:active { transform: scale(0.97); }
         .toolbar-btn.active { background: #3498db; color: #fff; border-color: #3498db; }
-        #copy-status { font-family: -apple-system, sans-serif; font-size: 0.85em; color: #198754; text-align: right; min-height: 1.2em; opacity: 0; transition: opacity 0.3s ease-in-out; font-weight: 500; }
+#copy-status { font-family: -apple-system, sans-serif; font-size: 0.85em; color: #198754; text-align: right; min-height: 1.2em; opacity: 0; transition: opacity 0.3s ease-in-out; font-weight: 500; }
+        
+        /* Reading momentum toolbar */
+        .reading-momentum { display: flex; align-items: center; gap: 15px; margin-right: auto; font-family: -apple-system, sans-serif; }
+        .momentum-item { display: flex; align-items: center; gap: 6px; font-size: 0.9em; color: #666; }
+        .momentum-icon { font-size: 1.1em; }
+        .reading-time-counter { font-weight: 500; color: #333; min-width: 60px; text-align: right; }
+        .streak-indicator { display: inline-flex; align-items: center; gap: 4px; background: linear-gradient(135deg, #ffa500, #ff6b6b); color: #fff; padding: 4px 10px; border-radius: 20px; font-size: 0.8em; font-weight: 600; }
+        
+        /* Fade transition for chapter changes */
+        .content-container.fade-out { opacity: 0; transition: opacity 0.3s ease; }
+        .content-container.fade-in { opacity: 1; transition: opacity 0.3s ease; }
 
         /* Content Styling (Basic normalization for the book HTML) */
         .book-content { position: relative; z-index: 1; }
@@ -559,7 +572,8 @@
                     <a href="#" onclick="findAndGo('{{ item.file_href }}')"
                        class="toc-link {% if is_active %}active{% endif %}"
                        data-href="{{ item.file_href }}">
-                        {{ item.title }}
+                        <span class="toc-title">{{ item.title }}</span>
+                        <span class="toc-chapter-percent" data-href="{{ item.file_href }}">0%</span>
                     </a>
                     <div class="chapter-progress" data-href="{{ item.file_href }}">
                         <div class="chapter-progress-bar">
@@ -2124,10 +2138,15 @@
             if (idx !== undefined) {
                 saveScrollPosition();
                 let url = "/read/{{ book_id }}/" + idx;
-                // If there was an anchor, we could try to scroll to it,
-                // but simple page loads often lose anchor position without extra JS.
-                // Let's just go to the page.
-                window.location.href = url;
+                // Fade out current content for a smooth transition
+                const content = document.querySelector('.content-container');
+                if (content) {
+                    content.classList.remove('fade-in');
+                    content.classList.add('fade-out');
+                    setTimeout(() => { window.location.href = url; }, 250);
+                } else {
+                    window.location.href = url;
+                }
             } else {
                 console.log("Could not find index for", filename);
             }
@@ -2193,6 +2212,13 @@
             
             // Update reading progress bar on scroll
             updateReadingProgress();
+            
+            // Apply initial fade-in to content for a smooth entrance
+            const contentContainer = document.querySelector('.content-container');
+            if (contentContainer) {
+                contentContainer.classList.add('fade-in');
+                setTimeout(() => contentContainer.classList.remove('fade-in'), 350);
+            }
         });
 
         // Save scroll position on navigation buttons (Previous/Next)
@@ -2354,13 +2380,27 @@
                 if (progressElem) {
                     progressElem.style.width = `${progress}%`;
                 }
-                
+
+                // Set percent text next to chapter title
+                const percentEl = document.querySelector(`.toc-chapter-percent[data-href="${href}"]`);
+                if (percentEl) {
+                    percentEl.textContent = `${Math.round(progress)}%`;
+                }
+
                 // Mark as read if 90%+
+                const link = document.querySelector(`.toc-link[data-href="${href}"]`);
                 if (progress >= 90) {
-                    const link = document.querySelector(`.toc-link[data-href="${href}"]`);
-                    if (link) {
-                        link.classList.add('read');
-                    }
+                    if (link) link.classList.add('read');
+                    if (link) link.classList.remove('unread');
+                } else {
+                    if (link) link.classList.remove('read');
+                }
+
+                // Mark unread chapters (0% progress) with subtle background
+                if (progress === 0) {
+                    if (link) link.classList.add('unread');
+                } else {
+                    if (link) link.classList.remove('unread');
                 }
             });
         }

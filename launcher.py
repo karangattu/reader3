@@ -94,11 +94,25 @@ def main():
         import uvicorn
         from server import app
         
+        # When running as a PyInstaller executable (especially on Windows),
+        # sys.stdout may be None, which breaks uvicorn's logging.
+        # Redirect stdout/stderr to prevent AttributeError in uvicorn logging.
+        if getattr(sys, 'frozen', False) and sys.stdout is None:
+            # Redirect output to null device
+            null_file = open(os.devnull, 'w')
+            sys.stdout = null_file
+            sys.stderr = null_file
+        
         # Start browser in a separate thread
         threading.Thread(target=open_browser, daemon=True).start()
 
         # Run server
-        uvicorn.run(app, host="127.0.0.1", port=8123, log_level="info")
+        uvicorn.run(
+            app,
+            host="127.0.0.1",
+            port=8123,
+            log_level="info"
+        )
     except Exception as e:
         # Log errors to a file when running as executable
         log_error(f"Fatal error: {e}")
