@@ -16,15 +16,6 @@ uv run python launcher.py
 
 The browser opens automatically. Upload a book and start reading!
 
-## Features
-
-- 📚 **EPUB & PDF Support** — Read both formats with infinite scroll
-- 🔖 **Bookmarks & Highlights** — Save passages with notes, highlight in 5 colors
-- 🔍 **Search** — Full-text search across all books (Ctrl/⌘+F)
-- 📊 **Reading Progress** — Auto-saves position, resume where you left off
-- 📤 **Export** — Export notes to JSON or Markdown
-- 📋 **Easy Copy** — Batch select and copy text for LLM conversations
-
 ## Keyboard Shortcuts
 
 | Shortcut | Action |
