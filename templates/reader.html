@@ -1985,7 +1985,7 @@
             loadingPages = true;
             const nextStart = currentPageIndex + 1;
             
-            fetch(`/read/${bookId}/pages/${nextStart}/5`)
+            fetch(`/read/${bookId}/pages/${nextStart}/10`)
                 .then(resp => resp.json())
                 .then(data => {
                     if (data.pages && data.pages.length > 0) {
