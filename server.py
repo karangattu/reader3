@@ -998,6 +998,7 @@ async def export_pdf_pages_endpoint(book_id: str, request: Request):
         )
 
     # Return the file
+    filename = f"{book_id}_pages_{start_page + 1}-{end_page + 1}.pdf"
     return FileResponse(
         export_path,
         media_type="application/pdf",
@@ -1006,54 +1007,6 @@ async def export_pdf_pages_endpoint(book_id: str, request: Request):
             "Content-Disposition": f"attachment; filename={filename}"
         }
     )
-
-
-@app.post("/api/pdf/{book_id}/copy-text")
-async def copy_pdf_text(book_id: str, request: Request):
-    """
-    Copy text from a range of pages in a PDF.
-    Request body: { "start_page": 0, "end_page": 10 }
-    """
-    book = load_book_cached(book_id)
-    if not book:
-        raise HTTPException(status_code=404, detail="Book not found")
-
-    if not book.is_pdf:
-        raise HTTPException(status_code=400, detail="Not a PDF book")
-
-    data = await request.json()
-    start_page = data.get("start_page", 0)
-    end_page = data.get("end_page", 0)
-
-    # Validate range
-    if start_page < 0:
-        start_page = 0
-    if end_page >= book.pdf_total_pages:
-        end_page = book.pdf_total_pages - 1
-    
-    if start_page > end_page:
-        raise HTTPException(
-            status_code=400, 
-            detail="start_page must be less than or equal to end_page"
-        )
-
-    # Collect text from the spine chapters (which store the page text)
-    full_text = []
-    
-    # We iterate through the spine items corresponding to the page range
-    # Note: book.spine is ordered by page number for PDFs in process_pdf
-    for i in range(start_page, end_page + 1):
-        if i < len(book.spine):
-            page_text = book.spine[i].text
-            if page_text:
-                full_text.append(page_text)
-                
-    return {
-        "book_id": book_id,
-        "start_page": start_page,
-        "end_page": end_page,
-        "text": "\n\n".join(full_text)
-    }
 
 
 @app.get("/api/pdf/{book_id}/text-layer/{page_num}")

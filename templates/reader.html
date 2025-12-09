@@ -1,1742 +1,321 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ book.metadata.title }}</title>
     <style>
         /* Layout */
-        body {
-            margin: 0;
-            padding: 0;
-            display: flex;
-            height: 100vh;
-            overflow: hidden;
-            font-family: "Georgia", serif;
-            background: #fff;
-        }
-
-        body.sidebar-collapsed #sidebar {
-            width: 0;
-            padding: 0;
-            border-right: none;
-            transform: translateX(-100%);
-            opacity: 0;
-            pointer-events: none;
-        }
-
-        body.sidebar-collapsed #main {
-            width: 100%;
-        }
-
-        body.selection-mode .book-content {
-            cursor: text;
-            user-select: text;
-        }
-
-        body.selection-mode .book-content ::selection {
-            background: #ffeb3b;
-            color: #000;
-        }
-
+        body { margin: 0; padding: 0; display: flex; height: 100vh; overflow: hidden; font-family: "Georgia", serif; background: #fff; }
+        body.sidebar-collapsed #sidebar { width: 0; padding: 0; border-right: none; transform: translateX(-100%); opacity: 0; pointer-events: none; }
+        body.sidebar-collapsed #main { width: 100%; }
+        body.selection-mode .book-content { cursor: text; user-select: text; }
+        body.selection-mode .book-content ::selection { background: #ffeb3b; color: #000; }
+        
         /* PDF-specific styles */
-        body.is-pdf .book-content {
-            user-select: text;
-            cursor: text;
-        }
-
-        body.is-pdf .book-content ::selection {
-            background: #b3d9ff;
-            color: #000;
-        }
+        body.is-pdf .book-content { user-select: text; cursor: text; }
+        body.is-pdf .book-content ::selection { background: #b3d9ff; color: #000; }
 
         /* Sidebar */
-        #sidebar {
-            width: 300px;
-            background: #f8f9fa;
-            border-right: 1px solid #e9ecef;
-            overflow-y: auto;
-            padding: 20px;
-            flex-shrink: 0;
-            transition: width 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
-        }
+        #sidebar { width: 300px; background: #f8f9fa; border-right: 1px solid #e9ecef; overflow-y: auto; padding: 20px; flex-shrink: 0; transition: width 0.2s ease, transform 0.2s ease, opacity 0.2s ease; }
+        .nav-header { font-family: -apple-system, sans-serif; font-weight: bold; color: #495057; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #dee2e6; }
+        .nav-home { display: block; margin-bottom: 20px; margin-top: 45px; color: #3498db; text-decoration: none; font-family: -apple-system, sans-serif; font-size: 0.9em; }
 
-        .nav-header {
-            font-family: -apple-system, sans-serif;
-            font-weight: bold;
-            color: #495057;
-            margin-bottom: 15px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid #dee2e6;
-        }
-
-        .nav-home {
-            display: block;
-            margin-bottom: 20px;
-            margin-top: 45px;
-            color: #3498db;
-            text-decoration: none;
-            font-family: -apple-system, sans-serif;
-            font-size: 0.9em;
-        }
-
-        #sidebar-toggle {
-            position: fixed;
-            top: 15px;
-            left: 15px;
-            z-index: 1000;
-            border: 1px solid #ddd;
-            background: rgba(255, 255, 255, 0.95);
-            color: #495057;
-            padding: 8px 14px;
-            border-radius: 5px;
-            font-family: -apple-system, sans-serif;
-            font-size: 0.85em;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-        }
-
-        #sidebar-toggle:hover {
-            background: #495057;
-            color: #fff;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-        }
+        #sidebar-toggle { position: fixed; top: 15px; left: 15px; z-index: 1000; border: 1px solid #ddd; background: rgba(255, 255, 255, 0.95); color: #495057; padding: 8px 14px; border-radius: 5px; font-family: -apple-system, sans-serif; font-size: 0.85em; font-weight: 500; cursor: pointer; transition: all 0.2s ease; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05); }
+        #sidebar-toggle:hover { background: #495057; color: #fff; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15); }
 
         /* Selection floating toolbar */
-        #selection-toolbar {
-            display: none;
-            position: fixed;
-            z-index: 1001;
-            background: #333;
-            color: #fff;
-            padding: 8px 12px;
-            border-radius: 6px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-            font-family: -apple-system, sans-serif;
-            font-size: 0.85em;
-        }
-
-        #selection-toolbar.visible {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-        }
-
-        #selection-toolbar button {
-            background: transparent;
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            color: #fff;
-            padding: 6px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 0.85em;
-            transition: all 0.2s;
-        }
-
-        #selection-toolbar button:hover {
-            background: rgba(255, 255, 255, 0.2);
-            border-color: rgba(255, 255, 255, 0.5);
-        }
-
-        #selection-toolbar .selection-count {
-            opacity: 0.7;
-            font-size: 0.8em;
-        }
+        #selection-toolbar { display: none; position: fixed; z-index: 1001; background: #333; color: #fff; padding: 8px 12px; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); font-family: -apple-system, sans-serif; font-size: 0.85em; }
+        #selection-toolbar.visible { display: flex; gap: 8px; align-items: center; }
+        #selection-toolbar button { background: transparent; border: 1px solid rgba(255,255,255,0.3); color: #fff; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.85em; transition: all 0.2s; }
+        #selection-toolbar button:hover { background: rgba(255,255,255,0.2); border-color: rgba(255,255,255,0.5); }
+        #selection-toolbar .selection-count { opacity: 0.7; font-size: 0.8em; }
 
         /* TOC Tree */
-        ul.toc-list {
-            list-style: none;
-            padding-left: 0;
-            margin: 0;
-        }
-
-        ul.toc-list ul {
-            padding-left: 20px;
-        }
-
-        /* Indent children */
-        li.toc-item {
-            margin-bottom: 8px;
-        }
-
-        a.toc-link {
-            text-decoration: none;
-            color: #495057;
-            font-size: 0.95em;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 10px 12px;
-            line-height: 1.4;
-            border-radius: 4px;
-            transition: all 0.2s ease;
-            border-left: 3px solid transparent;
-            margin-left: -3px;
-            position: relative;
-        }
-
-        a.toc-link:hover {
-            color: #000;
-            background-color: #f1f3f5;
-            border-left-color: #d63384;
-        }
-
-        a.toc-link.active {
-            color: #fff;
-            font-weight: 600;
-            background: linear-gradient(135deg, #d63384 0%, #c21f6b 100%);
-            box-shadow: 0 2px 6px rgba(214, 51, 132, 0.35);
-            border-left-color: #fff;
-        }
-
-        a.toc-link.unread {
-            background-color: rgba(150, 150, 150, 0.08);
-            opacity: 0.75;
-        }
-
-        .toc-chapter-percent {
-            font-size: 0.8em;
-            color: #888;
-            font-weight: normal;
-            flex-shrink: 0;
-            margin-left: 8px;
-        }
-
+        ul.toc-list { list-style: none; padding-left: 0; margin: 0; }
+        ul.toc-list ul { padding-left: 20px; } /* Indent children */
+        li.toc-item { margin-bottom: 8px; }
+        a.toc-link { text-decoration: none; color: #495057; font-size: 0.95em; display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; line-height: 1.4; border-radius: 4px; transition: all 0.2s ease; border-left: 3px solid transparent; margin-left: -3px; position: relative; }
+        a.toc-link:hover { color: #000; background-color: #f1f3f5; border-left-color: #d63384; }
+        a.toc-link.active { color: #fff; font-weight: 600; background: linear-gradient(135deg, #d63384 0%, #c21f6b 100%); box-shadow: 0 2px 6px rgba(214, 51, 132, 0.35); border-left-color: #fff; }
+        a.toc-link.unread { background-color: rgba(150, 150, 150, 0.08); opacity: 0.75; }
+        .toc-chapter-percent { font-size: 0.8em; color: #888; font-weight: normal; flex-shrink: 0; margin-left: 8px; }
+        
         /* Chapter progress indicator */
-        .toc-item-wrapper {
-            position: relative;
-        }
-
-        .chapter-progress {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 2px 12px 8px;
-        }
-
-        .chapter-progress-bar {
-            flex: 1;
-            height: 3px;
-            background: #e9ecef;
-            border-radius: 2px;
-            overflow: hidden;
-        }
-
-        .chapter-progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #3498db, #9b59b6);
-            transition: width 0.3s;
-        }
-
-        .chapter-reading-time {
-            font-size: 0.75em;
-            color: #888;
-            white-space: nowrap;
-        }
-
-        a.toc-link.read {
-            position: relative;
-        }
-
-        a.toc-link.read::after {
-            content: '✓';
-            position: absolute;
-            right: 10px;
-            top: 50%;
-            transform: translateY(-50%);
-            font-size: 0.8em;
-            color: #27ae60;
-        }
-
-        a.toc-link.active::after {
-            color: rgba(255, 255, 255, 0.8);
-        }
-
+        .toc-item-wrapper { position: relative; }
+        .chapter-progress { display: flex; align-items: center; gap: 8px; padding: 2px 12px 8px; }
+        .chapter-progress-bar { flex: 1; height: 3px; background: #e9ecef; border-radius: 2px; overflow: hidden; }
+        .chapter-progress-fill { height: 100%; background: linear-gradient(90deg, #3498db, #9b59b6); transition: width 0.3s; }
+        .chapter-reading-time { font-size: 0.75em; color: #888; white-space: nowrap; }
+        a.toc-link.read { position: relative; }
+        a.toc-link.read::after { content: '✓'; position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 0.8em; color: #27ae60; }
+        a.toc-link.active::after { color: rgba(255,255,255,0.8); }
+        
         /* Empty state illustrations */
-        .empty-state {
-            text-align: center;
-            padding: 40px 20px;
-        }
-
-        .empty-state-icon {
-            font-size: 4em;
-            margin-bottom: 15px;
-            opacity: 0.5;
-        }
-
-        .empty-state-text {
-            color: #888;
-            font-size: 0.95em;
-            margin-bottom: 10px;
-        }
-
-        .empty-state-hint {
-            color: #aaa;
-            font-size: 0.85em;
-        }
-
+        .empty-state { text-align: center; padding: 40px 20px; }
+        .empty-state-icon { font-size: 4em; margin-bottom: 15px; opacity: 0.5; }
+        .empty-state-text { color: #888; font-size: 0.95em; margin-bottom: 10px; }
+        .empty-state-hint { color: #aaa; font-size: 0.85em; }
+        
         /* Keyboard shortcuts help */
-        #keyboard-help {
-            position: fixed;
-            bottom: 20px;
-            left: 20px;
-            background: rgba(0, 0, 0, 0.8);
-            color: #fff;
-            padding: 15px 20px;
-            border-radius: 10px;
-            font-family: -apple-system, sans-serif;
-            font-size: 0.85em;
-            z-index: 1000;
-            opacity: 0;
-            transform: translateY(20px);
-            transition: all 0.3s ease;
-            pointer-events: none;
-        }
-
-        #keyboard-help.visible {
-            opacity: 1;
-            transform: translateY(0);
-        }
-
-        .kbd {
-            display: inline-block;
-            background: rgba(255, 255, 255, 0.2);
-            padding: 2px 8px;
-            border-radius: 4px;
-            margin: 0 2px;
-            font-family: monospace;
-        }
-
-        .shortcut-row {
-            display: flex;
-            justify-content: space-between;
-            gap: 20px;
-            margin: 5px 0;
-        }
-
-        .shortcut-key {
-            opacity: 0.7;
-        }
+        #keyboard-help { position: fixed; bottom: 20px; left: 20px; background: rgba(0,0,0,0.8); color: #fff; padding: 15px 20px; border-radius: 10px; font-family: -apple-system, sans-serif; font-size: 0.85em; z-index: 1000; opacity: 0; transform: translateY(20px); transition: all 0.3s ease; pointer-events: none; }
+        #keyboard-help.visible { opacity: 1; transform: translateY(0); }
+        .kbd { display: inline-block; background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 4px; margin: 0 2px; font-family: monospace; }
+        .shortcut-row { display: flex; justify-content: space-between; gap: 20px; margin: 5px 0; }
+        .shortcut-key { opacity: 0.7; }
 
         /* Main Content */
-        #main {
-            flex-grow: 1;
-            overflow-y: auto;
-            position: relative;
-            scroll-behavior: smooth;
-        }
-
-        .content-container {
-            max-width: 700px;
-            margin: 0 auto;
-            padding: 60px 40px 60px 40px;
-            line-height: 1.8;
-            font-size: 1.15em;
-            color: #212529;
-            background: #fff;
-            position: relative;
-            z-index: 1;
-        }
-
-        .content-toolbar {
-            display: flex;
-            justify-content: flex-end;
-            gap: 10px;
-            margin-bottom: 25px;
-            font-family: -apple-system, sans-serif;
-            flex-wrap: wrap;
-        }
-
-        .toolbar-btn {
-            border: 1px solid #ddd;
-            background: #fff;
-            color: #495057;
-            padding: 9px 16px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 0.9em;
-            font-weight: 500;
-            transition: all 0.2s ease;
-        }
-
-        .toolbar-btn:hover {
-            background: #495057;
-            color: #fff;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-        }
-
-        .toolbar-btn:active {
-            transform: scale(0.97);
-        }
-
-        .toolbar-btn.active {
-            background: #3498db;
-            color: #fff;
-            border-color: #3498db;
-        }
-
-        #copy-status {
-            font-family: -apple-system, sans-serif;
-            font-size: 0.85em;
-            color: #198754;
-            text-align: right;
-            min-height: 1.2em;
-            opacity: 0;
-            transition: opacity 0.3s ease-in-out;
-            font-weight: 500;
-        }
-
+        #main { flex-grow: 1; overflow-y: auto; position: relative; scroll-behavior: smooth; }
+        .content-container { max-width: 700px; margin: 0 auto; padding: 60px 40px 60px 40px; line-height: 1.8; font-size: 1.15em; color: #212529; background: #fff; position: relative; z-index: 1; }
+        .content-toolbar { display: flex; justify-content: flex-end; gap: 10px; margin-bottom: 25px; font-family: -apple-system, sans-serif; flex-wrap: wrap; }
+        .toolbar-btn { border: 1px solid #ddd; background: #fff; color: #495057; padding: 9px 16px; border-radius: 5px; cursor: pointer; font-size: 0.9em; font-weight: 500; transition: all 0.2s ease; }
+        .toolbar-btn:hover { background: #495057; color: #fff; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); }
+        .toolbar-btn:active { transform: scale(0.97); }
+        .toolbar-btn.active { background: #3498db; color: #fff; border-color: #3498db; }
+#copy-status { font-family: -apple-system, sans-serif; font-size: 0.85em; color: #198754; text-align: right; min-height: 1.2em; opacity: 0; transition: opacity 0.3s ease-in-out; font-weight: 500; }
+        
         /* Reading momentum toolbar */
-        .reading-momentum {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            margin-right: auto;
-            font-family: -apple-system, sans-serif;
-        }
-
-        .momentum-item {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 0.9em;
-            color: #666;
-        }
-
-        .momentum-icon {
-            font-size: 1.1em;
-        }
-
-        .reading-time-counter {
-            font-weight: 500;
-            color: #333;
-            min-width: 60px;
-            text-align: right;
-        }
-
-        .streak-indicator {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            background: linear-gradient(135deg, #ffa500, #ff6b6b);
-            color: #fff;
-            padding: 4px 10px;
-            border-radius: 20px;
-            font-size: 0.8em;
-            font-weight: 600;
-        }
-
+        .reading-momentum { display: flex; align-items: center; gap: 15px; margin-right: auto; font-family: -apple-system, sans-serif; }
+        .momentum-item { display: flex; align-items: center; gap: 6px; font-size: 0.9em; color: #666; }
+        .momentum-icon { font-size: 1.1em; }
+        .reading-time-counter { font-weight: 500; color: #333; min-width: 60px; text-align: right; }
+        .streak-indicator { display: inline-flex; align-items: center; gap: 4px; background: linear-gradient(135deg, #ffa500, #ff6b6b); color: #fff; padding: 4px 10px; border-radius: 20px; font-size: 0.8em; font-weight: 600; }
+        
         /* Fade transition for chapter changes */
-        .content-container.fade-out {
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-
-        .content-container.fade-in {
-            opacity: 1;
-            transition: opacity 0.3s ease;
-        }
+        .content-container.fade-out { opacity: 0; transition: opacity 0.3s ease; }
+        .content-container.fade-in { opacity: 1; transition: opacity 0.3s ease; }
 
         /* Content Styling (Basic normalization for the book HTML) */
-        .book-content {
-            position: relative;
-            z-index: 1;
-        }
-
-        .book-content img {
-            max-width: 100%;
-            height: auto;
-            display: block;
-            margin: 20px auto;
-        }
-
-        .book-content h1,
-        .book-content h2,
-        .book-content h3 {
-            font-family: -apple-system, sans-serif;
-            margin-top: 1.5em;
-            color: #333;
-        }
-
-        .book-content p {
-            margin-bottom: 1.5em;
-            text-align: justify;
-        }
+        .book-content { position: relative; z-index: 1; }
+        .book-content img { max-width: 100%; height: auto; display: block; margin: 20px auto; }
+        .book-content h1, .book-content h2, .book-content h3 { font-family: -apple-system, sans-serif; margin-top: 1.5em; color: #333; }
+        .book-content p { margin-bottom: 1.5em; text-align: justify; }
 
         /* Navigation Footer */
-        .chapter-nav {
-            position: relative;
-            z-index: 10;
-            display: flex;
-            justify-content: space-between;
-            margin-top: 60px;
-            padding-top: 20px;
-            padding-bottom: 20px;
-            border-top: 1px solid #eee;
-            background: #fff;
-            font-family: -apple-system, sans-serif;
-        }
-
-        .nav-btn {
-            text-decoration: none;
-            color: #3498db;
-            font-weight: 600;
-            padding: 12px 22px;
-            border: 1px solid #3498db;
-            border-radius: 5px;
-            transition: all 0.2s ease;
-        }
-
-        .nav-btn:hover {
-            background: #3498db;
-            color: white;
-            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
-        }
-
-        .nav-btn:active {
-            transform: scale(0.96);
-        }
-
-        .nav-btn.disabled {
-            opacity: 0.4;
-            pointer-events: none;
-            border-color: #ddd;
-            color: #bbb;
-        }
+        .chapter-nav { position: relative; z-index: 10; display: flex; justify-content: space-between; margin-top: 60px; padding-top: 20px; padding-bottom: 20px; border-top: 1px solid #eee; background: #fff; font-family: -apple-system, sans-serif; }
+        .nav-btn { text-decoration: none; color: #3498db; font-weight: 600; padding: 12px 22px; border: 1px solid #3498db; border-radius: 5px; transition: all 0.2s ease; }
+        .nav-btn:hover { background: #3498db; color: white; box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3); }
+        .nav-btn:active { transform: scale(0.96); }
+        .nav-btn.disabled { opacity: 0.4; pointer-events: none; border-color: #ddd; color: #bbb; }
 
         /* PDF Page styling */
-        .pdf-page {
-            position: relative;
-            padding: 30px 0;
-            border-bottom: 1px solid #eee;
-            margin-bottom: 30px;
-        }
-
-        .pdf-page:last-child {
-            border-bottom: none;
-        }
-
-        .pdf-page-header {
-            text-align: center;
-            color: #999;
-            font-size: 0.85em;
-            margin-bottom: 20px;
-            font-family: -apple-system, sans-serif;
-            position: sticky;
-            top: 0;
-            background: linear-gradient(to bottom, #fff 70%, transparent);
-            padding: 10px 0 20px;
-            z-index: 5;
-        }
-
-        .pdf-page-number {
-            display: inline-block;
-            background: #f0f0f0;
-            padding: 4px 12px;
-            border-radius: 12px;
-            font-size: 0.8em;
-        }
-
+        .pdf-page { position: relative; padding: 30px 0; border-bottom: 1px solid #eee; margin-bottom: 30px; }
+        .pdf-page:last-child { border-bottom: none; }
+        .pdf-page-header { text-align: center; color: #999; font-size: 0.85em; margin-bottom: 20px; font-family: -apple-system, sans-serif; position: sticky; top: 0; background: linear-gradient(to bottom, #fff 70%, transparent); padding: 10px 0 20px; z-index: 5; }
+        .pdf-page-number { display: inline-block; background: #f0f0f0; padding: 4px 12px; border-radius: 12px; font-size: 0.8em; }
+        
         /* PDF page image container - renders page like traditional PDF viewer */
-        .pdf-page-image-container {
-            text-align: center;
-            margin: 20px 0;
-        }
-
-        .pdf-page-image {
-            max-width: 100%;
-            height: auto;
-            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
-            border-radius: 2px;
-            background: #fff;
-        }
-
+        .pdf-page-image-container { text-align: center; margin: 20px 0; }
+        .pdf-page-image { max-width: 100%; height: auto; box-shadow: 0 2px 12px rgba(0,0,0,0.15); border-radius: 2px; background: #fff; }
+        
         /* PDF copy text button */
-        .pdf-copy-text-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            background: #f8f9fa;
-            border: 1px solid #ddd;
-            color: #495057;
-            padding: 8px 16px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-family: -apple-system, sans-serif;
-            font-size: 0.85em;
-            margin-top: 15px;
-            transition: all 0.2s;
-        }
-
-        .pdf-copy-text-btn:hover {
-            background: #495057;
-            color: #fff;
-        }
-
-        .pdf-copy-text-btn.copied {
-            background: #27ae60;
-            color: #fff;
-            border-color: #27ae60;
-        }
-
+        .pdf-copy-text-btn { display: inline-flex; align-items: center; gap: 6px; background: #f8f9fa; border: 1px solid #ddd; color: #495057; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-family: -apple-system, sans-serif; font-size: 0.85em; margin-top: 15px; transition: all 0.2s; }
+        .pdf-copy-text-btn:hover { background: #495057; color: #fff; }
+        .pdf-copy-text-btn.copied { background: #27ae60; color: #fff; border-color: #27ae60; }
+        
         /* PDF text preview (hidden, for copy) */
-        .pdf-text-content {
-            display: none;
-        }
-
+        .pdf-text-content { display: none; }
+        
         /* PDF floating page indicator */
-        #pdf-page-indicator {
-            position: fixed;
-            bottom: 30px;
-            right: 30px;
-            background: rgba(0, 0, 0, 0.8);
-            color: #fff;
-            padding: 10px 18px;
-            border-radius: 25px;
-            font-family: -apple-system, sans-serif;
-            font-size: 0.9em;
-            z-index: 100;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-            pointer-events: none;
-        }
-
-        #pdf-page-indicator.visible {
-            opacity: 1;
-        }
-
+        #pdf-page-indicator { position: fixed; bottom: 30px; right: 30px; background: rgba(0,0,0,0.8); color: #fff; padding: 10px 18px; border-radius: 25px; font-family: -apple-system, sans-serif; font-size: 0.9em; z-index: 100; opacity: 0; transition: opacity 0.3s ease; pointer-events: none; }
+        #pdf-page-indicator.visible { opacity: 1; }
+        
         /* PDF progress bar */
-        #pdf-progress {
-            position: fixed;
-            top: 0;
-            left: 0;
-            height: 3px;
-            background: linear-gradient(90deg, #3498db, #9b59b6);
-            z-index: 1001;
-            transition: width 0.3s ease;
-        }
-
+        #pdf-progress { position: fixed; top: 0; left: 0; height: 3px; background: linear-gradient(90deg, #3498db, #9b59b6); z-index: 1001; transition: width 0.3s ease; }
+        
         /* Quick page jump for PDFs */
-        #page-jump-container {
-            display: none;
-            position: fixed;
-            bottom: 80px;
-            right: 30px;
-            background: #fff;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            padding: 12px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-            z-index: 100;
-            font-family: -apple-system, sans-serif;
-        }
-
-        #page-jump-container.visible {
-            display: block;
-        }
-
-        #page-jump-input {
-            width: 60px;
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            text-align: center;
-            font-size: 1em;
-        }
-
-        #page-jump-btn {
-            background: #3498db;
-            color: #fff;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 4px;
-            cursor: pointer;
-            margin-left: 8px;
-        }
-
-        #page-jump-btn:hover {
-            background: #2980b9;
-        }
-
+        #page-jump-container { display: none; position: fixed; bottom: 80px; right: 30px; background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 100; font-family: -apple-system, sans-serif; }
+        #page-jump-container.visible { display: block; }
+        #page-jump-input { width: 60px; padding: 8px; border: 1px solid #ddd; border-radius: 4px; text-align: center; font-size: 1em; }
+        #page-jump-btn { background: #3498db; color: #fff; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; margin-left: 8px; }
+        #page-jump-btn:hover { background: #2980b9; }
+        
         /* Copy toast notification */
-        #copy-toast {
-            position: fixed;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%) translateY(100px);
-            background: #333;
-            color: #fff;
-            padding: 12px 24px;
-            border-radius: 8px;
-            font-family: -apple-system, sans-serif;
-            font-size: 0.9em;
-            z-index: 1002;
-            opacity: 0;
-            transition: all 0.3s ease;
-        }
-
-        #copy-toast.visible {
-            opacity: 1;
-            transform: translateX(-50%) translateY(0);
-        }
-
-        #copy-toast.success {
-            background: #27ae60;
-        }
-
-        #copy-toast.error {
-            background: #e74c3c;
-        }
+        #copy-toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(100px); background: #333; color: #fff; padding: 12px 24px; border-radius: 8px; font-family: -apple-system, sans-serif; font-size: 0.9em; z-index: 1002; opacity: 0; transition: all 0.3s ease; }
+        #copy-toast.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+        #copy-toast.success { background: #27ae60; }
+        #copy-toast.error { background: #e74c3c; }
 
         /* Highlights */
-        .highlight-yellow {
-            background-color: rgba(255, 235, 59, 0.4);
-        }
-
-        .highlight-green {
-            background-color: rgba(76, 175, 80, 0.3);
-        }
-
-        .highlight-blue {
-            background-color: rgba(33, 150, 243, 0.3);
-        }
-
-        .highlight-pink {
-            background-color: rgba(233, 30, 99, 0.3);
-        }
-
-        .highlight-purple {
-            background-color: rgba(156, 39, 176, 0.3);
-        }
-
-        .highlight-mark {
-            cursor: pointer;
-            border-radius: 2px;
-            transition: all 0.2s;
-        }
-
-        .highlight-mark:hover {
-            filter: brightness(0.9);
-        }
-
+        .highlight-yellow { background-color: rgba(255, 235, 59, 0.4); }
+        .highlight-green { background-color: rgba(76, 175, 80, 0.3); }
+        .highlight-blue { background-color: rgba(33, 150, 243, 0.3); }
+        .highlight-pink { background-color: rgba(233, 30, 99, 0.3); }
+        .highlight-purple { background-color: rgba(156, 39, 176, 0.3); }
+        .highlight-mark { cursor: pointer; border-radius: 2px; transition: all 0.2s; }
+        .highlight-mark:hover { filter: brightness(0.9); }
+        
         /* Highlight color picker in toolbar */
-        .highlight-colors {
-            display: flex;
-            gap: 4px;
-            align-items: center;
-        }
-
-        #selection-toolbar .highlight-color-btn {
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            border: 2px solid rgba(255, 255, 255, 0.5);
-            cursor: pointer;
-            transition: all 0.2s;
-            padding: 0;
-        }
-
-        #selection-toolbar .highlight-color-btn:hover {
-            transform: scale(1.2);
-            border-color: #fff;
-        }
-
-        #selection-toolbar .highlight-color-btn.yellow {
-            background: #ffeb3b;
-        }
-
-        #selection-toolbar .highlight-color-btn.green {
-            background: #4caf50;
-        }
-
-        #selection-toolbar .highlight-color-btn.blue {
-            background: #2196f3;
-        }
-
-        #selection-toolbar .highlight-color-btn.pink {
-            background: #e91e63;
-        }
-
-        #selection-toolbar .highlight-color-btn.purple {
-            background: #9c27b0;
-        }
-
+        .highlight-colors { display: flex; gap: 4px; align-items: center; }
+        #selection-toolbar .highlight-color-btn { width: 20px; height: 20px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.5); cursor: pointer; transition: all 0.2s; padding: 0; }
+        #selection-toolbar .highlight-color-btn:hover { transform: scale(1.2); border-color: #fff; }
+        #selection-toolbar .highlight-color-btn.yellow { background: #ffeb3b; }
+        #selection-toolbar .highlight-color-btn.green { background: #4caf50; }
+        #selection-toolbar .highlight-color-btn.blue { background: #2196f3; }
+        #selection-toolbar .highlight-color-btn.pink { background: #e91e63; }
+        #selection-toolbar .highlight-color-btn.purple { background: #9c27b0; }
+        
         /* Bookmarks panel */
-        #bookmarks-panel {
-            position: fixed;
-            top: 60px;
-            right: -350px;
-            width: 320px;
-            height: calc(100vh - 80px);
-            background: #fff;
-            border-left: 1px solid #ddd;
-            box-shadow: -4px 0 12px rgba(0, 0, 0, 0.1);
-            z-index: 999;
-            transition: right 0.3s ease;
-            overflow-y: auto;
-            padding: 20px;
-            font-family: -apple-system, sans-serif;
-        }
-
-        #bookmarks-panel.visible {
-            right: 0;
-        }
-
-        .panel-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid #eee;
-        }
-
-        .panel-title {
-            font-size: 1.1em;
-            font-weight: 600;
-            color: #333;
-        }
-
-        .panel-close {
-            background: none;
-            border: none;
-            font-size: 1.5em;
-            cursor: pointer;
-            color: #999;
-        }
-
-        .panel-tabs {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 15px;
-        }
-
-        .panel-tab {
-            padding: 8px 16px;
-            border: none;
-            background: #f0f0f0;
-            border-radius: 20px;
-            cursor: pointer;
-            font-size: 0.85em;
-            transition: all 0.2s;
-        }
-
-        .panel-tab.active {
-            background: #3498db;
-            color: #fff;
-        }
-
-        .bookmark-item,
-        .highlight-item {
-            padding: 12px;
-            background: #f9f9f9;
-            border-radius: 6px;
-            margin-bottom: 10px;
-            position: relative;
-        }
-
-        .bookmark-item:hover,
-        .highlight-item:hover {
-            background: #f0f0f0;
-        }
-
-        .bookmark-title {
-            font-weight: 500;
-            color: #333;
-            margin-bottom: 4px;
-            cursor: pointer;
-        }
-
-        .bookmark-meta {
-            font-size: 0.8em;
-            color: #888;
-        }
-
-        .bookmark-note {
-            font-size: 0.85em;
-            color: #666;
-            margin-top: 6px;
-            font-style: italic;
-        }
-
-        .bookmark-actions {
-            position: absolute;
-            top: 8px;
-            right: 8px;
-            display: flex;
-            gap: 4px;
-        }
-
-        .bookmark-action-btn {
-            background: none;
-            border: none;
-            cursor: pointer;
-            font-size: 0.9em;
-            opacity: 0.6;
-        }
-
-        .bookmark-action-btn:hover {
-            opacity: 1;
-        }
-
-        .highlight-text {
-            font-size: 0.9em;
-            color: #555;
-            margin-bottom: 6px;
-            padding: 8px;
-            border-radius: 4px;
-        }
-
+        #bookmarks-panel { position: fixed; top: 60px; right: -350px; width: 320px; height: calc(100vh - 80px); background: #fff; border-left: 1px solid #ddd; box-shadow: -4px 0 12px rgba(0,0,0,0.1); z-index: 999; transition: right 0.3s ease; overflow-y: auto; padding: 20px; font-family: -apple-system, sans-serif; }
+        #bookmarks-panel.visible { right: 0; }
+        .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid #eee; }
+        .panel-title { font-size: 1.1em; font-weight: 600; color: #333; }
+        .panel-close { background: none; border: none; font-size: 1.5em; cursor: pointer; color: #999; }
+        .panel-tabs { display: flex; gap: 10px; margin-bottom: 15px; }
+        .panel-tab { padding: 8px 16px; border: none; background: #f0f0f0; border-radius: 20px; cursor: pointer; font-size: 0.85em; transition: all 0.2s; }
+        .panel-tab.active { background: #3498db; color: #fff; }
+        .bookmark-item, .highlight-item { padding: 12px; background: #f9f9f9; border-radius: 6px; margin-bottom: 10px; position: relative; }
+        .bookmark-item:hover, .highlight-item:hover { background: #f0f0f0; }
+        .bookmark-title { font-weight: 500; color: #333; margin-bottom: 4px; cursor: pointer; }
+        .bookmark-meta { font-size: 0.8em; color: #888; }
+        .bookmark-note { font-size: 0.85em; color: #666; margin-top: 6px; font-style: italic; }
+        .bookmark-actions { position: absolute; top: 8px; right: 8px; display: flex; gap: 4px; }
+        .bookmark-action-btn { background: none; border: none; cursor: pointer; font-size: 0.9em; opacity: 0.6; }
+        .bookmark-action-btn:hover { opacity: 1; }
+        .highlight-text { font-size: 0.9em; color: #555; margin-bottom: 6px; padding: 8px; border-radius: 4px; }
+        
         /* Search modal */
-        #search-modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 1100;
-        }
-
-        #search-modal.visible {
-            display: flex;
-            justify-content: center;
-            align-items: flex-start;
-            padding-top: 80px;
-        }
-
-        .search-container {
-            background: #fff;
-            width: 600px;
-            max-width: 90%;
-            max-height: 80vh;
-            border-radius: 12px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-            overflow: hidden;
-        }
-
-        .search-header {
-            padding: 20px;
-            border-bottom: 1px solid #eee;
-        }
-
-        .search-input-wrapper {
-            display: flex;
-            gap: 10px;
-        }
-
-        .search-input {
-            flex: 1;
-            padding: 12px 16px;
-            border: 2px solid #ddd;
-            border-radius: 8px;
-            font-size: 1em;
-            outline: none;
-            transition: border-color 0.2s;
-        }
-
-        .search-input:focus {
-            border-color: #3498db;
-        }
-
-        .search-btn {
-            background: #3498db;
-            color: #fff;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 500;
-        }
-
-        .search-btn:hover {
-            background: #2980b9;
-        }
-
-        .search-results {
-            max-height: 60vh;
-            overflow-y: auto;
-            padding: 10px 20px 20px;
-        }
-
-        .search-result {
-            padding: 15px;
-            border-bottom: 1px solid #eee;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-
-        .search-result:hover {
-            background: #f5f5f5;
-        }
-
-        .search-result-title {
-            font-weight: 500;
-            color: #333;
-            margin-bottom: 4px;
-        }
-
-        .search-result-chapter {
-            font-size: 0.85em;
-            color: #888;
-            margin-bottom: 6px;
-        }
-
-        .search-result-context {
-            font-size: 0.9em;
-            color: #555;
-        }
-
-        .search-result-context mark {
-            background: #ffeb3b;
-            padding: 0 2px;
-            border-radius: 2px;
-        }
-
-        .search-history {
-            padding: 10px 0;
-        }
-
-        .search-history-title {
-            font-size: 0.85em;
-            color: #888;
-            margin-bottom: 10px;
-        }
-
-        .search-history-item {
-            display: inline-block;
-            padding: 6px 12px;
-            background: #f0f0f0;
-            border-radius: 20px;
-            margin: 4px;
-            cursor: pointer;
-            font-size: 0.85em;
-        }
-
-        .search-history-item:hover {
-            background: #e0e0e0;
-        }
-
+        #search-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1100; }
+        #search-modal.visible { display: flex; justify-content: center; align-items: flex-start; padding-top: 80px; }
+        .search-container { background: #fff; width: 600px; max-width: 90%; max-height: 80vh; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.3); overflow: hidden; }
+        .search-header { padding: 20px; border-bottom: 1px solid #eee; }
+        .search-input-wrapper { display: flex; gap: 10px; }
+        .search-input { flex: 1; padding: 12px 16px; border: 2px solid #ddd; border-radius: 8px; font-size: 1em; outline: none; transition: border-color 0.2s; }
+        .search-input:focus { border-color: #3498db; }
+        .search-btn { background: #3498db; color: #fff; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-weight: 500; }
+        .search-btn:hover { background: #2980b9; }
+        .search-results { max-height: 60vh; overflow-y: auto; padding: 10px 20px 20px; }
+        .search-result { padding: 15px; border-bottom: 1px solid #eee; cursor: pointer; transition: background 0.2s; }
+        .search-result:hover { background: #f5f5f5; }
+        .search-result-title { font-weight: 500; color: #333; margin-bottom: 4px; }
+        .search-result-chapter { font-size: 0.85em; color: #888; margin-bottom: 6px; }
+        .search-result-context { font-size: 0.9em; color: #555; }
+        .search-result-context mark { background: #ffeb3b; padding: 0 2px; border-radius: 2px; }
+        .search-history { padding: 10px 0; }
+        .search-history-title { font-size: 0.85em; color: #888; margin-bottom: 10px; }
+        .search-history-item { display: inline-block; padding: 6px 12px; background: #f0f0f0; border-radius: 20px; margin: 4px; cursor: pointer; font-size: 0.85em; }
+        .search-history-item:hover { background: #e0e0e0; }
+        
         /* Reading progress indicator */
-        #reading-progress {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 3px;
-            background: #e0e0e0;
-            z-index: 1000;
-        }
-
-        #reading-progress-bar {
-            height: 100%;
-            background: linear-gradient(90deg, #3498db, #9b59b6);
-            transition: width 0.1s;
-            width: 0%;
-        }
-
+        #reading-progress { position: fixed; top: 0; left: 0; width: 100%; height: 3px; background: #e0e0e0; z-index: 1000; }
+        #reading-progress-bar { height: 100%; background: linear-gradient(90deg, #3498db, #9b59b6); transition: width 0.1s; width: 0%; }
+        
         /* Resume reading banner */
-        #resume-banner {
-            display: none;
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #fff;
-            padding: 15px 25px;
-            border-radius: 10px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-            z-index: 100;
-            font-family: -apple-system, sans-serif;
-        }
-
-        #resume-banner.visible {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-
-        .resume-text {
-            font-size: 0.9em;
-            color: #555;
-        }
-
-        .resume-btn {
-            background: #3498db;
-            color: #fff;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 0.85em;
-        }
-
-        .resume-dismiss {
-            background: none;
-            border: none;
-            color: #999;
-            cursor: pointer;
-            font-size: 1.2em;
-        }
-
+        #resume-banner { display: none; position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #fff; padding: 15px 25px; border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); z-index: 100; font-family: -apple-system, sans-serif; }
+        #resume-banner.visible { display: flex; align-items: center; gap: 15px; }
+        .resume-text { font-size: 0.9em; color: #555; }
+        .resume-btn { background: #3498db; color: #fff; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; font-size: 0.85em; }
+        .resume-dismiss { background: none; border: none; color: #999; cursor: pointer; font-size: 1.2em; }
+        
         /* Dictionary/Definition popup */
-        #dictionary-popup {
-            display: none;
-            position: fixed;
-            z-index: 1200;
-            background: #fff;
-            border-radius: 12px;
-            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
-            min-width: 300px;
-            max-width: 400px;
-            font-family: -apple-system, sans-serif;
-            overflow: hidden;
-        }
-
-        #dictionary-popup.visible {
-            display: block;
-        }
-
-        .dict-header {
-            background: #f8f9fa;
-            padding: 15px 20px;
-            border-bottom: 1px solid #eee;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .dict-word {
-            font-size: 1.3em;
-            font-weight: 600;
-            color: #333;
-        }
-
-        .dict-phonetic {
-            font-size: 0.9em;
-            color: #888;
-            margin-left: 10px;
-            font-style: italic;
-        }
-
-        .dict-close {
-            background: none;
-            border: none;
-            font-size: 1.5em;
-            cursor: pointer;
-            color: #999;
-            line-height: 1;
-        }
-
-        .dict-close:hover {
-            color: #333;
-        }
-
-        .dict-content {
-            padding: 20px;
-            max-height: 300px;
-            overflow-y: auto;
-        }
-
-        .dict-part-of-speech {
-            font-size: 0.85em;
-            color: #3498db;
-            font-weight: 500;
-            text-transform: italic;
-            margin-bottom: 8px;
-        }
-
-        .dict-definition {
-            font-size: 0.95em;
-            color: #333;
-            line-height: 1.6;
-            margin-bottom: 12px;
-        }
-
-        .dict-example {
-            font-size: 0.9em;
-            color: #666;
-            font-style: italic;
-            padding: 10px 15px;
-            background: #f8f9fa;
-            border-radius: 6px;
-            margin-bottom: 15px;
-            border-left: 3px solid #3498db;
-        }
-
-        .dict-actions {
-            display: flex;
-            gap: 10px;
-            padding-top: 15px;
-            border-top: 1px solid #eee;
-            margin-top: 10px;
-        }
-
-        .dict-btn {
-            flex: 1;
-            padding: 10px;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 0.9em;
-            transition: all 0.2s;
-        }
-
-        .dict-btn-primary {
-            background: #3498db;
-            color: #fff;
-        }
-
-        .dict-btn-primary:hover {
-            background: #2980b9;
-        }
-
-        .dict-btn-secondary {
-            background: #f0f0f0;
-            color: #555;
-        }
-
-        .dict-btn-secondary:hover {
-            background: #e0e0e0;
-        }
-
-        .dict-loading {
-            text-align: center;
-            padding: 30px;
-            color: #888;
-        }
-
-        .dict-error {
-            text-align: center;
-            padding: 30px;
-            color: #e74c3c;
-        }
-
+        #dictionary-popup { display: none; position: fixed; z-index: 1200; background: #fff; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.25); min-width: 300px; max-width: 400px; font-family: -apple-system, sans-serif; overflow: hidden; }
+        #dictionary-popup.visible { display: block; }
+        .dict-header { background: #f8f9fa; padding: 15px 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+        .dict-word { font-size: 1.3em; font-weight: 600; color: #333; }
+        .dict-phonetic { font-size: 0.9em; color: #888; margin-left: 10px; font-style: italic; }
+        .dict-close { background: none; border: none; font-size: 1.5em; cursor: pointer; color: #999; line-height: 1; }
+        .dict-close:hover { color: #333; }
+        .dict-content { padding: 20px; max-height: 300px; overflow-y: auto; }
+        .dict-part-of-speech { font-size: 0.85em; color: #3498db; font-weight: 500; text-transform: italic; margin-bottom: 8px; }
+        .dict-definition { font-size: 0.95em; color: #333; line-height: 1.6; margin-bottom: 12px; }
+        .dict-example { font-size: 0.9em; color: #666; font-style: italic; padding: 10px 15px; background: #f8f9fa; border-radius: 6px; margin-bottom: 15px; border-left: 3px solid #3498db; }
+        .dict-actions { display: flex; gap: 10px; padding-top: 15px; border-top: 1px solid #eee; margin-top: 10px; }
+        .dict-btn { flex: 1; padding: 10px; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9em; transition: all 0.2s; }
+        .dict-btn-primary { background: #3498db; color: #fff; }
+        .dict-btn-primary:hover { background: #2980b9; }
+        .dict-btn-secondary { background: #f0f0f0; color: #555; }
+        .dict-btn-secondary:hover { background: #e0e0e0; }
+        .dict-loading { text-align: center; padding: 30px; color: #888; }
+        .dict-error { text-align: center; padding: 30px; color: #e74c3c; }
+        
         /* Vocabulary panel */
-        #vocabulary-panel {
-            position: fixed;
-            top: 60px;
-            right: -400px;
-            width: 380px;
-            height: calc(100vh - 80px);
-            background: #fff;
-            border-left: 1px solid #ddd;
-            box-shadow: -4px 0 12px rgba(0, 0, 0, 0.1);
-            z-index: 999;
-            transition: right 0.3s ease;
-            overflow: hidden;
-            font-family: -apple-system, sans-serif;
-            display: flex;
-            flex-direction: column;
-        }
-
-        #vocabulary-panel.visible {
-            right: 0;
-        }
-
-        .vocab-header {
-            padding: 20px;
-            border-bottom: 1px solid #eee;
-        }
-
-        .vocab-search {
-            width: 100%;
-            padding: 10px 15px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            font-size: 0.9em;
-            margin-top: 10px;
-        }
-
-        .vocab-list {
-            flex: 1;
-            overflow-y: auto;
-            padding: 10px 20px;
-        }
-
-        .vocab-item {
-            padding: 15px;
-            background: #f8f9fa;
-            border-radius: 8px;
-            margin-bottom: 10px;
-            position: relative;
-        }
-
-        .vocab-word {
-            font-weight: 600;
-            color: #333;
-            font-size: 1.1em;
-        }
-
-        .vocab-pos {
-            font-size: 0.8em;
-            color: #3498db;
-            margin-left: 8px;
-            font-style: italic;
-        }
-
-        .vocab-def {
-            font-size: 0.9em;
-            color: #555;
-            margin-top: 6px;
-            line-height: 1.5;
-        }
-
-        .vocab-context {
-            font-size: 0.85em;
-            color: #888;
-            font-style: italic;
-            margin-top: 8px;
-            padding: 8px;
-            background: #fff;
-            border-radius: 4px;
-        }
-
-        .vocab-meta {
-            font-size: 0.75em;
-            color: #aaa;
-            margin-top: 8px;
-        }
-
-        .vocab-delete {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: none;
-            border: none;
-            cursor: pointer;
-            font-size: 0.9em;
-            opacity: 0.5;
-        }
-
-        .vocab-delete:hover {
-            opacity: 1;
-        }
-
-        .vocab-stats {
-            padding: 15px 20px;
-            background: #f8f9fa;
-            border-top: 1px solid #eee;
-            font-size: 0.85em;
-            color: #666;
-        }
-
+        #vocabulary-panel { position: fixed; top: 60px; right: -400px; width: 380px; height: calc(100vh - 80px); background: #fff; border-left: 1px solid #ddd; box-shadow: -4px 0 12px rgba(0,0,0,0.1); z-index: 999; transition: right 0.3s ease; overflow: hidden; font-family: -apple-system, sans-serif; display: flex; flex-direction: column; }
+        #vocabulary-panel.visible { right: 0; }
+        .vocab-header { padding: 20px; border-bottom: 1px solid #eee; }
+        .vocab-search { width: 100%; padding: 10px 15px; border: 1px solid #ddd; border-radius: 6px; font-size: 0.9em; margin-top: 10px; }
+        .vocab-list { flex: 1; overflow-y: auto; padding: 10px 20px; }
+        .vocab-item { padding: 15px; background: #f8f9fa; border-radius: 8px; margin-bottom: 10px; position: relative; }
+        .vocab-word { font-weight: 600; color: #333; font-size: 1.1em; }
+        .vocab-pos { font-size: 0.8em; color: #3498db; margin-left: 8px; font-style: italic; }
+        .vocab-def { font-size: 0.9em; color: #555; margin-top: 6px; line-height: 1.5; }
+        .vocab-context { font-size: 0.85em; color: #888; font-style: italic; margin-top: 8px; padding: 8px; background: #fff; border-radius: 4px; }
+        .vocab-meta { font-size: 0.75em; color: #aaa; margin-top: 8px; }
+        .vocab-delete { position: absolute; top: 10px; right: 10px; background: none; border: none; cursor: pointer; font-size: 0.9em; opacity: 0.5; }
+        .vocab-delete:hover { opacity: 1; }
+        .vocab-stats { padding: 15px 20px; background: #f8f9fa; border-top: 1px solid #eee; font-size: 0.85em; color: #666; }
+        
         /* Annotations panel */
-        #annotations-panel {
-            position: fixed;
-            top: 60px;
-            right: -400px;
-            width: 380px;
-            height: calc(100vh - 80px);
-            background: #fff;
-            border-left: 1px solid #ddd;
-            box-shadow: -4px 0 12px rgba(0, 0, 0, 0.1);
-            z-index: 999;
-            transition: right 0.3s ease;
-            overflow: hidden;
-            font-family: -apple-system, sans-serif;
-            display: flex;
-            flex-direction: column;
-        }
-
-        #annotations-panel.visible {
-            right: 0;
-        }
-
-        .annot-header {
-            padding: 20px;
-            border-bottom: 1px solid #eee;
-        }
-
-        .annot-tabs {
-            display: flex;
-            gap: 10px;
-            margin-top: 15px;
-        }
-
-        .annot-tab {
-            flex: 1;
-            padding: 8px;
-            border: none;
-            background: #f0f0f0;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 0.85em;
-            transition: all 0.2s;
-        }
-
-        .annot-tab.active {
-            background: #3498db;
-            color: #fff;
-        }
-
-        .annot-search {
-            width: 100%;
-            padding: 10px 15px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            font-size: 0.9em;
-            margin-top: 10px;
-        }
-
-        .annot-list {
-            flex: 1;
-            overflow-y: auto;
-            padding: 10px 20px;
-        }
-
-        .annot-item {
-            padding: 15px;
-            background: #f8f9fa;
-            border-radius: 8px;
-            margin-bottom: 10px;
-            position: relative;
-        }
-
-        .annot-chapter {
-            font-size: 0.8em;
-            color: #3498db;
-            font-weight: 500;
-            margin-bottom: 6px;
-        }
-
-        .annot-text {
-            font-size: 0.95em;
-            color: #333;
-            line-height: 1.5;
-        }
-
-        .annot-tags {
-            display: flex;
-            gap: 6px;
-            flex-wrap: wrap;
-            margin-top: 10px;
-        }
-
-        .annot-tag {
-            font-size: 0.75em;
-            background: #e8f4fc;
-            color: #3498db;
-            padding: 3px 8px;
-            border-radius: 12px;
-        }
-
-        .annot-meta {
-            font-size: 0.75em;
-            color: #aaa;
-            margin-top: 8px;
-        }
-
-        .annot-actions {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            display: flex;
-            gap: 6px;
-        }
-
-        .annot-actions button {
-            background: none;
-            border: none;
-            cursor: pointer;
-            font-size: 0.85em;
-            opacity: 0.5;
-        }
-
-        .annot-actions button:hover {
-            opacity: 1;
-        }
-
-        .annot-export {
-            padding: 15px 20px;
-            background: #f8f9fa;
-            border-top: 1px solid #eee;
-        }
-
-        .annot-export-btn {
-            width: 100%;
-            padding: 10px;
-            background: #27ae60;
-            color: #fff;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 0.9em;
-        }
-
-        .annot-export-btn:hover {
-            background: #219a52;
-        }
-
+        #annotations-panel { position: fixed; top: 60px; right: -400px; width: 380px; height: calc(100vh - 80px); background: #fff; border-left: 1px solid #ddd; box-shadow: -4px 0 12px rgba(0,0,0,0.1); z-index: 999; transition: right 0.3s ease; overflow: hidden; font-family: -apple-system, sans-serif; display: flex; flex-direction: column; }
+        #annotations-panel.visible { right: 0; }
+        .annot-header { padding: 20px; border-bottom: 1px solid #eee; }
+        .annot-tabs { display: flex; gap: 10px; margin-top: 15px; }
+        .annot-tab { flex: 1; padding: 8px; border: none; background: #f0f0f0; border-radius: 6px; cursor: pointer; font-size: 0.85em; transition: all 0.2s; }
+        .annot-tab.active { background: #3498db; color: #fff; }
+        .annot-search { width: 100%; padding: 10px 15px; border: 1px solid #ddd; border-radius: 6px; font-size: 0.9em; margin-top: 10px; }
+        .annot-list { flex: 1; overflow-y: auto; padding: 10px 20px; }
+        .annot-item { padding: 15px; background: #f8f9fa; border-radius: 8px; margin-bottom: 10px; position: relative; }
+        .annot-chapter { font-size: 0.8em; color: #3498db; font-weight: 500; margin-bottom: 6px; }
+        .annot-text { font-size: 0.95em; color: #333; line-height: 1.5; }
+        .annot-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+        .annot-tag { font-size: 0.75em; background: #e8f4fc; color: #3498db; padding: 3px 8px; border-radius: 12px; }
+        .annot-meta { font-size: 0.75em; color: #aaa; margin-top: 8px; }
+        .annot-actions { position: absolute; top: 10px; right: 10px; display: flex; gap: 6px; }
+        .annot-actions button { background: none; border: none; cursor: pointer; font-size: 0.85em; opacity: 0.5; }
+        .annot-actions button:hover { opacity: 1; }
+        .annot-export { padding: 15px 20px; background: #f8f9fa; border-top: 1px solid #eee; }
+        .annot-export-btn { width: 100%; padding: 10px; background: #27ae60; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9em; }
+        .annot-export-btn:hover { background: #219a52; }
+        
         /* Add note modal */
-        #add-note-modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 1150;
-            justify-content: center;
-            align-items: center;
-        }
-
-        #add-note-modal.visible {
-            display: flex;
-        }
-
-        .note-modal-content {
-            background: #fff;
-            width: 500px;
-            max-width: 90%;
-            border-radius: 12px;
-            overflow: hidden;
-        }
-
-        .note-modal-header {
-            padding: 20px;
-            border-bottom: 1px solid #eee;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .note-modal-header h3 {
-            margin: 0;
-            font-size: 1.1em;
-            color: #333;
-        }
-
-        .note-modal-body {
-            padding: 20px;
-        }
-
-        .note-textarea {
-            width: 100%;
-            height: 150px;
-            padding: 15px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            font-size: 0.95em;
-            resize: vertical;
-            font-family: inherit;
-        }
-
-        .note-tags-input {
-            width: 100%;
-            padding: 10px 15px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            font-size: 0.9em;
-            margin-top: 15px;
-        }
-
-        .note-modal-footer {
-            padding: 15px 20px;
-            border-top: 1px solid #eee;
-            display: flex;
-            justify-content: flex-end;
-            gap: 10px;
-        }
-
+        #add-note-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1150; justify-content: center; align-items: center; }
+        #add-note-modal.visible { display: flex; }
+        .note-modal-content { background: #fff; width: 500px; max-width: 90%; border-radius: 12px; overflow: hidden; }
+        .note-modal-header { padding: 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+        .note-modal-header h3 { margin: 0; font-size: 1.1em; color: #333; }
+        .note-modal-body { padding: 20px; }
+        .note-textarea { width: 100%; height: 150px; padding: 15px; border: 1px solid #ddd; border-radius: 8px; font-size: 0.95em; resize: vertical; font-family: inherit; }
+        .note-tags-input { width: 100%; padding: 10px 15px; border: 1px solid #ddd; border-radius: 6px; font-size: 0.9em; margin-top: 15px; }
+        .note-modal-footer { padding: 15px 20px; border-top: 1px solid #eee; display: flex; justify-content: flex-end; gap: 10px; }
+        
         /* Session history panel */
-        #session-history-panel {
-            position: fixed;
-            top: 60px;
-            right: -400px;
-            width: 380px;
-            height: calc(100vh - 80px);
-            background: #fff;
-            border-left: 1px solid #ddd;
-            box-shadow: -4px 0 12px rgba(0, 0, 0, 0.1);
-            z-index: 999;
-            transition: right 0.3s ease;
-            overflow: hidden;
-            font-family: -apple-system, sans-serif;
-            display: flex;
-            flex-direction: column;
-        }
-
-        #session-history-panel.visible {
-            right: 0;
-        }
-
-        .session-stats {
-            padding: 20px;
-            background: linear-gradient(135deg, #3498db, #9b59b6);
-            color: #fff;
-        }
-
-        .session-stats-title {
-            font-size: 0.85em;
-            opacity: 0.9;
-            margin-bottom: 10px;
-        }
-
-        .session-stats-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 15px;
-        }
-
-        .stat-item {
-            text-align: center;
-        }
-
-        .stat-value {
-            font-size: 1.5em;
-            font-weight: 600;
-        }
-
-        .stat-label {
-            font-size: 0.75em;
-            opacity: 0.8;
-        }
-
-        .session-list {
-            flex: 1;
-            overflow-y: auto;
-            padding: 10px 20px;
-        }
-
-        .session-item {
-            padding: 15px;
-            background: #f8f9fa;
-            border-radius: 8px;
-            margin-bottom: 10px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .session-item:hover {
-            background: #f0f0f0;
-            transform: translateX(5px);
-        }
-
-        .session-book {
-            font-weight: 500;
-            color: #333;
-            margin-bottom: 4px;
-        }
-
-        .session-chapter {
-            font-size: 0.85em;
-            color: #666;
-        }
-
-        .session-time {
-            font-size: 0.8em;
-            color: #888;
-            margin-top: 8px;
-            display: flex;
-            justify-content: space-between;
-        }
-
+        #session-history-panel { position: fixed; top: 60px; right: -400px; width: 380px; height: calc(100vh - 80px); background: #fff; border-left: 1px solid #ddd; box-shadow: -4px 0 12px rgba(0,0,0,0.1); z-index: 999; transition: right 0.3s ease; overflow: hidden; font-family: -apple-system, sans-serif; display: flex; flex-direction: column; }
+        #session-history-panel.visible { right: 0; }
+        .session-stats { padding: 20px; background: linear-gradient(135deg, #3498db, #9b59b6); color: #fff; }
+        .session-stats-title { font-size: 0.85em; opacity: 0.9; margin-bottom: 10px; }
+        .session-stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
+        .stat-item { text-align: center; }
+        .stat-value { font-size: 1.5em; font-weight: 600; }
+        .stat-label { font-size: 0.75em; opacity: 0.8; }
+        .session-list { flex: 1; overflow-y: auto; padding: 10px 20px; }
+        .session-item { padding: 15px; background: #f8f9fa; border-radius: 8px; margin-bottom: 10px; cursor: pointer; transition: all 0.2s; }
+        .session-item:hover { background: #f0f0f0; transform: translateX(5px); }
+        .session-book { font-weight: 500; color: #333; margin-bottom: 4px; }
+        .session-chapter { font-size: 0.85em; color: #666; }
+        .session-time { font-size: 0.8em; color: #888; margin-top: 8px; display: flex; justify-content: space-between; }
+        
         /* Lazy load placeholder for images */
-        .lazy-image {
-            background: #f0f0f0;
-            min-height: 200px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #999;
-        }
-
-        .lazy-image.loaded {
-            min-height: auto;
-            background: none;
-        }
+        .lazy-image { background: #f0f0f0; min-height: 200px; display: flex; align-items: center; justify-content: center; color: #999; }
+        .lazy-image.loaded { min-height: auto; background: none; }
 
         /* Highlight context menu */
-        #highlight-context-menu {
-            display: none;
-            position: fixed;
-            z-index: 1100;
-            background: #fff;
-            border-radius: 8px;
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
-            font-family: -apple-system, sans-serif;
-            min-width: 160px;
-            overflow: hidden;
-        }
+        #highlight-context-menu { display: none; position: fixed; z-index: 1100; background: #fff; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.2); font-family: -apple-system, sans-serif; min-width: 160px; overflow: hidden; }
+        #highlight-context-menu.visible { display: block; }
+        .highlight-menu-item { padding: 10px 16px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 0.9em; transition: background 0.2s; }
+        .highlight-menu-item:hover { background: #f5f5f5; }
+        .highlight-menu-item.delete { color: #e74c3c; }
+        .highlight-menu-item.delete:hover { background: #fdf2f2; }
+        .highlight-menu-colors { display: flex; gap: 6px; padding: 10px 16px; border-bottom: 1px solid #eee; }
+        .highlight-menu-color { width: 24px; height: 24px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; transition: all 0.2s; }
+        .highlight-menu-color:hover { transform: scale(1.15); }
+        .highlight-menu-color.active { border-color: #333; }
+        .highlight-menu-color.yellow { background: #ffeb3b; }
+        .highlight-menu-color.green { background: #4caf50; }
+        .highlight-menu-color.blue { background: #2196f3; }
+        .highlight-menu-color.pink { background: #e91e63; }
+        .highlight-menu-color.purple { background: #9c27b0; }
 
-        #highlight-context-menu.visible {
-            display: block;
-        }
-
-        .highlight-menu-item {
-            padding: 10px 16px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 0.9em;
-            transition: background 0.2s;
-        }
-
-        .highlight-menu-item:hover {
-            background: #f5f5f5;
-        }
-
-        .highlight-menu-item.delete {
-            color: #e74c3c;
-        }
-
-        .highlight-menu-item.delete:hover {
-            background: #fdf2f2;
-        }
-
-        .highlight-menu-colors {
-            display: flex;
-            gap: 6px;
-            padding: 10px 16px;
-            border-bottom: 1px solid #eee;
-        }
-
-        .highlight-menu-color {
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            border: 2px solid transparent;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .highlight-menu-color:hover {
-            transform: scale(1.15);
-        }
-
-        .highlight-menu-color.active {
-            border-color: #333;
-        }
-
-        .highlight-menu-color.yellow {
-            background: #ffeb3b;
-        }
-
-        .highlight-menu-color.green {
-            background: #4caf50;
-        }
-
-        .highlight-menu-color.blue {
-            background: #2196f3;
-        }
-
-        .highlight-menu-color.pink {
-            background: #e91e63;
-        }
-
-        .highlight-menu-color.purple {
-            background: #9c27b0;
-        }
     </style>
 </head>
-
 <body class="{{ 'is-pdf' if is_pdf else '' }}">
 
     <!-- Reading progress bar at top -->
@@ -1749,23 +328,17 @@
     <div id="pdf-progress" style="width: 0%"></div>
     {% endif %}
 
-    <button id="sidebar-toggle" type="button" onclick="toggleSidebar()" aria-pressed="false"
-        aria-controls="sidebar">Hide Chapters</button>
+    <button id="sidebar-toggle" type="button" onclick="toggleSidebar()" aria-pressed="false" aria-controls="sidebar">Hide Chapters</button>
 
     <!-- Selection floating toolbar -->
     <div id="selection-toolbar">
         <span class="selection-count" id="selection-char-count"></span>
         <div class="highlight-colors">
-            <button class="highlight-color-btn yellow" onclick="highlightSelection('yellow')"
-                title="Highlight yellow"></button>
-            <button class="highlight-color-btn green" onclick="highlightSelection('green')"
-                title="Highlight green"></button>
-            <button class="highlight-color-btn blue" onclick="highlightSelection('blue')"
-                title="Highlight blue"></button>
-            <button class="highlight-color-btn pink" onclick="highlightSelection('pink')"
-                title="Highlight pink"></button>
-            <button class="highlight-color-btn purple" onclick="highlightSelection('purple')"
-                title="Highlight purple"></button>
+            <button class="highlight-color-btn yellow" onclick="highlightSelection('yellow')" title="Highlight yellow"></button>
+            <button class="highlight-color-btn green" onclick="highlightSelection('green')" title="Highlight green"></button>
+            <button class="highlight-color-btn blue" onclick="highlightSelection('blue')" title="Highlight blue"></button>
+            <button class="highlight-color-btn pink" onclick="highlightSelection('pink')" title="Highlight pink"></button>
+            <button class="highlight-color-btn purple" onclick="highlightSelection('purple')" title="Highlight purple"></button>
         </div>
         <button onclick="addBookmark()" title="Bookmark this passage">🔖 Bookmark</button>
         <button onclick="openAddNoteModal()" title="Add a note">📝 Note</button>
@@ -1773,10 +346,10 @@
         <button onclick="appendToClipboard()" title="Add to existing clipboard">➕ Add to Batch</button>
         <button onclick="clearSelection()" title="Clear selection">✕</button>
     </div>
-
+    
     <!-- Copy toast notification -->
     <div id="copy-toast"></div>
-
+    
     <!-- Highlight context menu -->
     <div id="highlight-context-menu">
         <div class="highlight-menu-colors">
@@ -1789,29 +362,24 @@
         <div class="highlight-menu-item" onclick="copyHighlightText()">📋 Copy text</div>
         <div class="highlight-menu-item delete" onclick="deleteCurrentHighlight()">🗑️ Delete highlight</div>
     </div>
-
+    
     <!-- Keyboard shortcuts help -->
     <div id="keyboard-help">
         <div style="font-weight: 600; margin-bottom: 10px;">⌨️ Keyboard Shortcuts</div>
-        <div class="shortcut-row"><span class="shortcut-key"><span class="kbd">←</span> <span
-                    class="kbd">→</span></span><span>Prev/Next chapter</span></div>
-        <div class="shortcut-row"><span class="shortcut-key"><span class="kbd">⌘/Ctrl</span>+<span
-                    class="kbd">F</span></span><span>Search</span></div>
-        <div class="shortcut-row"><span class="shortcut-key"><span class="kbd">⌘/Ctrl</span>+<span
-                    class="kbd">B</span></span><span>Bookmarks</span></div>
-        <div class="shortcut-row"><span class="shortcut-key"><span class="kbd">Esc</span></span><span>Close
-                modals</span></div>
-        <div class="shortcut-row"><span class="shortcut-key"><span class="kbd">?</span></span><span>Show/hide this
-                help</span></div>
+        <div class="shortcut-row"><span class="shortcut-key"><span class="kbd">←</span> <span class="kbd">→</span></span><span>Prev/Next chapter</span></div>
+        <div class="shortcut-row"><span class="shortcut-key"><span class="kbd">⌘/Ctrl</span>+<span class="kbd">F</span></span><span>Search</span></div>
+        <div class="shortcut-row"><span class="shortcut-key"><span class="kbd">⌘/Ctrl</span>+<span class="kbd">B</span></span><span>Bookmarks</span></div>
+        <div class="shortcut-row"><span class="shortcut-key"><span class="kbd">Esc</span></span><span>Close modals</span></div>
+        <div class="shortcut-row"><span class="shortcut-key"><span class="kbd">?</span></span><span>Show/hide this help</span></div>
     </div>
-
+    
     <!-- Resume reading banner -->
     <div id="resume-banner">
         <span class="resume-text">Continue reading from where you left off?</span>
         <button class="resume-btn" onclick="resumeReading()">Resume</button>
         <button class="resume-dismiss" onclick="dismissResume()">✕</button>
     </div>
-
+    
     <!-- Bookmarks/Highlights Panel -->
     <div id="bookmarks-panel">
         <div class="panel-header">
@@ -1825,22 +393,17 @@
         <div id="bookmarks-list"></div>
         <div id="highlights-list" style="display:none;"></div>
         <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #eee;">
-            <button onclick="exportNotes('json')"
-                style="padding: 8px 16px; margin-right: 8px; border: 1px solid #ddd; background: #fff; border-radius: 4px; cursor: pointer;">Export
-                JSON</button>
-            <button onclick="exportNotes('markdown')"
-                style="padding: 8px 16px; border: 1px solid #ddd; background: #fff; border-radius: 4px; cursor: pointer;">Export
-                Markdown</button>
+            <button onclick="exportNotes('json')" style="padding: 8px 16px; margin-right: 8px; border: 1px solid #ddd; background: #fff; border-radius: 4px; cursor: pointer;">Export JSON</button>
+            <button onclick="exportNotes('markdown')" style="padding: 8px 16px; border: 1px solid #ddd; background: #fff; border-radius: 4px; cursor: pointer;">Export Markdown</button>
         </div>
     </div>
-
+    
     <!-- Search Modal -->
     <div id="search-modal">
         <div class="search-container">
             <div class="search-header">
                 <div class="search-input-wrapper">
-                    <input type="text" class="search-input" id="search-input" placeholder="Search in this book..."
-                        onkeydown="if(event.key==='Enter')performSearch()">
+                    <input type="text" class="search-input" id="search-input" placeholder="Search in this book..." onkeydown="if(event.key==='Enter')performSearch()">
                     <button class="search-btn" onclick="performSearch()">🔍 Search</button>
                 </div>
             </div>
@@ -1849,7 +412,7 @@
             </div>
         </div>
     </div>
-
+    
     <!-- Dictionary Popup -->
     <div id="dictionary-popup">
         <div class="dict-header">
@@ -1863,7 +426,7 @@
             <div class="dict-loading">Loading definition...</div>
         </div>
     </div>
-
+    
     <!-- Vocabulary Panel -->
     <div id="vocabulary-panel">
         <div class="vocab-header">
@@ -1871,8 +434,7 @@
                 <span class="panel-title">📖 Vocabulary</span>
                 <button class="panel-close" onclick="toggleVocabularyPanel()">✕</button>
             </div>
-            <input type="text" class="vocab-search" id="vocab-search" placeholder="Search saved words..."
-                oninput="filterVocabulary()">
+            <input type="text" class="vocab-search" id="vocab-search" placeholder="Search saved words..." oninput="filterVocabulary()">
         </div>
         <div class="vocab-list" id="vocab-list">
             <div class="empty-state">
@@ -1885,7 +447,7 @@
             <strong>0</strong> words saved
         </div>
     </div>
-
+    
     <!-- Annotations Panel -->
     <div id="annotations-panel">
         <div class="annot-header">
@@ -1898,8 +460,7 @@
                 <button class="annot-tab" onclick="showAnnotTab('chapter')">This Chapter</button>
                 <button class="annot-tab" onclick="showAnnotTab('tags')">By Tag</button>
             </div>
-            <input type="text" class="annot-search" id="annot-search" placeholder="Search notes..."
-                oninput="filterAnnotations()">
+            <input type="text" class="annot-search" id="annot-search" placeholder="Search notes..." oninput="filterAnnotations()">
         </div>
         <div class="annot-list" id="annot-list">
             <div class="empty-state">
@@ -1912,7 +473,7 @@
             <button class="annot-export-btn" onclick="exportAnnotations()">📤 Export Annotations</button>
         </div>
     </div>
-
+    
     <!-- Session History Panel -->
     <div id="session-history-panel">
         <div class="session-stats" id="session-stats">
@@ -1948,7 +509,7 @@
             </div>
         </div>
     </div>
-
+    
     <!-- Add Note Modal -->
     <div id="add-note-modal">
         <div class="note-modal-content">
@@ -1966,84 +527,40 @@
             </div>
         </div>
     </div>
-
+    
     <!-- PDF floating page indicator -->
     {% if is_pdf %}
     <div id="pdf-page-indicator"></div>
-
+    
     <!-- Page jump control -->
     <div id="page-jump-container">
         <input type="number" id="page-jump-input" min="1" max="{{ book.spine|length }}" placeholder="Page">
         <button id="page-jump-btn" onclick="jumpToPage()">Go</button>
     </div>
-
-    <!-- Copy Range Modal (simpler style reuse) -->
-    <div id="copy-range-modal"
-        style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1200; justify-content: center; align-items: center;">
-        <div
-            style="background: #fff; padding: 25px; border-radius: 12px; width: 350px; max-width: 90%; font-family: -apple-system, sans-serif;">
-            <h3 style="margin-top: 0; color: #333;">Copy Page Range</h3>
-            <div style="margin: 20px 0; display: flex; gap: 10px; align-items: center;">
-                <input type="number" id="copy-range-start" placeholder="Start"
-                    style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
-                <span>to</span>
-                <input type="number" id="copy-range-end" placeholder="End"
-                    style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
-            </div>
-            <div style="display: flex; justify-content: flex-end; gap: 10px;">
-                <button onclick="closeCopyRangeModal()"
-                    style="padding: 10px 15px; border: none; background: #f0f0f0; border-radius: 6px; cursor: pointer;">Cancel</button>
-                <button onclick="copyCustomRange()"
-                    style="padding: 10px 15px; border: none; background: #3498db; color: #fff; border-radius: 6px; cursor: pointer;">Copy
-                    Text</button>
-            </div>
-        </div>
-    </div>
-    <script>
-        // Inline script to handle modal flex display when class is added
-        // The CSS class .visible is defined elsewhere for opacity, but we need display:flex here
-        document.addEventListener('DOMContentLoaded', () => {
-            const style = document.createElement('style');
-            style.textContent = `
-                #copy-range-modal.visible { display: flex !important; }
-            `;
-            document.head.appendChild(style);
-        });
-    </script>
     {% endif %}
 
     <!-- SIDEBAR -->
     <div id="sidebar">
         <a href="/" class="nav-home">← Back to Library</a>
         <div class="nav-header">{{ book.metadata.title }}</div>
-
+        
         <!-- Quick actions toolbar -->
         <div style="display: flex; gap: 8px; padding: 10px 15px; border-bottom: 1px solid #eee; flex-wrap: wrap;">
-            <button onclick="openSearch()"
-                style="flex: 1; padding: 8px; border: 1px solid #ddd; background: #fff; border-radius: 4px; cursor: pointer; font-size: 0.85em;"
-                title="Search (Ctrl/⌘+F)">🔍 Search</button>
-            <button onclick="toggleBookmarksPanel()"
-                style="flex: 1; padding: 8px; border: 1px solid #ddd; background: #fff; border-radius: 4px; cursor: pointer; font-size: 0.85em;"
-                title="Bookmarks & Highlights">📚 Notes</button>
+            <button onclick="openSearch()" style="flex: 1; padding: 8px; border: 1px solid #ddd; background: #fff; border-radius: 4px; cursor: pointer; font-size: 0.85em;" title="Search (Ctrl/⌘+F)">🔍 Search</button>
+            <button onclick="toggleBookmarksPanel()" style="flex: 1; padding: 8px; border: 1px solid #ddd; background: #fff; border-radius: 4px; cursor: pointer; font-size: 0.85em;" title="Bookmarks & Highlights">📚 Notes</button>
         </div>
         <div style="display: flex; gap: 8px; padding: 5px 15px 10px; border-bottom: 1px solid #eee; flex-wrap: wrap;">
-            <button onclick="toggleVocabularyPanel()"
-                style="flex: 1; padding: 8px; border: 1px solid #ddd; background: #fff; border-radius: 4px; cursor: pointer; font-size: 0.85em;"
-                title="Vocabulary List">📖 Vocab</button>
-            <button onclick="toggleAnnotationsPanel()"
-                style="flex: 1; padding: 8px; border: 1px solid #ddd; background: #fff; border-radius: 4px; cursor: pointer; font-size: 0.85em;"
-                title="Annotations">📝 Annot</button>
-            <button onclick="toggleSessionPanel()"
-                style="flex: 1; padding: 8px; border: 1px solid #ddd; background: #fff; border-radius: 4px; cursor: pointer; font-size: 0.85em;"
-                title="Reading History">📊 Stats</button>
+            <button onclick="toggleVocabularyPanel()" style="flex: 1; padding: 8px; border: 1px solid #ddd; background: #fff; border-radius: 4px; cursor: pointer; font-size: 0.85em;" title="Vocabulary List">📖 Vocab</button>
+            <button onclick="toggleAnnotationsPanel()" style="flex: 1; padding: 8px; border: 1px solid #ddd; background: #fff; border-radius: 4px; cursor: pointer; font-size: 0.85em;" title="Annotations">📝 Annot</button>
+            <button onclick="toggleSessionPanel()" style="flex: 1; padding: 8px; border: 1px solid #ddd; background: #fff; border-radius: 4px; cursor: pointer; font-size: 0.85em;" title="Reading History">📊 Stats</button>
         </div>
 
         <!-- Recursive Macro for TOC -->
         {% macro render_toc(items) %}
-        <ul class="toc-list">
+            <ul class="toc-list">
             {% for item in items %}
-            <li class="toc-item">
-                <div class="toc-item-wrapper">
+                <li class="toc-item">
+                    <div class="toc-item-wrapper">
                     <!--
                         Matching Logic:
                         If the TOC item filename matches the current chapter filename, mark active.
@@ -2053,7 +570,8 @@
                     {% set is_active = current_chapter.href == item.file_href %}
 
                     <a href="#" onclick="findAndGo('{{ item.file_href }}')"
-                        class="toc-link {% if is_active %}active{% endif %}" data-href="{{ item.file_href }}">
+                       class="toc-link {% if is_active %}active{% endif %}"
+                       data-href="{{ item.file_href }}">
                         <span class="toc-title">{{ item.title }}</span>
                         <span class="toc-chapter-percent" data-href="{{ item.file_href }}">0%</span>
                     </a>
@@ -2063,14 +581,14 @@
                         </div>
                         <span class="chapter-reading-time" title="Estimated reading time">--</span>
                     </div>
-                </div>
+                    </div>
 
-                {% if item.children %}
-                {{ render_toc(item.children) }}
-                {% endif %}
-            </li>
+                    {% if item.children %}
+                        {{ render_toc(item.children) }}
+                    {% endif %}
+                </li>
             {% endfor %}
-        </ul>
+            </ul>
         {% endmacro %}
 
         {{ render_toc(book.toc) }}
@@ -2081,19 +599,11 @@
         <div class="content-container">
             <div class="content-toolbar">
                 {% if is_pdf %}
-                <button class="toolbar-btn" type="button" onclick="copyVisiblePages()"
-                    title="Copy text from pages currently visible">📄 Copy Visible</button>
-                <button class="toolbar-btn" type="button" onclick="copyNext10Pages()"
-                    title="Copy text from next 10 pages">📄 Copy Next 10</button>
-                <button class="toolbar-btn" type="button" onclick="toggleCopyRangeModal()"
-                    title="Copy text from specific page range">📄 Copy Range</button>
-                <button class="toolbar-btn" type="button" onclick="togglePageJump()" title="Jump to a specific page">🔢
-                    Go to Page</button>
+                <button class="toolbar-btn" type="button" onclick="copyVisiblePages()" title="Copy text from pages currently visible">📄 Copy Visible</button>
+                <button class="toolbar-btn" type="button" onclick="togglePageJump()" title="Jump to a specific page">🔢 Go to Page</button>
                 {% endif %}
-                <button class="toolbar-btn" type="button" onclick="copyAllLoaded()" id="copy-all-btn"
-                    title="Copy all loaded content">📋 Copy All</button>
-                <button class="toolbar-btn" type="button" onclick="showBatchClipboard()" id="batch-clipboard-btn"
-                    style="display: none;">🗂️ Batch (<span id="batch-count">0</span>)</button>
+                <button class="toolbar-btn" type="button" onclick="copyAllLoaded()" id="copy-all-btn" title="Copy all loaded content">📋 Copy All</button>
+                <button class="toolbar-btn" type="button" onclick="showBatchClipboard()" id="batch-clipboard-btn" style="display: none;">🗂️ Batch (<span id="batch-count">0</span>)</button>
             </div>
             <div id="copy-status" aria-live="polite"></div>
             <div class="book-content" id="book-content">
@@ -2101,8 +611,7 @@
                 <div class="pdf-page" data-page-index="{{ chapter_index }}">
                     {{ current_chapter.content | safe }}
                     <div style="text-align: center; margin-top: 15px;">
-                        <button class="pdf-copy-text-btn" onclick="copyPageText(this, {{ chapter_index }})"
-                            title="Copy all text from this page">
+                        <button class="pdf-copy-text-btn" onclick="copyPageText(this, {{ chapter_index }})" title="Copy all text from this page">
                             📋 Copy Page Text
                         </button>
                     </div>
@@ -2117,9 +626,9 @@
             {% if not is_pdf %}
             <div class="chapter-nav">
                 {% if prev_idx is not none %}
-                <a href="/read/{{ book_id }}/{{ prev_idx }}" class="nav-btn">← Previous</a>
+                    <a href="/read/{{ book_id }}/{{ prev_idx }}" class="nav-btn">← Previous</a>
                 {% else %}
-                <span class="nav-btn disabled">← Previous</span>
+                    <span class="nav-btn disabled">← Previous</span>
                 {% endif %}
 
                 <span style="color: #999; padding: 10px;">
@@ -2127,21 +636,19 @@
                 </span>
 
                 {% if next_idx is not none %}
-                <a href="/read/{{ book_id }}/{{ next_idx }}" class="nav-btn">Next →</a>
+                    <a href="/read/{{ book_id }}/{{ next_idx }}" class="nav-btn">Next →</a>
                 {% else %}
-                <span class="nav-btn disabled">Next →</span>
+                    <span class="nav-btn disabled">Next →</span>
                 {% endif %}
             </div>
             {% else %}
-            <div id="pdf-scroll-indicator"
-                style="text-align: center; padding: 20px; font-family: -apple-system, sans-serif;">
+            <div id="pdf-scroll-indicator" style="text-align: center; padding: 20px; font-family: -apple-system, sans-serif;">
                 <div style="color: #999; font-size: 0.9em; margin-bottom: 15px;">
                     <span id="page-count">Page {{ chapter_index + 1 }} of {{ book.spine|length }}</span>
                 </div>
                 <div style="display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;">
                     <button class="toolbar-btn" onclick="scrollToTop()" title="Back to top">↑ Top</button>
-                    <button class="toolbar-btn" onclick="loadAllPages()" id="load-all-btn"
-                        title="Load all remaining pages">Load All Pages</button>
+                    <button class="toolbar-btn" onclick="loadAllPages()" id="load-all-btn" title="Load all remaining pages">Load All Pages</button>
                 </div>
             </div>
             {% endif %}
@@ -2151,21 +658,21 @@
     <script>
         const isPDF = {{ 'true' if is_pdf else 'false' }};
         const bookId = "{{ book_id }}";
-        const totalPages = {{ book.spine| length }};
+        const totalPages = {{ book.spine|length }};
         let currentPageIndex = {{ chapter_index }};
         let loadingPages = false;
         let visiblePageRange = { start: 0, end: 0 };
-
+        
         // Batch clipboard for collecting multiple text selections
         let batchClipboard = [];
         let isSelectionMode = false;
-
+        
         // User data: bookmarks, highlights, reading progress
         let userBookmarks = [];
         let userHighlights = [];
         let savedProgress = null;
         let searchHistory = [];
-
+        
         // New feature data
         let userVocabulary = [];
         let userAnnotations = [];
@@ -2173,9 +680,9 @@
         let currentSessionId = null;
         let sessionStartTime = null;
         let currentNoteContext = null; // For add note modal
-
+        
         // ===== USER DATA API FUNCTIONS =====
-
+        
         async function loadUserData() {
             try {
                 // Load bookmarks
@@ -2184,7 +691,7 @@
                     const bookmarksData = await bookmarksRes.json();
                     userBookmarks = bookmarksData.bookmarks || [];
                 }
-
+                
                 // Load highlights
                 const highlightsRes = await fetch(`/api/highlights/${encodeURIComponent(bookId)}`);
                 if (highlightsRes.ok) {
@@ -2192,42 +699,42 @@
                     userHighlights = highlightsData.highlights || [];
                     applyHighlights();
                 }
-
+                
                 // Load reading progress
                 const progressRes = await fetch(`/api/progress/${encodeURIComponent(bookId)}`);
                 if (progressRes.ok) {
                     savedProgress = await progressRes.json();
                     checkShowResumeBanner();
                 }
-
+                
                 // Load search history
                 const historyRes = await fetch('/api/search/history');
                 if (historyRes.ok) {
                     const historyData = await historyRes.json();
                     searchHistory = (historyData.history || []).slice(0, 10);
                 }
-
+                
                 // Load vocabulary
                 const vocabRes = await fetch(`/api/vocabulary/${encodeURIComponent(bookId)}`);
                 if (vocabRes.ok) {
                     const vocabData = await vocabRes.json();
                     userVocabulary = vocabData.words || [];
                 }
-
+                
                 // Load annotations
                 const annotRes = await fetch(`/api/annotations/${encodeURIComponent(bookId)}`);
                 if (annotRes.ok) {
                     const annotData = await annotRes.json();
                     userAnnotations = annotData.annotations || [];
                 }
-
+                
                 // Load reading sessions
                 const sessionsRes = await fetch('/api/sessions');
                 if (sessionsRes.ok) {
                     const sessionsData = await sessionsRes.json();
                     readingSessions = sessionsData.sessions || [];
                 }
-
+                
                 // Render panels
                 renderBookmarksList();
                 renderHighlightsList();
@@ -2235,35 +742,35 @@
                 renderVocabularyList();
                 renderAnnotationsList();
                 renderSessionList();
-
+                
                 // Start new reading session
                 startReadingSession();
             } catch (error) {
                 console.error('Failed to load user data:', error);
             }
         }
-
+        
         // ===== READING PROGRESS =====
-
+        
         function updateReadingProgress() {
             const mainEl = document.getElementById('main');
             if (!mainEl) return 0;
-
+            
             const scrollTop = mainEl.scrollTop;
             const scrollHeight = mainEl.scrollHeight - mainEl.clientHeight;
             const progress = scrollHeight > 0 ? (scrollTop / scrollHeight) * 100 : 0;
-
+            
             const progressBar = document.getElementById('reading-progress-bar');
             if (progressBar) {
                 progressBar.style.width = progress + '%';
             }
-
+            
             // Also update the current chapter's progress bar in the sidebar
             updateCurrentChapterProgress(progress);
-
+            
             return progress;
         }
-
+        
         function updateCurrentChapterProgress(progress) {
             // Find the current chapter's progress bar in the sidebar
             const currentHref = "{{ current_chapter.href }}";
@@ -2271,7 +778,7 @@
             if (progressElem) {
                 progressElem.style.width = `${Math.min(100, progress)}%`;
             }
-
+            
             // Mark as read if 90%+
             if (progress >= 90) {
                 const link = document.querySelector(`.toc-link[data-href="${currentHref}"]`);
@@ -2280,16 +787,16 @@
                 }
             }
         }
-
+        
         let progressSaveTimeout = null;
         async function saveReadingProgress() {
             if (progressSaveTimeout) clearTimeout(progressSaveTimeout);
-
+            
             progressSaveTimeout = setTimeout(async () => {
                 const progress = updateReadingProgress();
                 const mainEl = document.getElementById('main');
                 const scrollPosition = mainEl ? mainEl.scrollTop : 0;
-
+                
                 try {
                     // Save overall reading progress
                     await fetch(`/api/progress/${encodeURIComponent(bookId)}`, {
@@ -2301,7 +808,7 @@
                             progress_percent: progress
                         })
                     });
-
+                    
                     // Also save chapter-specific progress
                     await fetch(`/api/chapter-progress/${encodeURIComponent(bookId)}/${currentPageIndex}`, {
                         method: 'POST',
@@ -2313,7 +820,7 @@
                 }
             }, 1000);
         }
-
+        
         function checkShowResumeBanner() {
             if (savedProgress && savedProgress.scroll_position > 100) {
                 const banner = document.getElementById('resume-banner');
@@ -2322,7 +829,7 @@
                 }
             }
         }
-
+        
         function resumeReading() {
             if (savedProgress) {
                 const mainEl = document.getElementById('main');
@@ -2332,27 +839,27 @@
             }
             dismissResume();
         }
-
+        
         function dismissResume() {
             const banner = document.getElementById('resume-banner');
             if (banner) {
                 banner.classList.remove('visible');
             }
         }
-
+        
         // ===== BOOKMARKS =====
-
+        
         async function addBookmark() {
             const selection = window.getSelection();
             const text = selection.toString().trim();
-
+            
             if (!text) {
                 showToast('Select text to bookmark', 'error');
                 return;
             }
-
+            
             const note = prompt('Add a note (optional):');
-
+            
             try {
                 const mainEl = document.getElementById('main');
                 const scrollPos = mainEl ? mainEl.scrollTop / mainEl.scrollHeight : 0;
@@ -2366,7 +873,7 @@
                         note: note || ''
                     })
                 });
-
+                
                 if (response.ok) {
                     const result = await response.json();
                     // Reload bookmarks to get full data
@@ -2382,7 +889,7 @@
                 showToast('Failed to add bookmark', 'error');
             }
         }
-
+        
         async function loadBookmarksFromServer() {
             try {
                 const response = await fetch(`/api/bookmarks/${encodeURIComponent(bookId)}`);
@@ -2394,7 +901,7 @@
                 console.error('Failed to load bookmarks:', error);
             }
         }
-
+        
         async function deleteBookmark(id) {
             try {
                 await fetch(`/api/bookmarks/${encodeURIComponent(bookId)}/${id}`, {
@@ -2407,7 +914,7 @@
                 console.error('Failed to delete bookmark:', error);
             }
         }
-
+        
         function goToBookmark(bookmark) {
             // scroll_position is 0-1, convert to pixels
             const mainEl = document.getElementById('main');
@@ -2417,11 +924,11 @@
             }
             toggleBookmarksPanel();
         }
-
+        
         function renderBookmarksList() {
             const list = document.getElementById('bookmarks-list');
             if (!list) return;
-
+            
             if (userBookmarks.length === 0) {
                 list.innerHTML = `
                     <div class="empty-state">
@@ -2432,7 +939,7 @@
                 `;
                 return;
             }
-
+            
             list.innerHTML = userBookmarks.map(b => `
                 <div class="bookmark-item">
                     <div class="bookmark-actions">
@@ -2444,23 +951,23 @@
                 </div>
             `).join('');
         }
-
+        
         // ===== HIGHLIGHTS =====
-
+        
         async function highlightSelection(color) {
             const selection = window.getSelection();
             const text = selection.toString().trim();
-
+            
             if (!text) {
                 showToast('Select text to highlight', 'error');
                 return;
             }
-
+            
             // Get selection range info for restoration
             const range = selection.getRangeAt(0);
             const startContainer = getXPath(range.startContainer);
             const endContainer = getXPath(range.endContainer);
-
+            
             try {
                 const response = await fetch(`/api/highlights/${encodeURIComponent(bookId)}`, {
                     method: 'POST',
@@ -2474,15 +981,15 @@
                         note: ''
                     })
                 });
-
+                
                 if (response.ok) {
                     const result = await response.json();
                     // Reload highlights to get full data
                     await loadHighlightsFromServer();
-
+                    
                     // Apply visual highlight
                     applyHighlightToRange(range, color, result.id);
-
+                    
                     renderHighlightsList();
                     showToast(`Highlighted in ${color}! ✨`);
                     hideSelectionToolbar();
@@ -2495,7 +1002,7 @@
                 showToast('Failed to add highlight', 'error');
             }
         }
-
+        
         async function loadHighlightsFromServer() {
             try {
                 const response = await fetch(`/api/highlights/${encodeURIComponent(bookId)}`);
@@ -2507,13 +1014,13 @@
                 console.error('Failed to load highlights:', error);
             }
         }
-
+        
         function applyHighlightToRange(range, color, id) {
             const span = document.createElement('span');
             span.className = `highlight-mark highlight-${color}`;
             span.dataset.highlightId = id;
             span.onclick = (e) => showHighlightMenu(id, e);
-
+            
             try {
                 range.surroundContents(span);
             } catch (e) {
@@ -2527,19 +1034,19 @@
                 range.insertNode(mark);
             }
         }
-
+        
         function applyHighlights() {
             // Re-apply highlights on page load
             userHighlights.forEach(h => {
                 if (h.chapter_index !== currentPageIndex) return;
-
+                
                 // Find and highlight the text
                 const content = document.getElementById('content');
                 if (!content) return;
-
+                
                 const textToFind = h.text.substring(0, 50);
                 const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT);
-
+                
                 while (walker.nextNode()) {
                     const node = walker.currentNode;
                     const idx = node.textContent.indexOf(textToFind);
@@ -2553,21 +1060,21 @@
                 }
             });
         }
-
+        
         let currentHighlightId = null;
-
+        
         function showHighlightMenu(id, event) {
             event = event || window.event;
             event.preventDefault();
             event.stopPropagation();
-
+            
             currentHighlightId = id;
             const menu = document.getElementById('highlight-context-menu');
-
+            
             // Get current highlight color
             const highlight = userHighlights.find(h => h.id === id);
             const currentColor = highlight ? highlight.color : 'yellow';
-
+            
             // Update active color indicator
             menu.querySelectorAll('.highlight-menu-color').forEach(el => {
                 el.classList.remove('active');
@@ -2575,38 +1082,38 @@
                     el.classList.add('active');
                 }
             });
-
+            
             // Position the menu near the click
             const x = event.clientX || event.pageX;
             const y = event.clientY || event.pageY;
-
+            
             menu.style.left = `${Math.min(x, window.innerWidth - 180)}px`;
             menu.style.top = `${Math.min(y, window.innerHeight - 150)}px`;
             menu.classList.add('visible');
-
+            
             // Close menu when clicking outside
             setTimeout(() => {
                 document.addEventListener('click', closeHighlightMenu);
             }, 10);
         }
-
+        
         function closeHighlightMenu() {
             const menu = document.getElementById('highlight-context-menu');
             menu.classList.remove('visible');
             document.removeEventListener('click', closeHighlightMenu);
             currentHighlightId = null;
         }
-
+        
         function deleteCurrentHighlight() {
             if (currentHighlightId) {
                 deleteHighlight(currentHighlightId);
                 closeHighlightMenu();
             }
         }
-
+        
         function copyHighlightText() {
             if (!currentHighlightId) return;
-
+            
             const highlight = userHighlights.find(h => h.id === currentHighlightId);
             if (highlight && highlight.text) {
                 navigator.clipboard.writeText(highlight.text).then(() => {
@@ -2617,16 +1124,16 @@
             }
             closeHighlightMenu();
         }
-
+        
         async function changeHighlightColor(newColor) {
             if (!currentHighlightId) return;
-
+            
             const highlight = userHighlights.find(h => h.id === currentHighlightId);
             if (!highlight || highlight.color === newColor) {
                 closeHighlightMenu();
                 return;
             }
-
+            
             try {
                 // Update on server
                 await fetch(`/api/highlights/${encodeURIComponent(bookId)}/${currentHighlightId}/color`, {
@@ -2634,13 +1141,13 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ color: newColor })
                 });
-
+                
                 // Update visual highlight
                 const el = document.querySelector(`[data-highlight-id="${currentHighlightId}"]`);
                 if (el) {
                     el.className = `highlight-mark highlight-${newColor}`;
                 }
-
+                
                 // Update local data
                 highlight.color = newColor;
                 renderHighlightsList();
@@ -2651,13 +1158,13 @@
             }
             closeHighlightMenu();
         }
-
+        
         async function deleteHighlight(id) {
             try {
                 await fetch(`/api/highlights/${encodeURIComponent(bookId)}/${id}`, {
                     method: 'DELETE'
                 });
-
+                
                 // Remove visual highlight
                 const el = document.querySelector(`[data-highlight-id="${id}"]`);
                 if (el) {
@@ -2665,7 +1172,7 @@
                     parent.replaceChild(document.createTextNode(el.textContent), el);
                     parent.normalize();
                 }
-
+                
                 userHighlights = userHighlights.filter(h => h.id !== id);
                 renderHighlightsList();
                 showToast('Highlight removed');
@@ -2673,11 +1180,11 @@
                 console.error('Failed to delete highlight:', error);
             }
         }
-
+        
         function renderHighlightsList() {
             const list = document.getElementById('highlights-list');
             if (!list) return;
-
+            
             if (userHighlights.length === 0) {
                 list.innerHTML = `
                     <div class="empty-state">
@@ -2688,7 +1195,7 @@
                 `;
                 return;
             }
-
+            
             list.innerHTML = userHighlights.map(h => `
                 <div class="highlight-item">
                     <div class="bookmark-actions">
@@ -2699,24 +1206,24 @@
                 </div>
             `).join('');
         }
-
+        
         // ===== BOOKMARKS PANEL =====
-
+        
         function toggleBookmarksPanel() {
             const panel = document.getElementById('bookmarks-panel');
             if (panel) {
                 panel.classList.toggle('visible');
             }
         }
-
+        
         function showPanelTab(tab) {
             const tabs = document.querySelectorAll('.panel-tab');
             tabs.forEach(t => t.classList.remove('active'));
             event.target.classList.add('active');
-
+            
             const bookmarksList = document.getElementById('bookmarks-list');
             const highlightsList = document.getElementById('highlights-list');
-
+            
             if (tab === 'bookmarks') {
                 bookmarksList.style.display = 'block';
                 highlightsList.style.display = 'none';
@@ -2725,14 +1232,14 @@
                 highlightsList.style.display = 'block';
             }
         }
-
+        
         async function exportNotes(format) {
             try {
                 const response = await fetch(`/api/export/${encodeURIComponent(bookId)}?format=${format}`);
                 if (response.ok) {
                     const content = await response.text();
                     const filename = `${bookId}_notes.${format === 'markdown' ? 'md' : 'json'}`;
-
+                    
                     const mimeType = format === 'markdown' ? 'text/markdown' : 'application/json';
                     const blob = new Blob([content], { type: mimeType });
                     const url = URL.createObjectURL(blob);
@@ -2741,7 +1248,7 @@
                     a.download = filename;
                     a.click();
                     URL.revokeObjectURL(url);
-
+                    
                     showToast('Notes exported! 📁');
                 } else {
                     showToast('Export failed', 'error');
@@ -2751,9 +1258,9 @@
                 showToast('Export failed', 'error');
             }
         }
-
+        
         // ===== SEARCH =====
-
+        
         function openSearch() {
             const modal = document.getElementById('search-modal');
             if (modal) {
@@ -2761,32 +1268,32 @@
                 document.getElementById('search-input').focus();
             }
         }
-
+        
         function closeSearch() {
             const modal = document.getElementById('search-modal');
             if (modal) {
                 modal.classList.remove('visible');
             }
         }
-
+        
         async function performSearch() {
             const query = document.getElementById('search-input').value.trim();
             if (!query) return;
-
+            
             const resultsContainer = document.getElementById('search-results');
             resultsContainer.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">Searching...</p>';
-
+            
             try {
                 const response = await fetch(`/api/search?q=${encodeURIComponent(query)}&book_id=${encodeURIComponent(bookId)}`);
                 if (response.ok) {
                     const data = await response.json();
-
+                    
                     // Add to history
                     if (!searchHistory.includes(query)) {
                         searchHistory.unshift(query);
                         searchHistory = searchHistory.slice(0, 10);
                     }
-
+                    
                     renderSearchResults(data.results, query);
                 }
             } catch (error) {
@@ -2794,10 +1301,10 @@
                 resultsContainer.innerHTML = '<p style="text-align: center; color: #e74c3c; padding: 20px;">Search failed</p>';
             }
         }
-
+        
         function renderSearchResults(results, query) {
             const container = document.getElementById('search-results');
-
+            
             if (results.length === 0) {
                 container.innerHTML = `
                     <div class="empty-state">
@@ -2808,7 +1315,7 @@
                 `;
                 return;
             }
-
+            
             // Group results by chapter
             const grouped = {};
             results.forEach(r => {
@@ -2820,9 +1327,9 @@
                 }
                 grouped[r.chapter_index].matches.push(r);
             });
-
+            
             const regex = new RegExp(`(${escapeRegex(query)})`, 'gi');
-
+            
             container.innerHTML = `
                 <div style="padding: 10px 20px; background: #f5f5f5; font-size: 0.9em; color: #666; margin-bottom: 10px;">
                     ${results.length} result${results.length > 1 ? 's' : ''} found
@@ -2840,36 +1347,36 @@
                 </div>
             `).join('');
         }
-
+        
         // Store current highlights for cleanup
         let currentHighlights = [];
-
+        
         function goToSearchResult(chapterIndex, query, matchIndex) {
             closeSearch();
             const decodedQuery = decodeURIComponent(query);
             const content = document.getElementById('book-content');
             const mainEl = document.getElementById('main');
-
+            
             if (!content || !mainEl) return;
-
+            
             // Clear previous highlights
             clearHighlights();
-
+            
             // Find all instances of the search term in the content
             const matches = findAllTextMatches(content, decodedQuery);
-
+            
             if (matches.length === 0) return;
-
+            
             // Highlight all instances with different colors
             matches.forEach((match, index) => {
                 const span = document.createElement('span');
-
+                
                 // First match gets bright highlight, others get subtle highlight
                 if (index === matchIndex || matches.length === 1) {
                     span.style.background = '#ffeb3b';
                     span.style.color = '#000';
                     span.style.fontWeight = 'bold';
-
+                    
                     // Scroll the first occurrence into view
                     if (index === matchIndex || matchIndex === 0) {
                         setTimeout(() => {
@@ -2885,12 +1392,12 @@
                     span.style.background = '#fff59d';
                     span.style.color = '#000';
                 }
-
+                
                 span.style.transition = 'background 0.3s ease, color 0.3s ease';
                 span.style.padding = '2px 4px';
                 span.style.borderRadius = '3px';
                 span.className = 'search-highlight';
-
+                
                 // Wrap the matched text
                 const range = match.range;
                 try {
@@ -2904,11 +1411,11 @@
                     currentHighlights.push(span);
                 }
             });
-
+            
             // Remove highlights after 3 seconds
             setTimeout(clearHighlights, 3000);
         }
-
+        
         function findAllTextMatches(element, searchTerm) {
             const matches = [];
             const regex = new RegExp(escapeRegex(searchTerm), 'gi');
@@ -2918,7 +1425,7 @@
                 null,
                 false
             );
-
+            
             let node;
             while (node = walker.nextNode()) {
                 let match;
@@ -2930,10 +1437,10 @@
                 }
                 regex.lastIndex = 0;
             }
-
+            
             return matches;
         }
-
+        
         function clearHighlights() {
             currentHighlights.forEach(span => {
                 const parent = span.parentNode;
@@ -2946,31 +1453,31 @@
             });
             currentHighlights = [];
         }
-
+        
         // Highlight search term when loaded from library search
         function performSearchHighlight(searchTerm) {
             const content = document.getElementById('book-content');
             const mainEl = document.getElementById('main');
-
+            
             if (!content || !mainEl || !searchTerm) return;
-
+            
             clearHighlights();
-
+            
             // Find all instances of the search term
             const matches = findAllTextMatches(content, searchTerm);
-
+            
             if (matches.length === 0) return;
-
+            
             // Highlight all instances
             matches.forEach((match, index) => {
                 const span = document.createElement('span');
-
+                
                 if (index === 0) {
                     // First match gets bright highlight and we scroll to it
                     span.style.background = '#ffeb3b';
                     span.style.color = '#000';
                     span.style.fontWeight = 'bold';
-
+                    
                     // Scroll first match into view
                     setTimeout(() => {
                         const rect = span.getBoundingClientRect();
@@ -2985,12 +1492,12 @@
                     span.style.background = '#fff59d';
                     span.style.color = '#000';
                 }
-
+                
                 span.style.transition = 'background 0.3s ease, color 0.3s ease';
                 span.style.padding = '2px 4px';
                 span.style.borderRadius = '3px';
                 span.className = 'search-highlight';
-
+                
                 // Wrap the matched text
                 const range = match.range;
                 try {
@@ -3004,44 +1511,44 @@
                     currentHighlights.push(span);
                 }
             });
-
+            
             // Remove highlights after 4 seconds
             setTimeout(clearHighlights, 4000);
         }
-
+        
         function searchFromHistory(query) {
             document.getElementById('search-input').value = query;
             performSearch();
         }
-
+        
         function renderSearchHistory() {
             const container = document.getElementById('search-history');
             if (!container || searchHistory.length === 0) return;
-
+            
             container.innerHTML = `
                 <div class="search-history-title">Recent searches</div>
                 ${searchHistory.map(h => `<span class="search-history-item" onclick="searchFromHistory('${escapeHtml(h.query || h)}')">${escapeHtml(h.query || h)}</span>`).join('')}
             `;
         }
-
+        
         // ===== UTILITY FUNCTIONS =====
-
+        
         function escapeHtml(text) {
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
         }
-
+        
         function escapeRegex(string) {
             return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         }
-
+        
         function getXPath(node) {
             if (node.nodeType === Node.TEXT_NODE) {
                 return getXPath(node.parentNode) + '/text()';
             }
             if (node === document.body) return '/html/body';
-
+            
             let position = 1;
             let sibling = node.previousSibling;
             while (sibling) {
@@ -3052,27 +1559,27 @@
             }
             return getXPath(node.parentNode) + '/' + node.tagName.toLowerCase() + '[' + position + ']';
         }
-
+        
         // Toast notification system
         function showToast(message, type = 'success') {
             const toast = document.getElementById('copy-toast');
             if (!toast) return;
-
+            
             toast.textContent = message;
             toast.className = 'visible ' + type;
-
+            
             setTimeout(() => {
                 toast.className = '';
             }, 2500);
         }
-
+        
         // PDF: Copy only visible pages
         async function copyVisiblePages() {
             if (!isPDF) return;
-
+            
             const pages = document.querySelectorAll('.pdf-page');
             let visibleText = [];
-
+            
             pages.forEach(page => {
                 const rect = page.getBoundingClientRect();
                 const isVisible = rect.top < window.innerHeight && rect.bottom > 0;
@@ -3080,7 +1587,7 @@
                     visibleText.push(page.innerText.trim());
                 }
             });
-
+            
             // Also check the initial content if no pages yet
             if (visibleText.length === 0) {
                 const content = document.getElementById('book-content');
@@ -3088,9 +1595,9 @@
                     visibleText.push(content.innerText.trim());
                 }
             }
-
+            
             const textToCopy = visibleText.join('\n\n---\n\n');
-
+            
             try {
                 await navigator.clipboard.writeText(textToCopy);
                 showToast(`Copied ${visibleText.length} visible page(s)!`, 'success');
@@ -3098,7 +1605,7 @@
                 showToast('Clipboard unavailable', 'error');
             }
         }
-
+        
         // PDF: Toggle page jump control
         function togglePageJump() {
             const container = document.getElementById('page-jump-container');
@@ -3109,37 +1616,37 @@
                 }
             }
         }
-
+        
         // PDF: Jump to specific page
         function jumpToPage() {
             const input = document.getElementById('page-jump-input');
             const pageNum = parseInt(input.value);
-
+            
             if (pageNum && pageNum >= 1 && pageNum <= totalPages) {
                 window.location.href = `/read/${bookId}/${pageNum - 1}`;
             } else {
                 showToast(`Enter a page between 1 and ${totalPages}`, 'error');
             }
         }
-
+        
         // PDF: Load all remaining pages
         async function loadAllPages() {
             if (!isPDF || loadingPages) return;
-
+            
             const btn = document.getElementById('load-all-btn');
             if (btn) {
                 btn.textContent = 'Loading...';
                 btn.disabled = true;
             }
-
+            
             loadingPages = true;
-
+            
             while (currentPageIndex < totalPages - 1) {
                 const nextStart = currentPageIndex + 1;
                 try {
                     const resp = await fetch(`/read/${bookId}/pages/${nextStart}/10`);
                     const data = await resp.json();
-
+                    
                     if (data.pages && data.pages.length > 0) {
                         const contentDiv = document.getElementById('book-content');
                         data.pages.forEach(page => {
@@ -3154,7 +1661,7 @@
                             `;
                             contentDiv.appendChild(pageWrapper);
                         });
-
+                        
                         currentPageIndex = Math.max(...data.pages.map(p => p.index));
                         updatePageIndicator();
                         updateProgressBar();
@@ -3166,22 +1673,22 @@
                     break;
                 }
             }
-
+            
             loadingPages = false;
-
+            
             if (btn) {
                 btn.textContent = 'All Pages Loaded ✓';
                 btn.disabled = true;
             }
-
+            
             showToast(`Loaded all ${totalPages} pages!`, 'success');
         }
-
+        
         // Scroll to top
         function scrollToTop() {
             document.getElementById('main').scrollTo({ top: 0, behavior: 'smooth' });
         }
-
+        
         // Update progress bar
         function updateProgressBar() {
             const progress = document.getElementById('pdf-progress');
@@ -3190,22 +1697,22 @@
                 progress.style.width = percent + '%';
             }
         }
-
+        
         // Show floating page indicator on scroll
         let pageIndicatorTimeout;
         function showPageIndicator(pageNum) {
             const indicator = document.getElementById('pdf-page-indicator');
             if (!indicator) return;
-
+            
             indicator.textContent = `Page ${pageNum} of ${totalPages}`;
             indicator.classList.add('visible');
-
+            
             clearTimeout(pageIndicatorTimeout);
             pageIndicatorTimeout = setTimeout(() => {
                 indicator.classList.remove('visible');
             }, 1500);
         }
-
+        
         // Selection mode toggle (kept for non-PDF)
         function toggleSelectionMode() {
             isSelectionMode = !isSelectionMode;
@@ -3219,7 +1726,7 @@
                 hideSelectionToolbar();
             }
         }
-
+        
         // Copy text from a specific PDF page
         async function copyPageText(button, pageIndex) {
             const textElement = document.getElementById(`pdf-text-${pageIndex}`);
@@ -3227,13 +1734,13 @@
                 showCopyToast('Text not available', 'error');
                 return;
             }
-
+            
             const textToCopy = textElement.textContent.trim();
             if (!textToCopy) {
                 showCopyToast('No text on this page', 'error');
                 return;
             }
-
+            
             try {
                 await navigator.clipboard.writeText(textToCopy);
                 // Show success state on button
@@ -3241,7 +1748,7 @@
                 const originalText = button.innerHTML;
                 button.innerHTML = '✓ Copied!';
                 showCopyToast('Page text copied!', 'success');
-
+                
                 // Reset button after delay
                 setTimeout(() => {
                     button.classList.remove('copied');
@@ -3251,7 +1758,7 @@
                 showCopyToast('Failed to copy', 'error');
             }
         }
-
+        
         // Show toast notification for copy actions
         function showCopyToast(message, type) {
             let toast = document.getElementById('copy-toast');
@@ -3260,15 +1767,15 @@
                 toast.id = 'copy-toast';
                 document.body.appendChild(toast);
             }
-
+            
             toast.textContent = message;
             toast.className = `visible ${type}`;
-
+            
             setTimeout(() => {
                 toast.classList.remove('visible');
             }, 2000);
         }
-
+        
         // Copy all loaded content
         async function copyAllLoaded() {
             if (isPDF) {
@@ -3279,13 +1786,13 @@
                     const text = el.textContent.trim();
                     if (text) allText.push(text);
                 });
-
+                
                 const textToCopy = allText.join('\n\n--- Page Break ---\n\n');
                 if (!textToCopy) {
                     showCopyToast('Nothing to copy', 'error');
                     return;
                 }
-
+                
                 try {
                     await navigator.clipboard.writeText(textToCopy);
                     showCopyToast(`Copied ${textElements.length} page(s)!`, 'success');
@@ -3294,16 +1801,16 @@
                 }
                 return;
             }
-
+            
             const contentEl = document.getElementById('book-content');
             if (!contentEl) return;
-
+            
             const textToCopy = contentEl.innerText.trim();
             if (!textToCopy) {
                 showStatus('Nothing to copy.', '#dc3545');
                 return;
             }
-
+            
             try {
                 await navigator.clipboard.writeText(textToCopy);
                 showStatus('All loaded content copied!', '#198754');
@@ -3311,21 +1818,21 @@
                 showStatus('Clipboard unavailable.', '#dc3545');
             }
         }
-
+        
         // Show floating toolbar on text selection
         function showSelectionToolbar(x, y) {
             const toolbar = document.getElementById('selection-toolbar');
             if (!toolbar) return;
-
+            
             const selection = window.getSelection();
             const selectedText = selection.toString().trim();
-
+            
             if (selectedText.length > 0) {
                 const charCount = document.getElementById('selection-char-count');
                 if (charCount) {
                     charCount.textContent = `${selectedText.length} chars`;
                 }
-
+                
                 // Position toolbar above the selection
                 toolbar.style.left = `${Math.max(10, Math.min(x - 100, window.innerWidth - 250))}px`;
                 toolbar.style.top = `${Math.max(10, y - 50)}px`;
@@ -3334,24 +1841,24 @@
                 hideSelectionToolbar();
             }
         }
-
+        
         function hideSelectionToolbar() {
             const toolbar = document.getElementById('selection-toolbar');
             if (toolbar) {
                 toolbar.classList.remove('visible');
             }
         }
-
+        
         // Copy selected text
         async function copySelectedText() {
             const selection = window.getSelection();
             const selectedText = selection.toString().trim();
-
+            
             if (!selectedText) {
                 showStatus('No text selected.', '#dc3545');
                 return;
             }
-
+            
             try {
                 await navigator.clipboard.writeText(selectedText);
                 showStatus('Selection copied!', '#198754');
@@ -3360,58 +1867,58 @@
                 showStatus('Clipboard unavailable.', '#dc3545');
             }
         }
-
+        
         // Add selection to batch clipboard
         function appendToClipboard() {
             const selection = window.getSelection();
             const selectedText = selection.toString().trim();
-
+            
             if (!selectedText) {
                 showStatus('No text selected.', '#dc3545');
                 return;
             }
-
+            
             batchClipboard.push(selectedText);
             updateBatchButton();
             showStatus(`Added to batch (${batchClipboard.length} items)`, '#3498db');
             hideSelectionToolbar();
-
+            
             // Clear the selection
             selection.removeAllRanges();
         }
-
+        
         function clearSelection() {
             const selection = window.getSelection();
             selection.removeAllRanges();
             hideSelectionToolbar();
         }
-
+        
         function updateBatchButton() {
             const batchBtn = document.getElementById('batch-clipboard-btn');
             const batchCount = document.getElementById('batch-count');
-
+            
             if (batchBtn && batchCount) {
                 batchCount.textContent = batchClipboard.length;
                 batchBtn.style.display = batchClipboard.length > 0 ? 'inline-block' : 'none';
             }
         }
-
+        
         // Show batch clipboard modal
         async function showBatchClipboard() {
             if (batchClipboard.length === 0) {
                 showStatus('Batch clipboard is empty.', '#dc3545');
                 return;
             }
-
+            
             const fullText = batchClipboard.join('\n\n---\n\n');
-
+            
             // Simple confirm dialog to copy or clear
             const action = confirm(
                 `Batch contains ${batchClipboard.length} items (${fullText.length} chars total).\n\n` +
                 `OK = Copy all to clipboard\n` +
                 `Cancel = Clear batch`
             );
-
+            
             if (action) {
                 try {
                     await navigator.clipboard.writeText(fullText);
@@ -3425,19 +1932,19 @@
                 showStatus('Batch cleared.', '#3498db');
             }
         }
-
+        
         function showStatus(message, color) {
             // Use toast for better UX
             showToast(message, color === '#198754' ? 'success' : 'error');
         }
-
+        
         // Mouse up handler for selection toolbar
-        document.addEventListener('mouseup', function (e) {
+        document.addEventListener('mouseup', function(e) {
             // Small delay to allow selection to complete
             setTimeout(() => {
                 const selection = window.getSelection();
                 const selectedText = selection.toString().trim();
-
+                
                 // For PDFs, always show toolbar on selection (text is always selectable)
                 // For EPUBs, show toolbar when in selection mode or when text is selected
                 if (selectedText.length > 0) {
@@ -3447,17 +1954,17 @@
                 }
             }, 10);
         });
-
+        
         // Hide toolbar when clicking outside
-        document.addEventListener('mousedown', function (e) {
+        document.addEventListener('mousedown', function(e) {
             const toolbar = document.getElementById('selection-toolbar');
             if (toolbar && !toolbar.contains(e.target)) {
                 // Don't hide immediately - let the mouseup event handle it
             }
         });
-
+        
         // Keyboard shortcut: Ctrl/Cmd + B to add to batch
-        document.addEventListener('keydown', function (e) {
+        document.addEventListener('keydown', function(e) {
             if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
                 e.preventDefault();
                 const selection = window.getSelection();
@@ -3467,17 +1974,17 @@
                 }
             }
         });
-
+        
         {% if is_pdf %}
         // Infinite scroll setup for PDFs
         function loadMorePages() {
             if (loadingPages || currentPageIndex >= totalPages - 1) {
                 return;
             }
-
+            
             loadingPages = true;
             const nextStart = currentPageIndex + 1;
-
+            
             fetch(`/read/${bookId}/pages/${nextStart}/5`)
                 .then(resp => resp.json())
                 .then(data => {
@@ -3487,10 +1994,10 @@
                             const pageWrapper = document.createElement('div');
                             pageWrapper.className = 'pdf-page';
                             pageWrapper.dataset.pageIndex = page.index;
-
+                            
                             // Escape text for safe insertion into HTML
                             const escapedText = page.text ? page.text.replace(/</g, '&lt;').replace(/>/g, '&gt;') : '';
-
+                            
                             pageWrapper.innerHTML = `
                                 <div class="pdf-page-header">
                                     <span class="pdf-page-number">${page.title}</span>
@@ -3505,7 +2012,7 @@
                             `;
                             contentDiv.appendChild(pageWrapper);
                         });
-
+                        
                         currentPageIndex = Math.max(...data.pages.map(p => p.index));
                         updatePageIndicator();
                         updateProgressBar();
@@ -3517,13 +2024,13 @@
                     loadingPages = false;
                 });
         }
-
+        
         function updatePageIndicator() {
             const indicator = document.getElementById('page-count');
             if (indicator) {
                 indicator.textContent = `Page ${currentPageIndex + 1} of ${totalPages}`;
             }
-
+            
             // Update load all button state
             const loadAllBtn = document.getElementById('load-all-btn');
             if (loadAllBtn && currentPageIndex >= totalPages - 1) {
@@ -3531,26 +2038,26 @@
                 loadAllBtn.disabled = true;
             }
         }
-
+        
         // Track scroll position to show current page
         function trackVisiblePage() {
             const pages = document.querySelectorAll('.pdf-page');
             const mainContent = document.getElementById('main');
             const scrollTop = mainContent.scrollTop;
             const viewportHeight = mainContent.clientHeight;
-
+            
             let currentVisible = currentPageIndex + 1;
-
+            
             pages.forEach(page => {
                 const rect = page.getBoundingClientRect();
                 const pageIndex = parseInt(page.dataset.pageIndex) + 1;
-
+                
                 // If the page is mostly in view
                 if (rect.top < viewportHeight / 2 && rect.bottom > viewportHeight / 2) {
                     currentVisible = pageIndex;
                 }
             });
-
+            
             showPageIndicator(currentVisible);
         }
 
@@ -3569,10 +2076,10 @@
             sentinel.style.height = '1px';
             document.getElementById('book-content').parentElement.appendChild(sentinel);
             observer.observe(sentinel);
-
+            
             // Initialize progress bar
             updateProgressBar();
-
+            
             // Track scroll for page indicator
             let scrollTimeout;
             document.getElementById('main').addEventListener('scroll', () => {
@@ -3580,9 +2087,9 @@
                 scrollTimeout = setTimeout(trackVisiblePage, 100);
             });
         });
-
+        
         // Keyboard shortcut: Enter to jump to page when input is focused
-        document.addEventListener('keydown', function (e) {
+        document.addEventListener('keydown', function(e) {
             if (e.key === 'Enter' && document.activeElement.id === 'page-jump-input') {
                 jumpToPage();
             }
@@ -3596,8 +2103,8 @@
         // Pass the spine data from python to JS
         const spineMap = {
             {% for ch in book.spine %}
-        "{{ ch.href }}": { { loop.index0 } },
-        {% endfor %}
+            "{{ ch.href }}": {{ loop.index0 }},
+            {% endfor %}
         };
 
         // Save sidebar scroll position before navigation
@@ -3694,18 +2201,18 @@
         }
 
         // Restore scroll position when page loads
-        window.addEventListener('load', function () {
+        window.addEventListener('load', function() {
             // First try to restore saved position
             restoreScrollPosition();
             // Then ensure active chapter is visible
             setTimeout(scrollActiveChapterIntoView, 100);
-
+            
             // Load user data (bookmarks, highlights, progress)
             loadUserData();
-
+            
             // Update reading progress bar on scroll
             updateReadingProgress();
-
+            
             // Apply initial fade-in to content for a smooth entrance
             const contentContainer = document.querySelector('.content-container');
             if (contentContainer) {
@@ -3715,12 +2222,12 @@
         });
 
         // Save scroll position on navigation buttons (Previous/Next)
-        document.addEventListener('DOMContentLoaded', function () {
+        document.addEventListener('DOMContentLoaded', function() {
             const navButtons = document.querySelectorAll('.nav-btn:not(.disabled)');
             navButtons.forEach(button => {
                 button.addEventListener('click', saveScrollPosition);
             });
-
+            
             // Add scroll listener for reading progress on #main element
             const mainEl = document.getElementById('main');
             if (mainEl) {
@@ -3729,24 +2236,24 @@
                     saveReadingProgress();
                 });
             }
-
+            
             // Enhanced keyboard navigation
             document.addEventListener('keydown', (e) => {
                 // Don't trigger shortcuts when typing in inputs
                 const isTyping = ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName);
-
+                
                 if (e.key === 'Escape') {
                     closeSearch();
                     const panel = document.getElementById('bookmarks-panel');
                     if (panel) panel.classList.remove('visible');
                     hideKeyboardHelp();
                 }
-
+                
                 // Show keyboard help on ?
                 if (e.key === '?' && !isTyping) {
                     toggleKeyboardHelp();
                 }
-
+                
                 // Arrow keys for chapter navigation (only when not typing)
                 if (!isTyping && !isPDF) {
                     if (e.key === 'ArrowLeft') {
@@ -3758,7 +2265,7 @@
                         navigateChapter('next');
                     }
                 }
-
+                
                 // Home/End to go to first/last chapter
                 if (!isTyping && !isPDF) {
                     if (e.key === 'Home' && e.ctrlKey) {
@@ -3770,7 +2277,7 @@
                         window.location.href = `/read/${bookId}/${totalPages - 1}`;
                     }
                 }
-
+                
                 // Ctrl/Cmd + F for search
                 if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
                     e.preventDefault();
@@ -3781,12 +2288,12 @@
                     e.preventDefault();
                     toggleBookmarksPanel();
                 }
-
+                
                 // S to toggle sidebar
                 if (e.key === 's' && !isTyping && !e.ctrlKey && !e.metaKey) {
                     toggleSidebar();
                 }
-
+                
                 // Space to scroll down (like in PDF readers)
                 if (e.key === ' ' && !isTyping) {
                     e.preventDefault();
@@ -3796,18 +2303,18 @@
                     }
                 }
             });
-
+            
             // Close search modal when clicking outside
             document.getElementById('search-modal').addEventListener('click', (e) => {
                 if (e.target.id === 'search-modal') {
                     closeSearch();
                 }
             });
-
+            
             // Load chapter progress and reading times
             loadChapterProgress();
             calculateReadingTimes();
-
+            
             // Check for search query parameter from library search
             const urlParams = new URLSearchParams(window.location.search);
             const searchQuery = urlParams.get('search');
@@ -3818,13 +2325,13 @@
                 }, 500);
             }
         });
-
+        
         // ===== KEYBOARD NAVIGATION HELPERS =====
-
+        
         function navigateChapter(direction) {
             const prevBtn = document.querySelector('.nav-btn[href*="' + (currentPageIndex - 1) + '"]');
             const nextBtn = document.querySelector('.nav-btn[href*="' + (currentPageIndex + 1) + '"]');
-
+            
             if (direction === 'prev' && currentPageIndex > 0) {
                 saveScrollPosition();
                 window.location.href = `/read/${bookId}/${currentPageIndex - 1}`;
@@ -3833,23 +2340,23 @@
                 window.location.href = `/read/${bookId}/${currentPageIndex + 1}`;
             }
         }
-
+        
         function toggleKeyboardHelp() {
             const help = document.getElementById('keyboard-help');
             if (help) {
                 help.classList.toggle('visible');
             }
         }
-
+        
         function hideKeyboardHelp() {
             const help = document.getElementById('keyboard-help');
             if (help) {
                 help.classList.remove('visible');
             }
         }
-
+        
         // ===== CHAPTER PROGRESS TRACKING =====
-
+        
         async function loadChapterProgress() {
             try {
                 const response = await fetch(`/api/chapter-progress/${encodeURIComponent(bookId)}`);
@@ -3861,13 +2368,13 @@
                 console.error('Failed to load chapter progress:', error);
             }
         }
-
+        
         function applyChapterProgress(progressData) {
             // Apply progress to each chapter in the sidebar
             Object.keys(spineMap).forEach(href => {
                 const chapterIndex = spineMap[href];
                 const progress = progressData[chapterIndex] || 0;
-
+                
                 // Find the progress bar for this chapter
                 const progressElem = document.querySelector(`.chapter-progress[data-href="${href}"] .chapter-progress-fill`);
                 if (progressElem) {
@@ -3897,34 +2404,34 @@
                 }
             });
         }
-
+        
         // Save current chapter progress when leaving page
         window.addEventListener('beforeunload', () => {
             const progress = updateReadingProgress();
             // Use sendBeacon with FormData for reliable delivery on page unload
             const formData = new FormData();
             formData.append('progress', progress);
-
+            
             // sendBeacon doesn't support JSON content-type easily, so we use a query param approach
             navigator.sendBeacon(
                 `/api/chapter-progress/${encodeURIComponent(bookId)}/${currentPageIndex}?progress=${encodeURIComponent(progress)}`,
                 ''
             );
         });
-
+        
         // ===== ESTIMATED READING TIME =====
-
+        
         function calculateReadingTimes() {
             // Average reading speed: ~200-250 words per minute
             const wordsPerMinute = 225;
-
+            
             // Get word count for current chapter
             const content = document.getElementById('book-content');
             if (content) {
                 const text = content.innerText || '';
                 const wordCount = text.trim().split(/\s+/).length;
                 const minutes = Math.ceil(wordCount / wordsPerMinute);
-
+                
                 // Update reading time for current chapter
                 const currentHref = "{{ current_chapter.href }}";
                 const timeElem = document.querySelector(`.chapter-progress[data-href="${currentHref}"] .chapter-reading-time`);
@@ -3932,11 +2439,11 @@
                     timeElem.textContent = formatReadingTime(minutes);
                 }
             }
-
+            
             // For other chapters, fetch estimates from server
             fetchAllReadingTimes();
         }
-
+        
         async function fetchAllReadingTimes() {
             try {
                 const response = await fetch(`/api/reading-times/${encodeURIComponent(bookId)}`);
@@ -3948,12 +2455,12 @@
                 // Silent fail - reading times are not critical
             }
         }
-
+        
         function applyReadingTimes(timesData) {
             Object.keys(spineMap).forEach(href => {
                 const chapterIndex = spineMap[href];
                 const minutes = timesData[chapterIndex];
-
+                
                 if (minutes !== undefined) {
                     const timeElem = document.querySelector(`.chapter-progress[data-href="${href}"] .chapter-reading-time`);
                     if (timeElem && timeElem.textContent === '--') {
@@ -3962,7 +2469,7 @@
                 }
             });
         }
-
+        
         function formatReadingTime(minutes) {
             if (minutes < 1) return '<1 min';
             if (minutes < 60) return `${minutes} min`;
@@ -3970,9 +2477,9 @@
             const mins = minutes % 60;
             return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
         }
-
+        
         // ===== READING SESSIONS =====
-
+        
         async function startReadingSession() {
             sessionStartTime = Date.now();
             try {
@@ -3994,14 +2501,14 @@
                 console.error('Failed to start reading session:', error);
             }
         }
-
+        
         async function endReadingSession() {
             if (!currentSessionId || !sessionStartTime) return;
-
+            
             const duration = Math.floor((Date.now() - sessionStartTime) / 1000);
-            const scrollPos = document.getElementById('main')?.scrollTop /
-                document.getElementById('main')?.scrollHeight || 0;
-
+            const scrollPos = document.getElementById('main')?.scrollTop / 
+                             document.getElementById('main')?.scrollHeight || 0;
+            
             try {
                 await fetch(`/api/sessions/${currentSessionId}/end`, {
                     method: 'POST',
@@ -4016,7 +2523,7 @@
                 console.error('Failed to end reading session:', error);
             }
         }
-
+        
         // End session before page unload
         window.addEventListener('beforeunload', () => {
             if (currentSessionId && sessionStartTime) {
@@ -4031,7 +2538,7 @@
                 );
             }
         });
-
+        
         function toggleSessionPanel() {
             const panel = document.getElementById('session-history-panel');
             if (panel) {
@@ -4041,19 +2548,19 @@
                 }
             }
         }
-
+        
         async function loadSessionStats() {
             try {
                 const response = await fetch('/api/sessions/stats');
                 if (response.ok) {
                     const stats = await response.json();
-
+                    
                     // Format total time
                     const totalHours = Math.floor(stats.total_time_seconds / 3600);
                     const totalMins = Math.floor((stats.total_time_seconds % 3600) / 60);
-                    document.getElementById('stat-total-time').textContent =
+                    document.getElementById('stat-total-time').textContent = 
                         totalHours > 0 ? `${totalHours}h ${totalMins}m` : `${totalMins}m`;
-
+                    
                     document.getElementById('stat-streak').textContent = stats.streak_days;
                     document.getElementById('stat-sessions').textContent = stats.session_count;
                     document.getElementById('stat-pages').textContent = stats.total_pages;
@@ -4062,11 +2569,11 @@
                 console.error('Failed to load session stats:', error);
             }
         }
-
+        
         function renderSessionList() {
             const list = document.getElementById('session-list');
             if (!list) return;
-
+            
             if (readingSessions.length === 0) {
                 list.innerHTML = `
                     <div class="empty-state">
@@ -4077,13 +2584,13 @@
                 `;
                 return;
             }
-
+            
             list.innerHTML = readingSessions.slice(0, 20).map(s => {
                 const duration = s.duration_seconds || 0;
                 const mins = Math.floor(duration / 60);
                 const date = new Date(s.start_time).toLocaleDateString();
-                const time = new Date(s.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
+                const time = new Date(s.start_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                
                 return `
                     <div class="session-item">
                         <div class="session-book">${escapeHtml(s.book_title || 'Unknown Book')}</div>
@@ -4096,40 +2603,40 @@
                 `;
             }).join('');
         }
-
+        
         // ===== DICTIONARY & VOCABULARY =====
-
+        
         // Double-click handler for dictionary lookup
-        document.addEventListener('dblclick', async function (e) {
+        document.addEventListener('dblclick', async function(e) {
             const selection = window.getSelection();
             const word = selection.toString().trim();
-
+            
             // Only trigger for single words (no spaces)
             if (word && !word.includes(' ') && word.length > 1 && word.length < 30) {
                 await lookupWord(word, e.clientX, e.clientY);
             }
         });
-
+        
         async function lookupWord(word, x, y) {
             const popup = document.getElementById('dictionary-popup');
             const wordEl = document.getElementById('dict-word');
             const phoneticEl = document.getElementById('dict-phonetic');
             const contentEl = document.getElementById('dict-content');
-
+            
             // Show popup with loading state
             wordEl.textContent = word;
             phoneticEl.textContent = '';
             contentEl.innerHTML = '<div class="dict-loading">Looking up definition...</div>';
-
+            
             // Position popup
             popup.style.left = `${Math.min(x, window.innerWidth - 420)}px`;
             popup.style.top = `${Math.min(y + 20, window.innerHeight - 400)}px`;
             popup.classList.add('visible');
-
+            
             try {
                 // Use Free Dictionary API
                 const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`);
-
+                
                 if (!response.ok) {
                     contentEl.innerHTML = `
                         <div class="dict-error">
@@ -4139,21 +2646,21 @@
                     `;
                     return;
                 }
-
+                
                 const data = await response.json();
                 const entry = data[0];
-
+                
                 // Update phonetic
                 if (entry.phonetic) {
                     phoneticEl.textContent = entry.phonetic;
                 }
-
+                
                 // Build definition HTML
                 let html = '';
-
+                
                 entry.meanings.forEach(meaning => {
                     html += `<div class="dict-part-of-speech">${meaning.partOfSpeech}</div>`;
-
+                    
                     meaning.definitions.slice(0, 2).forEach(def => {
                         html += `<div class="dict-definition">${escapeHtml(def.definition)}</div>`;
                         if (def.example) {
@@ -4161,10 +2668,10 @@
                         }
                     });
                 });
-
+                
                 // Get context (sentence containing the word)
                 const context = getWordContext(word);
-
+                
                 html += `
                     <div class="dict-actions">
                         <button class="dict-btn dict-btn-primary" onclick="saveToVocabulary('${escapeHtml(word)}', ${JSON.stringify(entry).replace(/'/g, "\\'")}, '${escapeHtml(context)}')">
@@ -4175,9 +2682,9 @@
                         </button>
                     </div>
                 `;
-
+                
                 contentEl.innerHTML = html;
-
+                
             } catch (error) {
                 console.error('Dictionary lookup failed:', error);
                 contentEl.innerHTML = `
@@ -4188,15 +2695,15 @@
                 `;
             }
         }
-
+        
         function getWordContext(word) {
             // Try to find the sentence containing the word
             const content = document.getElementById('book-content');
             if (!content) return '';
-
+            
             const text = content.innerText || '';
             const sentences = text.split(/[.!?]+/);
-
+            
             for (const sentence of sentences) {
                 if (sentence.toLowerCase().includes(word.toLowerCase())) {
                     return sentence.trim().substring(0, 200);
@@ -4204,22 +2711,22 @@
             }
             return '';
         }
-
+        
         function closeDictionary() {
             const popup = document.getElementById('dictionary-popup');
             if (popup) {
                 popup.classList.remove('visible');
             }
         }
-
+        
         async function saveToVocabulary(word, entryData, context) {
             const entry = typeof entryData === 'string' ? JSON.parse(entryData) : entryData;
-
+            
             // Extract first definition and example
             let definition = '';
             let partOfSpeech = '';
             let example = '';
-
+            
             if (entry.meanings && entry.meanings.length > 0) {
                 partOfSpeech = entry.meanings[0].partOfSpeech || '';
                 if (entry.meanings[0].definitions && entry.meanings[0].definitions.length > 0) {
@@ -4227,7 +2734,7 @@
                     example = entry.meanings[0].definitions[0].example || '';
                 }
             }
-
+            
             try {
                 const response = await fetch(`/api/vocabulary/${encodeURIComponent(bookId)}`, {
                     method: 'POST',
@@ -4242,11 +2749,11 @@
                         context: context
                     })
                 });
-
+                
                 if (response.ok) {
                     showToast('Word saved to vocabulary! 📖');
                     closeDictionary();
-
+                    
                     // Reload vocabulary
                     const vocabRes = await fetch(`/api/vocabulary/${encodeURIComponent(bookId)}`);
                     if (vocabRes.ok) {
@@ -4260,19 +2767,19 @@
                 showToast('Failed to save word', 'error');
             }
         }
-
+        
         function toggleVocabularyPanel() {
             const panel = document.getElementById('vocabulary-panel');
             if (panel) {
                 panel.classList.toggle('visible');
             }
         }
-
+        
         function renderVocabularyList() {
             const list = document.getElementById('vocab-list');
             const stats = document.getElementById('vocab-stats');
             if (!list) return;
-
+            
             if (userVocabulary.length === 0) {
                 list.innerHTML = `
                     <div class="empty-state">
@@ -4284,7 +2791,7 @@
                 if (stats) stats.innerHTML = '<strong>0</strong> words saved';
                 return;
             }
-
+            
             list.innerHTML = userVocabulary.map(w => `
                 <div class="vocab-item">
                     <button class="vocab-delete" onclick="deleteVocabWord('${w.id}')" title="Delete">🗑️</button>
@@ -4297,21 +2804,21 @@
                     <div class="vocab-meta">Chapter ${w.chapter_index + 1} • ${new Date(w.created_at).toLocaleDateString()}</div>
                 </div>
             `).join('');
-
+            
             if (stats) stats.innerHTML = `<strong>${userVocabulary.length}</strong> words saved`;
         }
-
+        
         function filterVocabulary() {
             const query = document.getElementById('vocab-search').value.toLowerCase();
             const items = document.querySelectorAll('.vocab-item');
-
+            
             items.forEach(item => {
                 const word = item.querySelector('.vocab-word')?.textContent.toLowerCase() || '';
                 const def = item.querySelector('.vocab-def')?.textContent.toLowerCase() || '';
                 item.style.display = (word.includes(query) || def.includes(query)) ? 'block' : 'none';
             });
         }
-
+        
         async function deleteVocabWord(wordId) {
             try {
                 await fetch(`/api/vocabulary/${encodeURIComponent(bookId)}/${wordId}`, {
@@ -4324,27 +2831,27 @@
                 console.error('Failed to delete word:', error);
             }
         }
-
+        
         // ===== ANNOTATIONS =====
-
+        
         function toggleAnnotationsPanel() {
             const panel = document.getElementById('annotations-panel');
             if (panel) {
                 panel.classList.toggle('visible');
             }
         }
-
+        
         function renderAnnotationsList(filter = 'all') {
             const list = document.getElementById('annot-list');
             if (!list) return;
-
+            
             let annotations = userAnnotations;
-
+            
             // Apply filter
             if (filter === 'chapter') {
                 annotations = annotations.filter(a => a.chapter_index === currentPageIndex);
             }
-
+            
             if (annotations.length === 0) {
                 list.innerHTML = `
                     <div class="empty-state">
@@ -4355,7 +2862,7 @@
                 `;
                 return;
             }
-
+            
             list.innerHTML = annotations.map(a => `
                 <div class="annot-item">
                     <div class="annot-actions">
@@ -4373,26 +2880,26 @@
                 </div>
             `).join('');
         }
-
+        
         function showAnnotTab(tab) {
             const tabs = document.querySelectorAll('.annot-tab');
             tabs.forEach(t => t.classList.remove('active'));
             event.target.classList.add('active');
-
+            
             renderAnnotationsList(tab);
         }
-
+        
         function filterAnnotations() {
             const query = document.getElementById('annot-search').value.toLowerCase();
             const items = document.querySelectorAll('.annot-item');
-
+            
             items.forEach(item => {
                 const text = item.querySelector('.annot-text')?.textContent.toLowerCase() || '';
                 const tags = item.querySelector('.annot-tags')?.textContent.toLowerCase() || '';
                 item.style.display = (text.includes(query) || tags.includes(query)) ? 'block' : 'none';
             });
         }
-
+        
         function openAddNoteModal(highlightId = null, bookmarkId = null) {
             currentNoteContext = { highlightId, bookmarkId };
             document.getElementById('note-textarea').value = '';
@@ -4400,22 +2907,22 @@
             document.getElementById('add-note-modal').classList.add('visible');
             document.getElementById('note-textarea').focus();
         }
-
+        
         function closeNoteModal() {
             document.getElementById('add-note-modal').classList.remove('visible');
             currentNoteContext = null;
         }
-
+        
         async function saveNote() {
             const noteText = document.getElementById('note-textarea').value.trim();
             const tagsInput = document.getElementById('note-tags-input').value.trim();
             const tags = tagsInput ? tagsInput.split(',').map(t => t.trim()).filter(t => t) : [];
-
+            
             if (!noteText) {
                 showToast('Please enter a note', 'error');
                 return;
             }
-
+            
             try {
                 const response = await fetch(`/api/annotations/${encodeURIComponent(bookId)}`, {
                     method: 'POST',
@@ -4428,11 +2935,11 @@
                         tags: tags
                     })
                 });
-
+                
                 if (response.ok) {
                     showToast('Note saved! 📝');
                     closeNoteModal();
-
+                    
                     // Reload annotations
                     const annotRes = await fetch(`/api/annotations/${encodeURIComponent(bookId)}`);
                     if (annotRes.ok) {
@@ -4446,7 +2953,7 @@
                 showToast('Failed to save note', 'error');
             }
         }
-
+        
         async function deleteAnnotation(annotationId) {
             try {
                 await fetch(`/api/annotations/${encodeURIComponent(bookId)}/${annotationId}`, {
@@ -4459,18 +2966,18 @@
                 console.error('Failed to delete annotation:', error);
             }
         }
-
+        
         function editAnnotation(annotationId) {
             const annot = userAnnotations.find(a => a.id === annotationId);
             if (!annot) return;
-
+            
             currentNoteContext = { annotationId };
             document.getElementById('note-textarea').value = annot.note_text;
             document.getElementById('note-tags-input').value = (annot.tags || []).join(', ');
             document.getElementById('add-note-modal').classList.add('visible');
             document.getElementById('note-textarea').focus();
         }
-
+        
         async function exportAnnotations() {
             try {
                 const response = await fetch(`/api/annotations/${encodeURIComponent(bookId)}/export?format=markdown`);
@@ -4490,106 +2997,23 @@
                 showToast('Export failed', 'error');
             }
         }
-
+        
         // Add "Add Note" button to selection toolbar
         function addNoteFromSelection() {
             const selection = window.getSelection();
             const selectedText = selection.toString().trim();
-
+            
             if (!selectedText) {
                 showToast('Select text first', 'error');
                 return;
             }
-
+            
             // Create a highlight first, then add note
             highlightSelection('yellow').then(() => {
                 // Open note modal linked to the new highlight
                 openAddNoteModal();
             });
         }
-
-        // ===== PDF COPY FUNCTIONS =====
-
-        async function copyNext10Pages() {
-            if (!isPDF) return;
-
-            const startPage = currentPageIndex;
-            const endPage = Math.min(startPage + 9, totalPages - 1);
-
-            await performCopyRange(startPage, endPage);
-        }
-
-        function toggleCopyRangeModal() {
-            const modal = document.getElementById('copy-range-modal');
-            if (modal) {
-                modal.classList.toggle('visible');
-                if (modal.classList.contains('visible')) {
-                    document.getElementById('copy-range-start').value = currentPageIndex + 1;
-                    document.getElementById('copy-range-end').value = Math.min(currentPageIndex + 10, totalPages);
-                }
-            }
-        }
-
-        function closeCopyRangeModal() {
-            const modal = document.getElementById('copy-range-modal');
-            if (modal) modal.classList.remove('visible');
-        }
-
-        async function copyCustomRange() {
-            const startInput = document.getElementById('copy-range-start');
-            const endInput = document.getElementById('copy-range-end');
-
-            let start = parseInt(startInput.value) - 1; // 0-based
-            let end = parseInt(endInput.value) - 1;     // 0-based
-
-            if (isNaN(start) || isNaN(end)) {
-                showToast("Invalid page numbers", "error");
-                return;
-            }
-
-            // Validate
-            start = Math.max(0, start);
-            end = Math.min(end, totalPages - 1);
-
-            if (start > end) {
-                showToast("Start page must be before end page", "error");
-                return;
-            }
-
-            await performCopyRange(start, end);
-            closeCopyRangeModal();
-        }
-
-        async function performCopyRange(start, end) {
-            showToast(`Fetching text for pages ${start + 1}-${end + 1}...`, "info");
-
-            try {
-                const response = await fetch(`/api/pdf/${encodeURIComponent(bookId)}/copy-text`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ start_page: start, end_page: end })
-                });
-
-                if (!response.ok) throw new Error("Failed to fetch text");
-
-                const data = await response.json();
-                const text = data.text;
-
-                if (!text) {
-                    showToast("No text found in selected range", "error");
-                    return;
-                }
-
-                await navigator.clipboard.writeText(text);
-                showToast(`Copied text from ${start + 1}-${end + 1} (${text.length} chars)`, "success");
-
-            } catch (err) {
-                console.error(err);
-                showToast("Failed to copy text: " + err.message, "error");
-            }
-        }
-
     </script>
 </body>
-
 </html>
