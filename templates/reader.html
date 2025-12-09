@@ -1796,6 +1796,8 @@
                 try {
                     await navigator.clipboard.writeText(textToCopy);
                     showCopyToast(`Copied ${textElements.length} page(s)!`, 'success');
+                    // Mark chapter as read (100% progress)
+                    await markChapterAsRead();
                 } catch (err) {
                     showCopyToast('Failed to copy', 'error');
                 }
@@ -1814,8 +1816,32 @@
             try {
                 await navigator.clipboard.writeText(textToCopy);
                 showStatus('All loaded content copied!', '#198754');
+                // Mark chapter as read (100% progress)
+                await markChapterAsRead();
             } catch (err) {
                 showStatus('Clipboard unavailable.', '#dc3545');
+            }
+        }
+        
+        // Mark the current chapter as fully read (100% progress)
+        async function markChapterAsRead() {
+            try {
+                await fetch(`/api/chapter-progress/${encodeURIComponent(bookId)}/${currentPageIndex}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ progress: 100.0 })
+                });
+                
+                // Update the progress bar in the sidebar
+                const currentHref = document.querySelector('.toc-link.active')?.getAttribute('data-href');
+                if (currentHref) {
+                    const progressElem = document.querySelector(`.chapter-progress[data-href="${currentHref}"] .chapter-progress-fill`);
+                    if (progressElem) {
+                        progressElem.style.width = '100%';
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to mark chapter as read:', error);
             }
         }
         
@@ -2133,7 +2159,19 @@
             const cleanFile = filename.split('#')[0];
             const anchor = filename.split('#')[1];
 
-            const idx = spineMap[cleanFile];
+            // Try exact match first
+            let idx = spineMap[cleanFile];
+            
+            // If not found, try matching just the basename (filename without path)
+            if (idx === undefined) {
+                const basename = cleanFile.split('/').pop();
+                for (const key in spineMap) {
+                    if (key.split('/').pop() === basename) {
+                        idx = spineMap[key];
+                        break;
+                    }
+                }
+            }
 
             if (idx !== undefined) {
                 saveScrollPosition();
@@ -2148,7 +2186,7 @@
                     window.location.href = url;
                 }
             } else {
-                console.log("Could not find index for", filename);
+                console.log("Could not find index for", filename, "tried:", cleanFile);
             }
         }
 
