@@ -102,6 +102,7 @@ class Book:
     # Meta info
     source_file: str
     processed_at: str
+    added_at: str = ""  # Timestamp when book was added to library
     version: str = "3.0"
     is_pdf: bool = False  # Flag to indicate if this is a PDF book
     
@@ -528,6 +529,7 @@ def process_pdf(pdf_path: str, output_dir: str,
         images=image_map,
         source_file=os.path.basename(pdf_path),
         processed_at=datetime.now().isoformat(),
+        added_at=datetime.now().isoformat(),
         is_pdf=True,
         pdf_page_data=pdf_page_data,
         pdf_total_pages=total_pages,
@@ -759,7 +761,8 @@ def process_epub(epub_path: str, output_dir: str) -> Book:
         toc=toc_structure,
         images=image_map,
         source_file=os.path.basename(epub_path),
-        processed_at=datetime.now().isoformat()
+        processed_at=datetime.now().isoformat(),
+        added_at=datetime.now().isoformat()
     )
 
     return final_book

@@ -93,7 +93,7 @@ def load_book_cached(folder_name: str) -> Optional[Book]:
 
 
 @app.get("/", response_class=HTMLResponse)
-async def library_view(request: Request):
+async def library_view(request: Request, sort: str = "recent"):
     """Lists all available processed books."""
     books = []
 
@@ -111,11 +111,20 @@ async def library_view(request: Request):
                             "title": book.metadata.title,
                             "author": ", ".join(book.metadata.authors),
                             "chapters": len(book.spine),
+                            "added_at": book.added_at or book.processed_at,  # Fallback to processed_at for old books
                         }
                     )
 
+    # Sort books based on the sort parameter
+    if sort == "recent":
+        books.sort(key=lambda x: x["added_at"], reverse=True)
+    elif sort == "alpha":
+        books.sort(key=lambda x: x["title"].lower())
+    elif sort == "author":
+        books.sort(key=lambda x: x["author"].lower())
+
     return templates.TemplateResponse(
-        "library.html", {"request": request, "books": books}
+        "library.html", {"request": request, "books": books, "sort": sort}
     )
 
 

@@ -30,6 +30,44 @@
             border-bottom: 1px solid #e5e5e5;
             padding-bottom: 20px;
             margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .sort-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .sort-label {
+            color: #666;
+            font-size: 0.9em;
+            font-weight: 500;
+        }
+
+        .sort-btn {
+            padding: 8px 16px;
+            border: 2px solid #ddd;
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.2s;
+            text-decoration: none;
+            color: #333;
+        }
+
+        .sort-btn:hover {
+            border-color: #3498db;
+            color: #3498db;
+        }
+
+        .sort-btn.active {
+            background: #3498db;
+            color: white;
+            border-color: #3498db;
         }
 
         .book-grid {
@@ -60,6 +98,22 @@
             font-weight: bold;
             color: #2c3e50;
             margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .new-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-size: 0.65em;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            box-shadow: 0 2px 4px rgba(102, 126, 234, 0.3);
         }
 
         .book-meta {
@@ -175,6 +229,12 @@
     <div class="container">
         <div class="library-header">
             <h1>Library</h1>
+            <div class="sort-controls">
+                <span class="sort-label">Sort by:</span>
+                <a href="/?sort=recent" class="sort-btn {% if sort == 'recent' %}active{% endif %}">Recent</a>
+                <a href="/?sort=alpha" class="sort-btn {% if sort == 'alpha' %}active{% endif %}">Title</a>
+                <a href="/?sort=author" class="sort-btn {% if sort == 'author' %}active{% endif %}">Author</a>
+            </div>
         </div>
 
         <!-- Global Search -->
@@ -221,7 +281,12 @@
         <div class="book-grid">
             {% for book in books %}
             <div class="book-card">
-                <div class="book-title">{{ book.title }}</div>
+                <div class="book-title">
+                    <span>{{ book.title }}</span>
+                    {% if book.added_at %}
+                    <span class="new-badge" data-added-at="{{ book.added_at }}" style="display: none;">NEW</span>
+                    {% endif %}
+                </div>
                 <div class="book-meta">
                     {{ book.author }}<br>
                     {{ book.chapters }} sections
@@ -388,8 +453,28 @@
             }
         }
         
+        // Show NEW badge for books added within the last 7 days
+        function showNewBadges() {
+            const badges = document.querySelectorAll('.new-badge');
+            const now = new Date();
+            const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+            badges.forEach(badge => {
+                const addedAt = badge.getAttribute('data-added-at');
+                if (addedAt) {
+                    const addedDate = new Date(addedAt);
+                    if (addedDate > sevenDaysAgo) {
+                        badge.style.display = 'inline-block';
+                    }
+                }
+            });
+        }
+
         // Load progress on page load
-        document.addEventListener('DOMContentLoaded', loadReadingProgress);
+        document.addEventListener('DOMContentLoaded', () => {
+            loadReadingProgress();
+            showNewBadges();
+        });
     </script>
     </div>
 </body>
