@@ -253,6 +253,41 @@ async def get_pages(book_id: str, start: int, count: int):
     return {"pages": pages, "total": total}
 
 
+@app.post("/api/chapters/text")
+async def get_chapters_text(request: Request):
+    """
+    Fetches text content from multiple chapters for copying.
+    Expects JSON body: {"book_id": "...", "chapter_hrefs": [...]}
+    Returns JSON with text content for each chapter.
+    """
+    body = await request.json()
+    book_id = body.get("book_id")
+    chapter_hrefs = body.get("chapter_hrefs", [])
+
+    if not book_id:
+        raise HTTPException(status_code=400, detail="book_id is required")
+
+    book = load_book_cached(book_id)
+    if not book:
+        raise HTTPException(status_code=404, detail="Book not found")
+
+    # Build a map of href -> chapter
+    href_to_chapter = {ch.href: ch for ch in book.spine}
+
+    # Collect text content
+    chapters_data = []
+    for href in chapter_hrefs:
+        chapter = href_to_chapter.get(href)
+        if chapter:
+            chapters_data.append({
+                "href": href,
+                "title": chapter.title,
+                "text": chapter.text
+            })
+
+    return {"chapters": chapters_data}
+
+
 @app.get("/read/{book_id}/images/{image_name}")
 async def serve_image(book_id: str, image_name: str):
     """

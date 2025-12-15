@@ -40,6 +40,18 @@
         a.toc-link.active { color: #fff; font-weight: 600; background: linear-gradient(135deg, #d63384 0%, #c21f6b 100%); box-shadow: 0 2px 6px rgba(214, 51, 132, 0.35); border-left-color: #fff; }
         a.toc-link.unread { background-color: rgba(150, 150, 150, 0.08); opacity: 0.75; }
         .toc-chapter-percent { font-size: 0.8em; color: #888; font-weight: normal; flex-shrink: 0; margin-left: 8px; }
+
+        /* Multi-chapter copy controls */
+        .multi-copy-controls { padding: 10px 15px; border-bottom: 1px solid #eee; background: #f8f9fa; }
+        .multi-copy-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .multi-copy-title { font-size: 0.85em; font-weight: 600; color: #495057; }
+        .multi-copy-actions { display: flex; gap: 6px; }
+        .multi-copy-btn { padding: 4px 10px; border: 1px solid #ddd; background: #fff; border-radius: 4px; cursor: pointer; font-size: 0.75em; transition: all 0.2s; }
+        .multi-copy-btn:hover { background: #495057; color: #fff; }
+        .copy-selected-btn { padding: 8px 16px; background: #3498db; color: #fff; border: 1px solid #3498db; border-radius: 5px; cursor: pointer; font-size: 0.85em; font-weight: 500; transition: all 0.2s; width: 100%; }
+        .copy-selected-btn:hover { background: #2980b9; box-shadow: 0 4px 8px rgba(52, 152, 219, 0.3); }
+        .copy-selected-btn:disabled { background: #ccc; border-color: #ccc; cursor: not-allowed; opacity: 0.6; }
+        .chapter-checkbox { margin-right: 8px; cursor: pointer; width: 16px; height: 16px; }
         
         /* Chapter progress indicator */
         .toc-item-wrapper { position: relative; }
@@ -555,6 +567,20 @@
             <button onclick="toggleSessionPanel()" style="flex: 1; padding: 8px; border: 1px solid #ddd; background: #fff; border-radius: 4px; cursor: pointer; font-size: 0.85em;" title="Reading History">📊 Stats</button>
         </div>
 
+        <!-- Multi-chapter copy controls -->
+        <div class="multi-copy-controls">
+            <div class="multi-copy-header">
+                <span class="multi-copy-title">Multi-Chapter Copy</span>
+                <div class="multi-copy-actions">
+                    <button class="multi-copy-btn" onclick="selectAllChapters()">Select All</button>
+                    <button class="multi-copy-btn" onclick="clearChapterSelection()">Clear</button>
+                </div>
+            </div>
+            <button class="copy-selected-btn" onclick="copySelectedChapters()" disabled id="copy-chapters-btn">
+                Copy Selected (0)
+            </button>
+        </div>
+
         <!-- Recursive Macro for TOC -->
         {% macro render_toc(items) %}
             <ul class="toc-list">
@@ -572,6 +598,7 @@
                     <a href="#" onclick="findAndGo('{{ item.file_href }}')"
                        class="toc-link {% if is_active %}active{% endif %}"
                        data-href="{{ item.file_href }}">
+                        <input type="checkbox" class="chapter-checkbox" data-href="{{ item.file_href }}" onclick="event.stopPropagation(); updateCopyButton();">
                         <span class="toc-title">{{ item.title }}</span>
                         <span class="toc-chapter-percent" data-href="{{ item.file_href }}">0%</span>
                     </a>
@@ -3051,6 +3078,87 @@
                 // Open note modal linked to the new highlight
                 openAddNoteModal();
             });
+        }
+
+        // Multi-chapter copy functionality
+        function updateCopyButton() {
+            const checkboxes = document.querySelectorAll('.chapter-checkbox');
+            const checkedCount = Array.from(checkboxes).filter(cb => cb.checked).length;
+            const copyBtn = document.getElementById('copy-chapters-btn');
+
+            if (copyBtn) {
+                copyBtn.textContent = `Copy Selected (${checkedCount})`;
+                copyBtn.disabled = checkedCount === 0;
+            }
+        }
+
+        function selectAllChapters() {
+            const checkboxes = document.querySelectorAll('.chapter-checkbox');
+            checkboxes.forEach(cb => cb.checked = true);
+            updateCopyButton();
+        }
+
+        function clearChapterSelection() {
+            const checkboxes = document.querySelectorAll('.chapter-checkbox');
+            checkboxes.forEach(cb => cb.checked = false);
+            updateCopyButton();
+        }
+
+        async function copySelectedChapters() {
+            const checkboxes = document.querySelectorAll('.chapter-checkbox:checked');
+            if (checkboxes.length === 0) {
+                showToast('No chapters selected', 'error');
+                return;
+            }
+
+            const copyBtn = document.getElementById('copy-chapters-btn');
+            const originalText = copyBtn.textContent;
+            copyBtn.textContent = 'Copying...';
+            copyBtn.disabled = true;
+
+            try {
+                // Collect selected chapter hrefs
+                const selectedHrefs = Array.from(checkboxes).map(cb => cb.getAttribute('data-href'));
+
+                // Fetch chapter text content from backend
+                const response = await fetch('/api/chapters/text', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        book_id: '{{ book_id }}',
+                        chapter_hrefs: selectedHrefs
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to fetch chapters');
+                }
+
+                const data = await response.json();
+                const chapters = data.chapters;
+
+                // Combine chapter text with separators
+                const combinedText = chapters.map(ch => {
+                    return `=== ${ch.title} ===\n\n${ch.text}`;
+                }).join('\n\n---\n\n');
+
+                // Copy to clipboard
+                await navigator.clipboard.writeText(combinedText);
+
+                showToast(`Copied ${chapters.length} chapter${chapters.length > 1 ? 's' : ''} to clipboard`, 'success');
+
+                // Clear selection after successful copy
+                clearChapterSelection();
+
+            } catch (error) {
+                console.error('Error copying chapters:', error);
+                showToast('Failed to copy chapters', 'error');
+            } finally {
+                copyBtn.textContent = originalText;
+                copyBtn.disabled = false;
+            }
         }
     </script>
 </body>
