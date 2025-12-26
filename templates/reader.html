@@ -48,6 +48,10 @@
         .multi-copy-actions { display: flex; gap: 6px; }
         .multi-copy-btn { padding: 4px 10px; border: 1px solid #ddd; background: #fff; border-radius: 4px; cursor: pointer; font-size: 0.75em; transition: all 0.2s; }
         .multi-copy-btn:hover { background: #495057; color: #fff; }
+        .chapter-filter { display: flex; gap: 8px; margin-bottom: 10px; }
+        .chapter-filter select, .chapter-filter input { padding: 6px 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 0.8em; flex: 1; }
+        .chapter-filter select { flex: 0 0 40%; background: #fff; }
+        .chapter-filter input::placeholder { color: #aaa; }
         .copy-selected-btn { padding: 8px 16px; background: #3498db; color: #fff; border: 1px solid #3498db; border-radius: 5px; cursor: pointer; font-size: 0.85em; font-weight: 500; transition: all 0.2s; width: 100%; }
         .copy-selected-btn:hover { background: #2980b9; box-shadow: 0 4px 8px rgba(52, 152, 219, 0.3); }
         .copy-selected-btn:disabled { background: #ccc; border-color: #ccc; cursor: not-allowed; opacity: 0.6; }
@@ -576,6 +580,18 @@
                     <button class="multi-copy-btn" onclick="clearChapterSelection()">Clear</button>
                 </div>
             </div>
+            
+            <!-- Filtering options -->
+            <div class="chapter-filter">
+                <select id="chapter-filter" onchange="filterChapters(this.value)">
+                    <option value="all">All Chapters</option>
+                    <option value="unread">Unread Only</option>
+                    <option value="read">Read Only</option>
+                </select>
+                <input type="text" id="chapter-search" placeholder="Search chapters..." 
+                       onkeyup="filterChapters(document.getElementById('chapter-filter').value)">
+            </div>
+            
             <button class="copy-selected-btn" onclick="copySelectedChapters()" disabled id="copy-chapters-btn">
                 Copy Selected (0)
             </button>
@@ -3113,14 +3129,18 @@
 
             const copyBtn = document.getElementById('copy-chapters-btn');
             const originalText = copyBtn.textContent;
-            copyBtn.textContent = 'Copying...';
+            const selectedHrefs = Array.from(checkboxes).map(cb => cb.getAttribute('data-href'));
+            
             copyBtn.disabled = true;
 
             try {
-                // Collect selected chapter hrefs
-                const selectedHrefs = Array.from(checkboxes).map(cb => cb.getAttribute('data-href'));
-
+                // Show progress indicator
+                let progressCount = 0;
+                const totalCount = selectedHrefs.length;
+                
                 // Fetch chapter text content from backend
+                copyBtn.textContent = `Fetching chapters... (0/${totalCount})`;
+                
                 const response = await fetch('/api/chapters/text', {
                     method: 'POST',
                     headers: {
@@ -3139,6 +3159,9 @@
                 const data = await response.json();
                 const chapters = data.chapters;
 
+                // Update progress: fetching complete
+                copyBtn.textContent = 'Copying to clipboard...';
+
                 // Combine chapter text with separators
                 const combinedText = chapters.map(ch => {
                     return `=== ${ch.title} ===\n\n${ch.text}`;
@@ -3147,7 +3170,44 @@
                 // Copy to clipboard
                 await navigator.clipboard.writeText(combinedText);
 
-                showToast(`Copied ${chapters.length} chapter${chapters.length > 1 ? 's' : ''} to clipboard`, 'success');
+                // Mark selected chapters as read
+                copyBtn.textContent = `Marking chapters as read... (0/${chapters.length})`;
+                for (let i = 0; i < chapters.length; i++) {
+                    const chapter = chapters[i];
+                    const spineIndex = Object.keys(spineMap).findIndex(
+                        key => key.endsWith(chapter.href.split('/').pop())
+                    );
+                    
+                    if (spineIndex !== -1) {
+                        await fetch(
+                            `/api/chapter-progress/${encodeURIComponent(bookId)}/${spineIndex}`,
+                            {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ progress: 100.0 })
+                            }
+                        );
+                        
+                        // Update progress bar for this chapter
+                        const link = document.querySelector(
+                            `.toc-link[data-href="${chapter.href}"]`
+                        );
+                        if (link) {
+                            link.classList.add('read');
+                            const progressBar = link.parentElement.querySelector(
+                                '.chapter-progress-fill'
+                            );
+                            if (progressBar) {
+                                progressBar.style.width = '100%';
+                            }
+                        }
+                    }
+                    
+                    // Update progress display
+                    copyBtn.textContent = `Marking chapters as read... (${i + 1}/${chapters.length})`;
+                }
+
+                showToast(`Copied and marked ${chapters.length} chapter${chapters.length > 1 ? 's' : ''} as read!`, 'success');
 
                 // Clear selection after successful copy
                 clearChapterSelection();
@@ -3159,6 +3219,50 @@
                 copyBtn.textContent = originalText;
                 copyBtn.disabled = false;
             }
+        }
+
+        function filterChapters(filterType) {
+            const checkboxes = document.querySelectorAll('.chapter-checkbox');
+            const searchTerm = document.getElementById('chapter-search')?.value.toLowerCase() || '';
+
+            checkboxes.forEach(cb => {
+                const chapterItem = cb.closest('.toc-item');
+                if (!chapterItem) return;
+
+                const title = chapterItem.textContent.toLowerCase();
+                const matchesSearch = !searchTerm || title.includes(searchTerm);
+                
+                let matchesFilter = true;
+                if (filterType !== 'all') {
+                    const link = chapterItem.querySelector('.toc-link');
+                    const isRead = link?.classList.contains('read') || false;
+                    
+                    if (filterType === 'unread') {
+                        matchesFilter = !isRead;
+                    } else if (filterType === 'read') {
+                        matchesFilter = isRead;
+                    }
+                }
+
+                const shouldShow = matchesSearch && matchesFilter;
+                chapterItem.style.display = shouldShow ? '' : 'none';
+
+                // If hiding, uncheck the checkbox
+                if (!shouldShow) {
+                    cb.checked = false;
+                }
+            });
+
+            updateCopyButton();
+        }
+
+        // Reset filter when chapter progress is updated
+        function resetChapterFilter() {
+            const filterSelect = document.getElementById('chapter-filter');
+            const searchInput = document.getElementById('chapter-search');
+            if (filterSelect) filterSelect.value = 'all';
+            if (searchInput) searchInput.value = '';
+            filterChapters('all');
         }
     </script>
 </body>
