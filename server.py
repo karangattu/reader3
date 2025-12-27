@@ -2,7 +2,7 @@ import os
 import pickle
 from functools import lru_cache
 from typing import Optional
-
+import tempfile
 import shutil
 from fastapi import FastAPI, Request, HTTPException, UploadFile, File
 from fastapi.responses import (
@@ -111,7 +111,8 @@ async def library_view(request: Request, sort: str = "recent"):
                             "title": book.metadata.title,
                             "author": ", ".join(book.metadata.authors),
                             "chapters": len(book.spine),
-                            "added_at": book.added_at or book.processed_at,  # Fallback to processed_at for old books
+                            "added_at": book.added_at or book.processed_at,
+                            "cover_image": book.cover_image,
                         }
                     )
 
@@ -128,7 +129,29 @@ async def library_view(request: Request, sort: str = "recent"):
     )
 
 
-import tempfile
+@app.get("/cover/{book_id}")
+async def get_cover_image(book_id: str):
+    """Serve cover image for a book."""
+    book = load_book_cached(book_id)
+    if not book:
+        raise HTTPException(status_code=404, detail="Book not found")
+
+    if not book.cover_image:
+        raise HTTPException(status_code=404, detail="No cover image available")
+
+    # Construct the full path to the cover image
+    cover_path = os.path.join(BOOKS_DIR, book_id, book.cover_image)
+
+    # Security: ensure the path is within the book directory
+    safe_book_id = os.path.basename(book_id)
+    expected_base = os.path.join(BOOKS_DIR, safe_book_id)
+    if not os.path.abspath(cover_path).startswith(expected_base):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    if not os.path.exists(cover_path):
+        raise HTTPException(status_code=404, detail="Cover image not found")
+
+    return FileResponse(cover_path)
 
 
 @app.post("/upload")

@@ -105,6 +105,8 @@ class Book:
     added_at: str = ""  # Timestamp when book was added to library
     version: str = "3.0"
     is_pdf: bool = False  # Flag to indicate if this is a PDF book
+    # Path to cover image (relative), e.g., 'images/cover.jpg'
+    cover_image: Optional[str] = None
     
     # PDF-specific data
     pdf_page_data: Dict[int, PDFPageData] = field(default_factory=dict)
@@ -656,6 +658,91 @@ def get_pdf_page_stats(book: Book) -> dict:
     }
 
 
+def extract_cover_image(
+    epub_book,
+    images_dir: str,
+    image_map: Dict[str, str]
+) -> Optional[str]:
+    """
+    Extract cover image from EPUB.
+    Returns relative path to cover image (e.g., 'images/cover.jpg') or None.
+    """
+    try:
+        # Try to get cover using ebooklib's cover attribute
+        cover_item = epub_book.get_cover()
+        if cover_item:
+            original_fname = os.path.basename(cover_item.get_name())
+            # Sanitize filename for OS
+            safe_fname = "".join(
+                [c for c in original_fname
+                 if c.isalpha() or c.isdigit() or c in '._-']
+            ).strip()
+            if not safe_fname:
+                safe_fname = "cover.jpg"
+
+            # Save to disk
+            local_path = os.path.join(images_dir, safe_fname)
+            with open(local_path, 'wb') as f:
+                f.write(cover_item.get_content())
+
+            cover_rel_path = f"images/{safe_fname}"
+            print(f"Extracted cover image: {cover_rel_path}")
+            return cover_rel_path
+    except Exception as e:
+        print(f"Could not extract cover using get_cover(): {e}")
+
+    # Fallback: Check EPUB manifest/spine for common cover patterns
+    try:
+        for item in epub_book.get_items():
+            if item.get_type() == ebooklib.ITEM_IMAGE:
+                item_name_lower = item.get_name().lower()
+                # Look for common cover file patterns
+                if any(pattern in item_name_lower
+                       for pattern in ['cover', 'front']):
+                    original_fname = os.path.basename(item.get_name())
+                    # Sanitize filename for OS
+                    safe_fname = "".join(
+                        [c for c in original_fname
+                         if c.isalpha() or c.isdigit() or c in '._-']
+                    ).strip()
+
+                    # Save to disk
+                    local_path = os.path.join(images_dir, safe_fname)
+                    with open(local_path, 'wb') as f:
+                        f.write(item.get_content())
+
+                    cover_rel_path = f"images/{safe_fname}"
+                    print(f"Found cover by pattern: {cover_rel_path}")
+                    return cover_rel_path
+    except Exception as e:
+        print(f"Fallback cover extraction failed: {e}")
+
+    # Final fallback: use the first image as cover
+    try:
+        for item in epub_book.get_items():
+            if item.get_type() == ebooklib.ITEM_IMAGE:
+                original_fname = os.path.basename(item.get_name())
+                # Sanitize filename for OS
+                safe_fname = "".join(
+                    [c for c in original_fname
+                     if c.isalpha() or c.isdigit() or c in '._-']
+                ).strip()
+
+                # Save to disk
+                local_path = os.path.join(images_dir, safe_fname)
+                with open(local_path, 'wb') as f:
+                    f.write(item.get_content())
+
+                cover_rel_path = f"images/{safe_fname}"
+                print(f"Using first image as cover: {cover_rel_path}")
+                return cover_rel_path
+    except Exception as e:
+        print(f"Could not use first image as cover: {e}")
+
+    print("Warning: No cover image found")
+    return None
+
+
 def process_epub(epub_path: str, output_dir: str) -> Book:
 
     # 1. Load Book
@@ -673,25 +760,33 @@ def process_epub(epub_path: str, output_dir: str) -> Book:
 
     # 4. Extract Images & Build Map
     print("Extracting images...")
-    image_map = {} # Key: internal_path, Value: local_relative_path
+    image_map = {}  # Key: internal_path, Value: local_relative_path
 
     for item in book.get_items():
         if item.get_type() == ebooklib.ITEM_IMAGE:
             # Normalize filename
             original_fname = os.path.basename(item.get_name())
             # Sanitize filename for OS
-            safe_fname = "".join([c for c in original_fname if c.isalpha() or c.isdigit() or c in '._-']).strip()
+            safe_fname = "".join(
+                [c for c in original_fname
+                 if c.isalpha() or c.isdigit() or c in '._-']
+            ).strip()
 
             # Save to disk
             local_path = os.path.join(images_dir, safe_fname)
             with open(local_path, 'wb') as f:
                 f.write(item.get_content())
 
-            # Map keys: We try both the full internal path and just the basename
-            # to be robust against messy HTML src attributes
+            # Map keys: We try both the full internal path
+            # and just the basename to be robust against
+            # messy HTML src attributes
             rel_path = f"images/{safe_fname}"
             image_map[item.get_name()] = rel_path
             image_map[original_fname] = rel_path
+
+    # 4.5 Extract Cover Image
+    print("Extracting cover image...")
+    cover_image = extract_cover_image(book, images_dir, image_map)
 
     # 5. Process TOC
     print("Parsing Table of Contents...")
@@ -762,7 +857,8 @@ def process_epub(epub_path: str, output_dir: str) -> Book:
         images=image_map,
         source_file=os.path.basename(epub_path),
         processed_at=datetime.now().isoformat(),
-        added_at=datetime.now().isoformat()
+        added_at=datetime.now().isoformat(),
+        cover_image=cover_image
     )
 
     return final_book
