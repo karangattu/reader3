@@ -13,6 +13,7 @@ dependencies = [
     "python-multipart>=0.0.20",
     "pyinstaller>=6.16.0",
     "pymupdf>=1.23.0",
+    "httpx>=0.28.1",
 ]
 
 [project.optional-dependencies]

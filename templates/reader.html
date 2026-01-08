@@ -330,6 +330,58 @@
         .highlight-menu-color.pink { background: #e91e63; }
         .highlight-menu-color.purple { background: #9c27b0; }
 
+        /* AI Popup */
+        #ai-popup { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 550px; max-width: 90%; max-height: 85vh; background: #fff; border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); z-index: 1200; overflow: hidden; font-family: -apple-system, sans-serif; }
+        #ai-popup.visible { display: flex; flex-direction: column; }
+        .ai-popup-header { padding: 18px 24px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; display: flex; justify-content: space-between; align-items: center; }
+        .ai-popup-header h3 { margin: 0; font-size: 1.1em; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+        .ai-popup-close { background: rgba(255,255,255,0.2); border: none; color: #fff; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 1.2em; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+        .ai-popup-close:hover { background: rgba(255,255,255,0.3); }
+        .ai-popup-context { padding: 16px 24px; background: #f8f9fa; border-bottom: 1px solid #eee; font-size: 0.9em; color: #555; max-height: 120px; overflow-y: auto; line-height: 1.6; }
+        .ai-popup-context-label { font-size: 0.75em; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin-bottom: 8px; font-weight: 600; }
+        .ai-popup-context-text { font-style: italic; }
+        .ai-popup-input { padding: 16px 24px; display: flex; gap: 12px; border-bottom: 1px solid #eee; background: #fff; }
+        .ai-popup-input input { flex: 1; padding: 12px 16px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 0.95em; outline: none; transition: border-color 0.2s; }
+        .ai-popup-input input:focus { border-color: #667eea; }
+        .ai-popup-input button { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.9em; transition: all 0.2s; }
+        .ai-popup-input button:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4); }
+        .ai-popup-input button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+        .ai-popup-actions { display: flex; gap: 8px; padding: 12px 24px; background: #f8f9fa; border-bottom: 1px solid #eee; flex-wrap: wrap; }
+        .ai-action-btn { padding: 8px 14px; background: #fff; border: 1px solid #ddd; border-radius: 20px; cursor: pointer; font-size: 0.85em; transition: all 0.2s; }
+        .ai-action-btn:hover { background: #667eea; color: #fff; border-color: #667eea; }
+        .ai-popup-response { flex: 1; padding: 24px; overflow-y: auto; line-height: 1.7; font-size: 0.95em; min-height: 150px; max-height: 300px; }
+        .ai-popup-response h1, .ai-popup-response h2, .ai-popup-response h3 { margin-top: 1em; margin-bottom: 0.5em; }
+        .ai-popup-response ul, .ai-popup-response ol { padding-left: 1.5em; margin: 0.5em 0; }
+        .ai-popup-response p { margin: 0.8em 0; }
+        .ai-popup-response code { background: #f0f0f0; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+        .ai-loading { display: flex; align-items: center; justify-content: center; gap: 12px; color: #888; padding: 40px; }
+        .ai-loading-spinner { width: 24px; height: 24px; border: 3px solid #e0e0e0; border-top-color: #667eea; border-radius: 50%; animation: spin 1s linear infinite; }
+        .ai-error { color: #e74c3c; padding: 20px; text-align: center; background: #fdf2f2; border-radius: 8px; margin: 20px; }
+        .ai-error-icon { font-size: 2em; margin-bottom: 10px; }
+        .ai-popup-footer { padding: 12px 24px; background: #f8f9fa; border-top: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; font-size: 0.8em; color: #888; }
+        .ai-provider-badge { display: flex; align-items: center; gap: 6px; background: #e8f4fc; color: #3498db; padding: 4px 10px; border-radius: 12px; font-weight: 500; }
+        
+        /* AI Settings Panel */
+        #ai-settings-panel { position: fixed; top: 60px; right: -400px; width: 380px; height: calc(100vh - 80px); background: #fff; border-left: 1px solid #ddd; box-shadow: -4px 0 12px rgba(0,0,0,0.1); z-index: 999; transition: right 0.3s ease; overflow-y: auto; font-family: -apple-system, sans-serif; }
+        #ai-settings-panel.visible { right: 0; }
+        .ai-settings-header { padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; }
+        .ai-settings-header h3 { margin: 0; display: flex; align-items: center; gap: 8px; }
+        .ai-settings-content { padding: 20px; }
+        .ai-settings-section { margin-bottom: 24px; }
+        .ai-settings-section h4 { margin: 0 0 12px; font-size: 0.9em; color: #333; display: flex; align-items: center; gap: 8px; }
+        .ai-settings-row { margin-bottom: 16px; }
+        .ai-settings-label { display: block; font-size: 0.85em; color: #666; margin-bottom: 6px; }
+        .ai-settings-input { width: 100%; padding: 10px 14px; border: 1px solid #ddd; border-radius: 6px; font-size: 0.9em; }
+        .ai-settings-select { width: 100%; padding: 10px 14px; border: 1px solid #ddd; border-radius: 6px; font-size: 0.9em; background: #fff; }
+        .ai-status-indicator { display: flex; align-items: center; gap: 8px; padding: 12px; background: #f8f9fa; border-radius: 8px; margin-top: 12px; }
+        .ai-status-dot { width: 10px; height: 10px; border-radius: 50%; }
+        .ai-status-dot.online { background: #27ae60; }
+        .ai-status-dot.offline { background: #e74c3c; }
+        .ai-status-dot.checking { background: #f39c12; animation: pulse 1s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .ai-settings-save { width: 100%; padding: 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; margin-top: 20px; }
+        .ai-settings-save:hover { box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4); }
+
     </style>
 </head>
 <body class="{{ 'is-pdf' if is_pdf else '' }}">
@@ -358,6 +410,7 @@
         </div>
         <button onclick="addBookmark()" title="Bookmark this passage">🔖 Bookmark</button>
         <button onclick="openAddNoteModal()" title="Add a note">📝 Note</button>
+        <button onclick="askAIAboutSelection()" title="Ask AI about this text">🤖 Ask AI</button>
         <button onclick="copySelectedText()" title="Copy selected text">📋 Copy</button>
         <button onclick="appendToClipboard()" title="Add to existing clipboard">➕ Add to Batch</button>
         <button onclick="clearSelection()" title="Clear selection">✕</button>
@@ -544,6 +597,98 @@
         </div>
     </div>
     
+    <!-- AI Popup Modal -->
+    <div id="ai-popup">
+        <div class="ai-popup-header">
+            <h3>🤖 AI Assistant</h3>
+            <button class="ai-popup-close" onclick="closeAIPopup()">✕</button>
+        </div>
+        <div class="ai-popup-context" id="ai-context">
+            <div class="ai-popup-context-label">Selected Text</div>
+            <div class="ai-popup-context-text" id="ai-context-text"></div>
+        </div>
+        <div class="ai-popup-actions">
+            <button class="ai-action-btn" onclick="aiQuickAction('summarize')">📝 Summarize</button>
+            <button class="ai-action-btn" onclick="aiQuickAction('explain')">💡 Explain Simply</button>
+            <button class="ai-action-btn" onclick="aiQuickAction('define')">📖 Define Terms</button>
+        </div>
+        <div class="ai-popup-input">
+            <input type="text" id="ai-question" placeholder="Ask a question about this text..." onkeydown="if(event.key==='Enter')submitAIQuestion()">
+            <button onclick="submitAIQuestion()" id="ai-submit-btn">Ask</button>
+        </div>
+        <div class="ai-popup-response" id="ai-response">
+            <div style="color: #888; text-align: center; padding: 30px;">
+                Ask a question or use the quick actions above
+            </div>
+        </div>
+        <div class="ai-popup-footer">
+            <span id="ai-provider-info"></span>
+            <button onclick="toggleAISettings()" style="background: none; border: none; color: #667eea; cursor: pointer; font-size: 0.9em;">⚙️ Settings</button>
+        </div>
+    </div>
+    
+    <!-- AI Settings Panel -->
+    <div id="ai-settings-panel">
+        <div class="ai-settings-header">
+            <h3>🤖 AI Settings</h3>
+        </div>
+        <div style="padding: 15px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-weight: 500;">Configuration</span>
+            <button class="panel-close" onclick="toggleAISettings()">✕</button>
+        </div>
+        <div class="ai-settings-content">
+            <div class="ai-settings-section">
+                <h4>🔌 Provider</h4>
+                <div class="ai-settings-row">
+                    <label class="ai-settings-label">AI Provider</label>
+                    <select class="ai-settings-select" id="ai-provider-select" onchange="updateProviderUI()">
+                        <option value="ollama">Ollama (Local - Free)</option>
+                        <option value="gemini">Google Gemini (Cloud)</option>
+                    </select>
+                </div>
+                <div class="ai-status-indicator" id="ai-status-indicator">
+                    <span class="ai-status-dot checking" id="ai-status-dot"></span>
+                    <span id="ai-status-text">Checking...</span>
+                </div>
+            </div>
+            
+            <div class="ai-settings-section" id="ollama-settings">
+                <h4>🦙 Ollama Settings</h4>
+                <div class="ai-settings-row">
+                    <label class="ai-settings-label">Server URL</label>
+                    <input type="text" class="ai-settings-input" id="ollama-url" value="http://localhost:11434" placeholder="http://localhost:11434">
+                </div>
+                <div class="ai-settings-row">
+                    <label class="ai-settings-label">Model</label>
+                    <input type="text" class="ai-settings-input" id="ollama-model" value="llama3.2" placeholder="e.g., llama3.2, mistral, gemma2">
+                </div>
+                <div style="font-size: 0.8em; color: #888; margin-top: 8px;">
+                    <a href="https://ollama.com" target="_blank" style="color: #667eea;">Install Ollama</a> to run AI locally for free.
+                </div>
+            </div>
+            
+            <div class="ai-settings-section" id="gemini-settings" style="display: none;">
+                <h4>✨ Google Gemini Settings</h4>
+                <div class="ai-settings-row">
+                    <label class="ai-settings-label">API Key</label>
+                    <input type="password" class="ai-settings-input" id="gemini-api-key" placeholder="Enter your Gemini API key">
+                </div>
+                <div class="ai-settings-row">
+                    <label class="ai-settings-label">Model</label>
+                    <select class="ai-settings-select" id="gemini-model">
+                        <option value="gemini-1.5-flash">Gemini 1.5 Flash (Fast)</option>
+                        <option value="gemini-1.5-pro">Gemini 1.5 Pro (Powerful)</option>
+                    </select>
+                </div>
+                <div style="font-size: 0.8em; color: #888; margin-top: 8px;">
+                    Get a free API key from <a href="https://aistudio.google.com/apikey" target="_blank" style="color: #667eea;">Google AI Studio</a>.
+                </div>
+            </div>
+            
+            <button class="ai-settings-save" onclick="saveAISettings()">Save Settings</button>
+        </div>
+    </div>
+    
     <!-- PDF floating page indicator -->
     {% if is_pdf %}
     <div id="pdf-page-indicator"></div>
@@ -569,6 +714,10 @@
             <button onclick="toggleVocabularyPanel()" style="flex: 1; padding: 8px; border: 1px solid #ddd; background: #fff; border-radius: 4px; cursor: pointer; font-size: 0.85em;" title="Vocabulary List">📖 Vocab</button>
             <button onclick="toggleAnnotationsPanel()" style="flex: 1; padding: 8px; border: 1px solid #ddd; background: #fff; border-radius: 4px; cursor: pointer; font-size: 0.85em;" title="Annotations">📝 Annot</button>
             <button onclick="toggleSessionPanel()" style="flex: 1; padding: 8px; border: 1px solid #ddd; background: #fff; border-radius: 4px; cursor: pointer; font-size: 0.85em;" title="Reading History">📊 Stats</button>
+        </div>
+        <div style="display: flex; gap: 8px; padding: 5px 15px 10px; border-bottom: 1px solid #eee; flex-wrap: wrap;">
+            <button onclick="summarizeCurrentChapter()" style="flex: 1; padding: 8px; border: 1px solid #ddd; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; border-radius: 4px; cursor: pointer; font-size: 0.85em; font-weight: 500;" title="AI Summarize Chapter">✨ Summarize</button>
+            <button onclick="toggleAISettings()" style="flex: 0 0 auto; padding: 8px 12px; border: 1px solid #ddd; background: #fff; border-radius: 4px; cursor: pointer; font-size: 0.85em;" title="AI Settings">🤖 AI</button>
         </div>
 
         <!-- Multi-chapter copy controls -->
@@ -3264,6 +3413,393 @@
             if (searchInput) searchInput.value = '';
             filterChapters('all');
         }
+        
+        // ===== AI INTEGRATION FUNCTIONS =====
+        
+        let currentAIContext = '';
+        let aiConfig = { provider: 'ollama' };
+        
+        // Load AI configuration on page load
+        async function loadAIConfig() {
+            try {
+                const res = await fetch('/api/ai/config');
+                if (res.ok) {
+                    aiConfig = await res.json();
+                    updateAISettingsUI();
+                }
+            } catch (e) {
+                console.log('AI config not available');
+            }
+        }
+        
+        // Check AI availability
+        async function checkAIStatus() {
+            const statusDot = document.getElementById('ai-status-dot');
+            const statusText = document.getElementById('ai-status-text');
+            const providerInfo = document.getElementById('ai-provider-info');
+            
+            if (statusDot) {
+                statusDot.className = 'ai-status-dot checking';
+            }
+            if (statusText) {
+                statusText.textContent = 'Checking...';
+            }
+            
+            try {
+                const res = await fetch('/api/ai/status');
+                const data = await res.json();
+                
+                if (statusDot) {
+                    statusDot.className = 'ai-status-dot ' + (data.available ? 'online' : 'offline');
+                }
+                if (statusText) {
+                    if (data.available) {
+                        statusText.textContent = `Connected: ${data.model}`;
+                    } else {
+                        statusText.textContent = data.error || 'Not available';
+                    }
+                }
+                if (providerInfo) {
+                    if (data.available) {
+                        providerInfo.innerHTML = `<span class="ai-provider-badge">🤖 ${data.provider} - ${data.model}</span>`;
+                    } else {
+                        providerInfo.innerHTML = `<span style="color: #e74c3c;">⚠️ AI not available</span>`;
+                    }
+                }
+                
+                return data;
+            } catch (e) {
+                if (statusDot) {
+                    statusDot.className = 'ai-status-dot offline';
+                }
+                if (statusText) {
+                    statusText.textContent = 'Error connecting';
+                }
+                return { available: false };
+            }
+        }
+        
+        // Open AI popup with selected text
+        function askAIAboutSelection() {
+            const selection = window.getSelection().toString().trim();
+            if (!selection) {
+                showToast('Please select some text first', 'error');
+                return;
+            }
+            
+            currentAIContext = selection;
+            showAIPopup(selection);
+        }
+        
+        // Show AI popup
+        function showAIPopup(context) {
+            const popup = document.getElementById('ai-popup');
+            const contextText = document.getElementById('ai-context-text');
+            const questionInput = document.getElementById('ai-question');
+            const responseEl = document.getElementById('ai-response');
+            
+            // Truncate long context for display
+            const displayContext = context.length > 500 ? context.substring(0, 500) + '...' : context;
+            contextText.textContent = displayContext;
+            currentAIContext = context;
+            
+            // Reset
+            questionInput.value = '';
+            responseEl.innerHTML = '<div style="color: #888; text-align: center; padding: 30px;">Ask a question or use the quick actions above</div>';
+            
+            popup.classList.add('visible');
+            questionInput.focus();
+            
+            // Check AI status
+            checkAIStatus();
+        }
+        
+        // Close AI popup
+        function closeAIPopup() {
+            document.getElementById('ai-popup').classList.remove('visible');
+        }
+        
+        // Submit AI question
+        async function submitAIQuestion() {
+            const question = document.getElementById('ai-question').value.trim();
+            if (!question) return;
+            
+            const responseEl = document.getElementById('ai-response');
+            const submitBtn = document.getElementById('ai-submit-btn');
+            
+            responseEl.innerHTML = '<div class="ai-loading"><div class="ai-loading-spinner"></div><span>Thinking...</span></div>';
+            submitBtn.disabled = true;
+            
+            try {
+                const res = await fetch('/api/ai/ask', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        question: question,
+                        context: currentAIContext,
+                        book_id: bookId
+                    })
+                });
+                
+                if (!res.ok) {
+                    const error = await res.json();
+                    throw new Error(error.detail || 'AI request failed');
+                }
+                
+                const data = await res.json();
+                responseEl.innerHTML = `<div class="ai-answer">${formatAIResponse(data.answer)}</div>`;
+            } catch (error) {
+                responseEl.innerHTML = `
+                    <div class="ai-error">
+                        <div class="ai-error-icon">⚠️</div>
+                        <div>${error.message}</div>
+                        <div style="margin-top: 10px; font-size: 0.9em;">
+                            ${error.message.includes('Ollama') ? '<a href="https://ollama.com" target="_blank" style="color: #667eea;">Install Ollama</a> to use AI locally for free.' : ''}
+                        </div>
+                    </div>
+                `;
+            } finally {
+                submitBtn.disabled = false;
+            }
+        }
+        
+        // Quick AI actions
+        async function aiQuickAction(action) {
+            const responseEl = document.getElementById('ai-response');
+            
+            responseEl.innerHTML = '<div class="ai-loading"><div class="ai-loading-spinner"></div><span>Processing...</span></div>';
+            
+            try {
+                let endpoint, body;
+                
+                if (action === 'summarize') {
+                    endpoint = '/api/ai/summarize';
+                    body = { text: currentAIContext, style: 'concise' };
+                } else if (action === 'explain') {
+                    endpoint = '/api/ai/explain';
+                    body = { text: currentAIContext };
+                } else if (action === 'define') {
+                    endpoint = '/api/ai/explain';
+                    body = { text: currentAIContext };
+                }
+                
+                const res = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                
+                if (!res.ok) {
+                    const error = await res.json();
+                    throw new Error(error.detail || 'AI request failed');
+                }
+                
+                const data = await res.json();
+                const result = data.summary || data.explanation || data.definition;
+                responseEl.innerHTML = `<div class="ai-answer">${formatAIResponse(result)}</div>`;
+            } catch (error) {
+                responseEl.innerHTML = `
+                    <div class="ai-error">
+                        <div class="ai-error-icon">⚠️</div>
+                        <div>${error.message}</div>
+                    </div>
+                `;
+            }
+        }
+        
+        // Summarize current chapter
+        async function summarizeCurrentChapter() {
+            const chapterText = document.getElementById('book-content').innerText;
+            
+            if (!chapterText || chapterText.length < 100) {
+                showToast('Not enough content to summarize', 'error');
+                return;
+            }
+            
+            // Show AI popup with chapter content
+            currentAIContext = chapterText;
+            
+            const popup = document.getElementById('ai-popup');
+            const contextText = document.getElementById('ai-context-text');
+            const responseEl = document.getElementById('ai-response');
+            
+            contextText.textContent = 'Current chapter content (' + chapterText.split(' ').length + ' words)';
+            
+            popup.classList.add('visible');
+            
+            // Automatically trigger summarize
+            responseEl.innerHTML = '<div class="ai-loading"><div class="ai-loading-spinner"></div><span>Summarizing chapter...</span></div>';
+            
+            try {
+                const res = await fetch('/api/ai/summarize', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: chapterText, style: 'bullets' })
+                });
+                
+                if (!res.ok) {
+                    const error = await res.json();
+                    throw new Error(error.detail || 'AI request failed');
+                }
+                
+                const data = await res.json();
+                responseEl.innerHTML = `<div class="ai-answer"><strong>📝 Chapter Summary</strong><br><br>${formatAIResponse(data.summary)}</div>`;
+                
+                // Update provider info
+                checkAIStatus();
+            } catch (error) {
+                responseEl.innerHTML = `
+                    <div class="ai-error">
+                        <div class="ai-error-icon">⚠️</div>
+                        <div>${error.message}</div>
+                        <div style="margin-top: 10px; font-size: 0.9em;">
+                            Make sure Ollama is running or configure Google Gemini in settings.
+                        </div>
+                    </div>
+                `;
+            }
+        }
+        
+        // Format AI response (basic markdown-like formatting)
+        function formatAIResponse(text) {
+            if (!text) return '';
+            
+            return text
+                // Escape HTML
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                // Bold
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                // Italic
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                // Code
+                .replace(/`(.*?)`/g, '<code>$1</code>')
+                // Bullet points
+                .replace(/^[\-\*] (.+)$/gm, '<li>$1</li>')
+                .replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>')
+                // Numbered lists
+                .replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
+                // Line breaks
+                .replace(/\n\n/g, '</p><p>')
+                .replace(/\n/g, '<br>');
+        }
+        
+        // Toggle AI settings panel
+        function toggleAISettings() {
+            const panel = document.getElementById('ai-settings-panel');
+            const wasVisible = panel.classList.contains('visible');
+            
+            // Close other panels
+            document.querySelectorAll('#bookmarks-panel, #vocabulary-panel, #annotations-panel, #session-history-panel').forEach(p => {
+                p.classList.remove('visible');
+            });
+            
+            if (!wasVisible) {
+                panel.classList.add('visible');
+                loadAIConfig();
+                checkAIStatus();
+            } else {
+                panel.classList.remove('visible');
+            }
+        }
+        
+        // Update AI settings UI based on provider selection
+        function updateProviderUI() {
+            const provider = document.getElementById('ai-provider-select').value;
+            const ollamaSettings = document.getElementById('ollama-settings');
+            const geminiSettings = document.getElementById('gemini-settings');
+            
+            if (provider === 'ollama') {
+                ollamaSettings.style.display = 'block';
+                geminiSettings.style.display = 'none';
+            } else {
+                ollamaSettings.style.display = 'none';
+                geminiSettings.style.display = 'block';
+            }
+        }
+        
+        // Update settings UI from loaded config
+        function updateAISettingsUI() {
+            const providerSelect = document.getElementById('ai-provider-select');
+            const ollamaUrl = document.getElementById('ollama-url');
+            const ollamaModel = document.getElementById('ollama-model');
+            const geminiModel = document.getElementById('gemini-model');
+            
+            if (providerSelect && aiConfig.provider) {
+                providerSelect.value = aiConfig.provider;
+            }
+            if (ollamaUrl && aiConfig.ollama) {
+                ollamaUrl.value = aiConfig.ollama.base_url || 'http://localhost:11434';
+            }
+            if (ollamaModel && aiConfig.ollama) {
+                ollamaModel.value = aiConfig.ollama.model || 'llama3.2';
+            }
+            if (geminiModel && aiConfig.gemini) {
+                geminiModel.value = aiConfig.gemini.model || 'gemini-1.5-flash';
+            }
+            
+            updateProviderUI();
+        }
+        
+        // Save AI settings
+        async function saveAISettings() {
+            const provider = document.getElementById('ai-provider-select').value;
+            const config = { provider };
+            
+            if (provider === 'ollama') {
+                config.ollama = {
+                    base_url: document.getElementById('ollama-url').value,
+                    model: document.getElementById('ollama-model').value
+                };
+            } else {
+                const apiKey = document.getElementById('gemini-api-key').value;
+                config.gemini = {
+                    model: document.getElementById('gemini-model').value
+                };
+                if (apiKey) {
+                    config.gemini.api_key = apiKey;
+                }
+            }
+            
+            try {
+                const res = await fetch('/api/ai/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config)
+                });
+                
+                if (res.ok) {
+                    showToast('AI settings saved!', 'success');
+                    aiConfig = config;
+                    checkAIStatus();
+                } else {
+                    showToast('Failed to save settings', 'error');
+                }
+            } catch (e) {
+                showToast('Error saving settings', 'error');
+            }
+        }
+        
+        // Initialize AI on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadAIConfig();
+        });
+        
+        // Close AI popup on escape
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeAIPopup();
+                document.getElementById('ai-settings-panel').classList.remove('visible');
+            }
+        });
+        
+        // Close AI popup when clicking outside
+        document.getElementById('ai-popup').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeAIPopup();
+            }
+        });
     </script>
 </body>
 </html>

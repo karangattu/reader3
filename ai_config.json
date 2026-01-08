@@ -1,0 +1,11 @@
+{
+  "provider": "ollama",
+  "ollama": {
+    "base_url": "http://localhost:11434",
+    "model": "gpt-oss:120b-cloud"
+  },
+  "gemini": {
+    "api_key": "",
+    "model": "gemini-1.5-flash"
+  }
+}

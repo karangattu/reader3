@@ -31,6 +31,7 @@ from user_data import (
     Annotation,
     generate_id,
 )
+from ai_service import get_ai_service, reset_ai_service, AIConfig
 
 import sys
 
@@ -1421,6 +1422,174 @@ async def export_annotations(book_id: str, format: str = "markdown"):
                     f"attachment; filename={book_id}_annotations.json"
             }
         )
+
+
+# ============================================================================
+# AI API Endpoints
+# ============================================================================
+
+
+@app.get("/api/ai/status")
+async def ai_status():
+    """Check if AI service is available and get current configuration."""
+    ai = get_ai_service()
+    status = await ai.check_availability()
+    return status
+
+
+@app.post("/api/ai/ask")
+async def ask_ai(request: Request):
+    """
+    Ask a question about selected text.
+    Request body: { "question": "...", "context": "...", "book_id": "..." }
+    """
+    data = await request.json()
+    question = data.get("question", "")
+    context = data.get("context", "")
+    book_id = data.get("book_id", "")
+    
+    if not question:
+        raise HTTPException(status_code=400, detail="Question is required")
+    if not context:
+        raise HTTPException(status_code=400, detail="Context is required")
+    
+    # Get book title for better context
+    book_title = ""
+    if book_id:
+        book = load_book_cached(book_id)
+        if book:
+            book_title = book.metadata.title
+    
+    try:
+        ai = get_ai_service()
+        response = await ai.ask(question, context, book_title)
+        return {"answer": response, "provider": ai.config.provider}
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e))
+
+
+@app.post("/api/ai/summarize")
+async def summarize_text(request: Request):
+    """
+    Summarize a chapter or selected text.
+    Request body: { "text": "...", "style": "concise|detailed|bullets" }
+    """
+    data = await request.json()
+    text = data.get("text", "")
+    style = data.get("style", "concise")
+    
+    if not text:
+        raise HTTPException(status_code=400, detail="Text is required")
+    
+    # Limit text length to avoid token limits (roughly 8000 words)
+    words = text.split()
+    if len(words) > 8000:
+        text = " ".join(words[:8000]) + "..."
+    
+    try:
+        ai = get_ai_service()
+        summary = await ai.summarize(text, style)
+        return {"summary": summary, "provider": ai.config.provider}
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e))
+
+
+@app.post("/api/ai/explain")
+async def explain_text(request: Request):
+    """
+    Explain text in simpler terms.
+    Request body: { "text": "..." }
+    """
+    data = await request.json()
+    text = data.get("text", "")
+    
+    if not text:
+        raise HTTPException(status_code=400, detail="Text is required")
+    
+    try:
+        ai = get_ai_service()
+        explanation = await ai.explain(text)
+        return {"explanation": explanation, "provider": ai.config.provider}
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e))
+
+
+@app.post("/api/ai/define")
+async def define_word(request: Request):
+    """
+    Define a word with optional context.
+    Request body: { "word": "...", "context": "..." }
+    """
+    data = await request.json()
+    word = data.get("word", "")
+    context = data.get("context", "")
+    
+    if not word:
+        raise HTTPException(status_code=400, detail="Word is required")
+    
+    try:
+        ai = get_ai_service()
+        definition = await ai.define(word, context)
+        return {"definition": definition, "provider": ai.config.provider}
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e))
+
+
+@app.get("/api/ai/config")
+async def get_ai_config():
+    """Get current AI configuration."""
+    ai = get_ai_service()
+    return {
+        "provider": ai.config.provider,
+        "ollama": {
+            "base_url": ai.config.ollama_base_url,
+            "model": ai.config.ollama_model,
+        },
+        "gemini": {
+            "model": ai.config.gemini_model,
+            "has_api_key": bool(ai.config.gemini_api_key),
+        }
+    }
+
+
+@app.post("/api/ai/config")
+async def update_ai_config(request: Request):
+    """
+    Update AI configuration.
+    Request body: { "provider": "ollama|gemini", "ollama": {...}, "gemini": {...} }
+    """
+    data = await request.json()
+    
+    ai = get_ai_service()
+    
+    # Update provider
+    if "provider" in data:
+        if data["provider"] in ["ollama", "gemini"]:
+            ai.config.provider = data["provider"]
+    
+    # Update Ollama settings
+    if "ollama" in data:
+        ollama = data["ollama"]
+        if "base_url" in ollama:
+            ai.config.ollama_base_url = ollama["base_url"]
+        if "model" in ollama:
+            ai.config.ollama_model = ollama["model"]
+    
+    # Update Gemini settings
+    if "gemini" in data:
+        gemini = data["gemini"]
+        if "api_key" in gemini:
+            ai.config.gemini_api_key = gemini["api_key"]
+        if "model" in gemini:
+            ai.config.gemini_model = gemini["model"]
+    
+    # Save config
+    ai.save_config()
+    
+    # Reset service to pick up new config
+    reset_ai_service()
+    
+    return {"status": "updated"}
 
 
 if __name__ == "__main__":
