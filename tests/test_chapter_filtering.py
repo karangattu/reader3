@@ -41,7 +41,7 @@ class TestChapterFilteringUI:
     def test_filter_dropdown_exists_in_html(self):
         """Test that filter dropdown is present in the reader HTML."""
         html_path = Path(__file__).parent.parent / "templates" / "reader.html"
-        content = html_path.read_text()
+        content = html_path.read_text(encoding='utf-8')
 
         assert 'id="chapter-filter"' in content, \
             "Filter dropdown not found in HTML"
@@ -52,7 +52,7 @@ class TestChapterFilteringUI:
     def test_search_input_exists_in_html(self):
         """Test that search input is present in the reader HTML."""
         html_path = Path(__file__).parent.parent / "templates" / "reader.html"
-        content = html_path.read_text()
+        content = html_path.read_text(encoding='utf-8')
 
         assert 'id="chapter-search"' in content, \
             "Search input not found in HTML"
@@ -64,7 +64,7 @@ class TestChapterFilteringUI:
     def test_filter_css_styles_present(self):
         """Test that CSS styles for filtering are present."""
         html_path = Path(__file__).parent.parent / "templates" / "reader.html"
-        content = html_path.read_text()
+        content = html_path.read_text(encoding='utf-8')
 
         assert '.chapter-filter' in content, \
             "Filter CSS class not found"
@@ -76,7 +76,7 @@ class TestChapterFilteringUI:
     def test_filter_function_exists(self):
         """Test that filterChapters JavaScript function exists."""
         html_path = Path(__file__).parent.parent / "templates" / "reader.html"
-        content = html_path.read_text()
+        content = html_path.read_text(encoding='utf-8')
 
         assert 'function filterChapters(filterType)' in content, \
             "filterChapters function not found"
@@ -88,7 +88,7 @@ class TestChapterFilteringUI:
     def test_filter_function_checks_read_status(self):
         """Test that filter function checks the read status."""
         html_path = Path(__file__).parent.parent / "templates" / "reader.html"
-        content = html_path.read_text()
+        content = html_path.read_text(encoding='utf-8')
 
         # Find the filterChapters function
         assert "classList.contains('read')" in content, \
@@ -99,7 +99,7 @@ class TestChapterFilteringUI:
     def test_filter_function_hides_unmatched_chapters(self):
         """Test that filter function hides non-matching chapters."""
         html_path = Path(__file__).parent.parent / "templates" / "reader.html"
-        content = html_path.read_text()
+        content = html_path.read_text(encoding='utf-8')
 
         assert "chapterItem.style.display" in content, \
             "Display style manipulation not found"
@@ -109,7 +109,7 @@ class TestChapterFilteringUI:
     def test_filter_function_unchecks_hidden_items(self):
         """Test that filter function unchecks hidden chapters."""
         html_path = Path(__file__).parent.parent / "templates" / "reader.html"
-        content = html_path.read_text()
+        content = html_path.read_text(encoding='utf-8')
 
         # Check that the function unchecks hidden chapters
         assert 'cb.checked = false' in content, \
@@ -120,7 +120,7 @@ class TestChapterFilteringUI:
     def test_search_filter_is_case_insensitive(self):
         """Test that search filtering is case insensitive."""
         html_path = Path(__file__).parent.parent / "templates" / "reader.html"
-        content = html_path.read_text()
+        content = html_path.read_text(encoding='utf-8')
 
         assert 'toLowerCase()' in content, \
             "Case-insensitive conversion not found"
@@ -138,7 +138,7 @@ class TestChapterFilteringUI:
     def test_search_and_filter_work_together(self):
         """Test that search and filter dropdowns work together."""
         html_path = Path(__file__).parent.parent / "templates" / "reader.html"
-        content = html_path.read_text()
+        content = html_path.read_text(encoding='utf-8')
 
         # Check that both matchesSearch and matchesFilter are used
         assert 'const matchesSearch' in content, \
@@ -151,7 +151,7 @@ class TestChapterFilteringUI:
     def test_filter_calls_update_copy_button(self):
         """Test that filtering updates the copy button state."""
         html_path = Path(__file__).parent.parent / "templates" / "reader.html"
-        content = html_path.read_text()
+        content = html_path.read_text(encoding='utf-8')
 
         assert 'updateCopyButton()' in content, \
             "updateCopyButton not called"
@@ -165,7 +165,7 @@ class TestChapterFilteringUI:
     def test_reset_filter_function_exists(self):
         """Test that resetChapterFilter function exists."""
         html_path = Path(__file__).parent.parent / "templates" / "reader.html"
-        content = html_path.read_text()
+        content = html_path.read_text(encoding='utf-8')
 
         assert 'function resetChapterFilter()' in content, \
             "resetChapterFilter function not found"
@@ -173,7 +173,7 @@ class TestChapterFilteringUI:
     def test_reset_filter_clears_inputs(self):
         """Test that reset filter clears both filter and search."""
         html_path = Path(__file__).parent.parent / "templates" / "reader.html"
-        content = html_path.read_text()
+        content = html_path.read_text(encoding='utf-8')
 
         func_start = content.find('function resetChapterFilter')
         func_end = content.find('function ', func_start + 1)
@@ -193,7 +193,7 @@ class TestFilteringIntegration:
     def test_filter_affects_selected_chapters_count(self):
         """Test that filtering affects which chapters are counted as selected."""
         html_path = Path(__file__).parent.parent / "templates" / "reader.html"
-        content = html_path.read_text()
+        content = html_path.read_text(encoding='utf-8')
         
         # Verify that updateCopyButton only counts visible checkboxes
         func_start = content.find('function updateCopyButton')
@@ -206,7 +206,7 @@ class TestFilteringIntegration:
     def test_copying_respects_hidden_chapters(self):
         """Test that copy functionality only copies visible chapters."""
         html_path = Path(__file__).parent.parent / "templates" / "reader.html"
-        content = html_path.read_text()
+        content = html_path.read_text(encoding='utf-8')
         
         # Verify that copySelectedChapters function exists and uses querySelectorAll
         assert 'function copySelectedChapters' in content, "copySelectedChapters function not found"
@@ -222,7 +222,7 @@ class TestFilteringIntegration:
     def test_hidden_chapters_cannot_be_selected(self):
         """Test that hidden chapters don't affect selection count."""
         html_path = Path(__file__).parent.parent / "templates" / "reader.html"
-        content = html_path.read_text()
+        content = html_path.read_text(encoding='utf-8')
         
         # Find the filterChapters function
         func_start = content.find('function filterChapters')
@@ -240,7 +240,7 @@ class TestFilteringEdgeCases:
     def test_filter_with_empty_search(self):
         """Test filtering with empty search term."""
         html_path = Path(__file__).parent.parent / "templates" / "reader.html"
-        content = html_path.read_text()
+        content = html_path.read_text(encoding='utf-8')
         
         func_start = content.find('function filterChapters')
         func_end = content.find('function ', func_start + 1)
@@ -253,7 +253,7 @@ class TestFilteringEdgeCases:
     def test_filter_with_special_characters(self):
         """Test filtering handles special characters in search."""
         html_path = Path(__file__).parent.parent / "templates" / "reader.html"
-        content = html_path.read_text()
+        content = html_path.read_text(encoding='utf-8')
         
         # The function uses includes() which handles special characters
         func_start = content.find('function filterChapters')
@@ -265,7 +265,7 @@ class TestFilteringEdgeCases:
     def test_filter_with_no_matching_chapters(self):
         """Test filtering when no chapters match the criteria."""
         html_path = Path(__file__).parent.parent / "templates" / "reader.html"
-        content = html_path.read_text()
+        content = html_path.read_text(encoding='utf-8')
         
         # The function should handle this gracefully
         func_start = content.find('function filterChapters')
@@ -277,7 +277,7 @@ class TestFilteringEdgeCases:
     def test_filter_after_marking_chapters_read(self):
         """Test that filter correctly reflects read status."""
         html_path = Path(__file__).parent.parent / "templates" / "reader.html"
-        content = html_path.read_text()
+        content = html_path.read_text(encoding='utf-8')
         
         # Verify that copySelectedChapters marks chapters as read
         assert 'chapter-progress' in content, \
@@ -296,7 +296,7 @@ class TestFilteringEdgeCases:
     def test_select_all_with_filter_active(self):
         """Test select all behavior when filter is active."""
         html_path = Path(__file__).parent.parent / "templates" / "reader.html"
-        content = html_path.read_text()
+        content = html_path.read_text(encoding='utf-8')
         
         # selectAllChapters should select visible checkboxes
         func_start = content.find('function selectAllChapters')
@@ -313,7 +313,7 @@ class TestFilteringAccessibility:
     def test_filter_controls_have_proper_labels(self):
         """Test that filter controls have descriptive text."""
         html_path = Path(__file__).parent.parent / "templates" / "reader.html"
-        content = html_path.read_text()
+        content = html_path.read_text(encoding='utf-8')
         
         # Check for descriptive options
         assert 'All Chapters' in content, "All option text not found"
@@ -323,14 +323,14 @@ class TestFilteringAccessibility:
     def test_search_input_has_placeholder(self):
         """Test that search input has helpful placeholder."""
         html_path = Path(__file__).parent.parent / "templates" / "reader.html"
-        content = html_path.read_text()
+        content = html_path.read_text(encoding='utf-8')
         
         assert 'placeholder="Search chapters..."' in content, "Search placeholder not found"
 
     def test_clear_button_clears_filter(self):
         """Test that clear button resets filter."""
         html_path = Path(__file__).parent.parent / "templates" / "reader.html"
-        content = html_path.read_text()
+        content = html_path.read_text(encoding='utf-8')
         
         # Clear button should clear selections
         assert 'onclick="clearChapterSelection()"' in content, "Clear button not found"
@@ -342,7 +342,7 @@ class TestFilteringPerformance:
     def test_filter_function_is_efficient(self):
         """Test that filter function doesn't have unnecessary loops."""
         html_path = Path(__file__).parent.parent / "templates" / "reader.html"
-        content = html_path.read_text()
+        content = html_path.read_text(encoding='utf-8')
         
         func_start = content.find('function filterChapters')
         func_end = content.find('function ', func_start + 1)
@@ -355,7 +355,7 @@ class TestFilteringPerformance:
     def test_filter_uses_event_delegation(self):
         """Test that filtering uses efficient event handling."""
         html_path = Path(__file__).parent.parent / "templates" / "reader.html"
-        content = html_path.read_text()
+        content = html_path.read_text(encoding='utf-8')
         
         # Filter is called on dropdown change, not on every keystroke... wait, it is on keyup
         # But that's acceptable for reasonable chapter counts
