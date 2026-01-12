@@ -849,7 +849,7 @@
 
     <script>
         const isPDF = {{ 'true' if is_pdf else 'false' }};
-        const bookId = "{{ book_id }}";
+        const bookId = {{ book_id | tojson }};
         const totalPages = {{ book.spine|length }};
         let currentPageIndex = {{ chapter_index }};
         let loadingPages = false;
@@ -2367,7 +2367,7 @@
 
             if (idx !== undefined) {
                 saveScrollPosition();
-                let url = "/read/{{ book_id }}/" + idx;
+                let url = "/read/" + encodeURIComponent(bookId) + "/" + idx;
                 // Fade out current content for a smooth transition
                 const content = document.querySelector('.content-container');
                 if (content) {
