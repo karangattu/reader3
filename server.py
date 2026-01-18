@@ -31,7 +31,6 @@ from user_data import (
     Annotation,
     generate_id,
 )
-from ai_service import get_ai_service, reset_ai_service, AIConfig
 
 import sys
 
@@ -230,6 +229,15 @@ async def read_chapter(request: Request, book_id: str, chapter_index: int):
     prev_idx = chapter_index - 1 if chapter_index > 0 else None
     next_idx = chapter_index + 1 if chapter_index < len(book.spine) - 1 else None
 
+    # Check if this is an old-style PDF (text-based instead of image-based)
+    needs_reprocess = False
+    if book.is_pdf and len(book.spine) > 0:
+        # Old-style PDFs have HTML content with positioned text
+        # New-style PDFs have simple img tags
+        first_content = book.spine[0].content
+        if '<div id="page' in first_content or 'style="top:' in first_content:
+            needs_reprocess = True
+
     return templates.TemplateResponse(
         "reader.html",
         {
@@ -241,6 +249,7 @@ async def read_chapter(request: Request, book_id: str, chapter_index: int):
             "prev_idx": prev_idx,
             "next_idx": next_idx,
             "is_pdf": book.is_pdf,
+            "needs_reprocess": needs_reprocess,
         },
     )
 
@@ -356,7 +365,56 @@ async def delete_book(book_id: str):
         return {"status": "deleted"}
     except Exception as e:
         print(f"Error deleting book {safe_book_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to delete book: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to delete book: {str(e)}"
+        )
+
+
+@app.post("/api/reprocess/{book_id}")
+async def reprocess_pdf(book_id: str):
+    """
+    Reprocess a PDF book with the latest rendering method.
+    This is needed for PDFs that were processed with old text-based rendering.
+    """
+    safe_book_id = os.path.basename(book_id)
+    if not safe_book_id.endswith("_data"):
+        raise HTTPException(status_code=400, detail="Invalid book ID")
+
+    book = load_book_cached(safe_book_id)
+    if not book:
+        raise HTTPException(status_code=404, detail="Book not found")
+
+    if not book.is_pdf:
+        raise HTTPException(status_code=400, detail="Only PDF books can be reprocessed")
+
+    # Find the original PDF file
+    pdf_name = safe_book_id.replace("_data", ".pdf")
+    pdf_path = os.path.join(BOOKS_DIR, pdf_name)
+
+    if not os.path.exists(pdf_path):
+        raise HTTPException(
+            status_code=400,
+            detail="Original PDF not found. Please re-upload the PDF."
+        )
+
+    try:
+        from reader3 import process_pdf
+
+        book_path = os.path.join(BOOKS_DIR, safe_book_id)
+
+        # Reprocess the PDF
+        book_obj = process_pdf(pdf_path, book_path)
+        save_to_pickle(book_obj, book_path)
+
+        # Clear cache
+        load_book_cached.cache_clear()
+
+        return {"status": "success", "message": "PDF reprocessed successfully"}
+    except Exception as e:
+        print(f"Error reprocessing PDF {safe_book_id}: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to reprocess PDF: {str(e)}"
+        )
 
 
 # ============================================================================
@@ -1422,174 +1480,6 @@ async def export_annotations(book_id: str, format: str = "markdown"):
                     f"attachment; filename={book_id}_annotations.json"
             }
         )
-
-
-# ============================================================================
-# AI API Endpoints
-# ============================================================================
-
-
-@app.get("/api/ai/status")
-async def ai_status():
-    """Check if AI service is available and get current configuration."""
-    ai = get_ai_service()
-    status = await ai.check_availability()
-    return status
-
-
-@app.post("/api/ai/ask")
-async def ask_ai(request: Request):
-    """
-    Ask a question about selected text.
-    Request body: { "question": "...", "context": "...", "book_id": "..." }
-    """
-    data = await request.json()
-    question = data.get("question", "")
-    context = data.get("context", "")
-    book_id = data.get("book_id", "")
-    
-    if not question:
-        raise HTTPException(status_code=400, detail="Question is required")
-    if not context:
-        raise HTTPException(status_code=400, detail="Context is required")
-    
-    # Get book title for better context
-    book_title = ""
-    if book_id:
-        book = load_book_cached(book_id)
-        if book:
-            book_title = book.metadata.title
-    
-    try:
-        ai = get_ai_service()
-        response = await ai.ask(question, context, book_title)
-        return {"answer": response, "provider": ai.config.provider}
-    except Exception as e:
-        raise HTTPException(status_code=503, detail=str(e))
-
-
-@app.post("/api/ai/summarize")
-async def summarize_text(request: Request):
-    """
-    Summarize a chapter or selected text.
-    Request body: { "text": "...", "style": "concise|detailed|bullets" }
-    """
-    data = await request.json()
-    text = data.get("text", "")
-    style = data.get("style", "concise")
-    
-    if not text:
-        raise HTTPException(status_code=400, detail="Text is required")
-    
-    # Limit text length to avoid token limits (roughly 8000 words)
-    words = text.split()
-    if len(words) > 8000:
-        text = " ".join(words[:8000]) + "..."
-    
-    try:
-        ai = get_ai_service()
-        summary = await ai.summarize(text, style)
-        return {"summary": summary, "provider": ai.config.provider}
-    except Exception as e:
-        raise HTTPException(status_code=503, detail=str(e))
-
-
-@app.post("/api/ai/explain")
-async def explain_text(request: Request):
-    """
-    Explain text in simpler terms.
-    Request body: { "text": "..." }
-    """
-    data = await request.json()
-    text = data.get("text", "")
-    
-    if not text:
-        raise HTTPException(status_code=400, detail="Text is required")
-    
-    try:
-        ai = get_ai_service()
-        explanation = await ai.explain(text)
-        return {"explanation": explanation, "provider": ai.config.provider}
-    except Exception as e:
-        raise HTTPException(status_code=503, detail=str(e))
-
-
-@app.post("/api/ai/define")
-async def define_word(request: Request):
-    """
-    Define a word with optional context.
-    Request body: { "word": "...", "context": "..." }
-    """
-    data = await request.json()
-    word = data.get("word", "")
-    context = data.get("context", "")
-    
-    if not word:
-        raise HTTPException(status_code=400, detail="Word is required")
-    
-    try:
-        ai = get_ai_service()
-        definition = await ai.define(word, context)
-        return {"definition": definition, "provider": ai.config.provider}
-    except Exception as e:
-        raise HTTPException(status_code=503, detail=str(e))
-
-
-@app.get("/api/ai/config")
-async def get_ai_config():
-    """Get current AI configuration."""
-    ai = get_ai_service()
-    return {
-        "provider": ai.config.provider,
-        "ollama": {
-            "base_url": ai.config.ollama_base_url,
-            "model": ai.config.ollama_model,
-        },
-        "gemini": {
-            "model": ai.config.gemini_model,
-            "has_api_key": bool(ai.config.gemini_api_key),
-        }
-    }
-
-
-@app.post("/api/ai/config")
-async def update_ai_config(request: Request):
-    """
-    Update AI configuration.
-    Request body: { "provider": "ollama|gemini", "ollama": {...}, "gemini": {...} }
-    """
-    data = await request.json()
-    
-    ai = get_ai_service()
-    
-    # Update provider
-    if "provider" in data:
-        if data["provider"] in ["ollama", "gemini"]:
-            ai.config.provider = data["provider"]
-    
-    # Update Ollama settings
-    if "ollama" in data:
-        ollama = data["ollama"]
-        if "base_url" in ollama:
-            ai.config.ollama_base_url = ollama["base_url"]
-        if "model" in ollama:
-            ai.config.ollama_model = ollama["model"]
-    
-    # Update Gemini settings
-    if "gemini" in data:
-        gemini = data["gemini"]
-        if "api_key" in gemini:
-            ai.config.gemini_api_key = gemini["api_key"]
-        if "model" in gemini:
-            ai.config.gemini_model = gemini["model"]
-    
-    # Save config
-    ai.save_config()
-    
-    # Reset service to pick up new config
-    reset_ai_service()
-    
-    return {"status": "updated"}
 
 
 if __name__ == "__main__":
