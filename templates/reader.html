@@ -130,6 +130,13 @@
         .pdf-copy-image-btn:hover { background: #495057; color: #fff; }
         .pdf-copy-image-btn.copied { background: #27ae60; color: #fff; border-color: #27ae60; }
         
+        /* PDF page selection checkbox */
+        .pdf-page-select { width: 18px; height: 18px; cursor: pointer; accent-color: #3498db; margin-right: 8px; }
+        .pdf-page.selected { outline: 3px solid #3498db; outline-offset: -3px; }
+        .pdf-multi-copy-btn { display: none; background: #3498db; color: #fff; border: none; }
+        .pdf-multi-copy-btn:hover { background: #2980b9; }
+        .pdf-multi-copy-btn.visible { display: inline-flex; }
+        
         /* PDF floating page indicator */
         #pdf-page-indicator { position: fixed; bottom: 30px; right: 30px; background: rgba(0,0,0,0.8); color: #fff; padding: 10px 18px; border-radius: 25px; font-family: -apple-system, sans-serif; font-size: 0.9em; z-index: 100; opacity: 0; transition: opacity 0.3s ease; pointer-events: none; }
         #pdf-page-indicator.visible { opacity: 1; }
@@ -650,6 +657,8 @@
             <div class="content-toolbar">
                 {% if is_pdf %}
                 <button class="toolbar-btn" type="button" onclick="togglePageJump()" title="Jump to a specific page">🔢 Go to Page</button>
+                <button class="toolbar-btn pdf-multi-copy-btn" type="button" onclick="copySelectedPagesAsImage()" id="pdf-multi-copy-btn" title="Copy selected pages as a combined image">📷 Copy Selected (<span id="pdf-selected-count">0</span>)</button>
+                <button class="toolbar-btn" type="button" onclick="toggleSelectAllPages()" id="pdf-select-all-btn" title="Select/Deselect all loaded pages">☑️ Select All</button>
                 {% else %}
                 <button class="toolbar-btn" type="button" onclick="copyAllLoaded()" id="copy-all-btn" title="Copy all loaded content">📋 Copy All</button>
                 <button class="toolbar-btn" type="button" onclick="showBatchClipboard()" id="batch-clipboard-btn" style="display: none;">🗂️ Batch (<span id="batch-count">0</span>)</button>
@@ -660,6 +669,7 @@
                 {% if is_pdf %}
                 <div class="pdf-page" data-page-index="{{ chapter_index }}">
                     <div class="pdf-page-header">
+                        <input type="checkbox" class="pdf-page-select" data-page-index="{{ chapter_index }}" onchange="updatePdfPageSelection(this)" title="Select page for multi-copy">
                         <span class="pdf-page-number">Page {{ chapter_index + 1 }}</span>
                         <div class="pdf-page-actions">
                             <button class="pdf-copy-image-btn" onclick="copyPageImage(this, {{ chapter_index }})" title="Copy page as image to clipboard">
@@ -1854,6 +1864,150 @@
             }
         }
         
+        // Track selected PDF pages for multi-copy
+        let selectedPdfPages = new Set();
+        
+        // Update PDF page selection state
+        function updatePdfPageSelection(checkbox) {
+            const pageIndex = parseInt(checkbox.dataset.pageIndex);
+            const pageEl = checkbox.closest('.pdf-page');
+            
+            if (checkbox.checked) {
+                selectedPdfPages.add(pageIndex);
+                pageEl?.classList.add('selected');
+            } else {
+                selectedPdfPages.delete(pageIndex);
+                pageEl?.classList.remove('selected');
+            }
+            
+            updatePdfMultiCopyButton();
+        }
+        
+        // Update the multi-copy button visibility and count
+        function updatePdfMultiCopyButton() {
+            const btn = document.getElementById('pdf-multi-copy-btn');
+            const countSpan = document.getElementById('pdf-selected-count');
+            
+            if (btn && countSpan) {
+                countSpan.textContent = selectedPdfPages.size;
+                if (selectedPdfPages.size > 0) {
+                    btn.classList.add('visible');
+                } else {
+                    btn.classList.remove('visible');
+                }
+            }
+        }
+        
+        // Toggle select all loaded pages
+        function toggleSelectAllPages() {
+            const checkboxes = document.querySelectorAll('.pdf-page-select');
+            const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+            
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = !allChecked;
+                updatePdfPageSelection(checkbox);
+            });
+            
+            // Update button text
+            const btn = document.getElementById('pdf-select-all-btn');
+            if (btn) {
+                btn.textContent = allChecked ? '☑️ Select All' : '☐ Deselect All';
+            }
+        }
+        
+        // Copy selected pages as a combined vertical image
+        async function copySelectedPagesAsImage() {
+            if (selectedPdfPages.size === 0) {
+                showCopyToast('No pages selected', 'error');
+                return;
+            }
+            
+            if (!navigator.clipboard || !window.ClipboardItem) {
+                showCopyToast('Image clipboard not supported', 'error');
+                return;
+            }
+            
+            const btn = document.getElementById('pdf-multi-copy-btn');
+            const originalText = btn?.innerHTML || '';
+            if (btn) btn.innerHTML = '⏳ Processing...';
+            
+            try {
+                // Sort selected pages by index
+                const sortedPages = Array.from(selectedPdfPages).sort((a, b) => a - b);
+                
+                // Collect all image elements
+                const images = [];
+                for (const pageIndex of sortedPages) {
+                    const pageEl = document.querySelector(`.pdf-page[data-page-index="${pageIndex}"]`);
+                    const imgEl = pageEl?.querySelector('img.pdf-page-image');
+                    
+                    if (imgEl && imgEl.src) {
+                        // Fetch image and create an Image object
+                        const img = new Image();
+                        img.crossOrigin = 'anonymous';
+                        await new Promise((resolve, reject) => {
+                            img.onload = resolve;
+                            img.onerror = reject;
+                            img.src = imgEl.src;
+                        });
+                        images.push(img);
+                    }
+                }
+                
+                if (images.length === 0) {
+                    showCopyToast('No images found in selected pages', 'error');
+                    if (btn) btn.innerHTML = originalText;
+                    return;
+                }
+                
+                // Calculate combined canvas dimensions
+                const padding = 20; // Padding between pages
+                const maxWidth = Math.max(...images.map(img => img.naturalWidth));
+                const totalHeight = images.reduce((sum, img) => sum + img.naturalHeight, 0) + (padding * (images.length - 1));
+                
+                // Create combined canvas
+                const canvas = document.createElement('canvas');
+                canvas.width = maxWidth;
+                canvas.height = totalHeight;
+                const ctx = canvas.getContext('2d');
+                
+                // Fill with white background
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // Draw each image centered horizontally
+                let yOffset = 0;
+                for (const img of images) {
+                    const xOffset = (maxWidth - img.naturalWidth) / 2;
+                    ctx.drawImage(img, xOffset, yOffset);
+                    yOffset += img.naturalHeight + padding;
+                }
+                
+                // Convert canvas to blob and copy to clipboard
+                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+                const item = new ClipboardItem({ 'image/png': blob });
+                await navigator.clipboard.write([item]);
+                
+                if (btn) {
+                    btn.classList.add('copied');
+                    btn.innerHTML = '✓ Copied!';
+                }
+                showCopyToast(`${images.length} page${images.length > 1 ? 's' : ''} copied as image!`, 'success');
+                
+                setTimeout(() => {
+                    if (btn) {
+                        btn.classList.remove('copied');
+                        btn.innerHTML = originalText;
+                    }
+                }, 2000);
+                
+            } catch (err) {
+                console.error('Failed to copy multi-page image:', err);
+                showCopyToast('Failed to copy images', 'error');
+                if (btn) btn.innerHTML = originalText;
+            }
+        }
+        
         // Show toast notification for copy actions
         function showCopyToast(message, type) {
             let toast = document.getElementById('copy-toast');
@@ -2101,6 +2255,7 @@
                             
                             pageWrapper.innerHTML = `
                                 <div class="pdf-page-header">
+                                    <input type="checkbox" class="pdf-page-select" data-page-index="${page.index}" onchange="updatePdfPageSelection(this)" title="Select page for multi-copy">
                                     <span class="pdf-page-number">${page.title}</span>
                                     <div class="pdf-page-actions">
                                         <button class="pdf-copy-image-btn" onclick="copyPageImage(this, ${page.index})" title="Copy page as image to clipboard">
