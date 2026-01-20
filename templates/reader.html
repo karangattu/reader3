@@ -85,6 +85,8 @@
         #main { flex-grow: 1; overflow-y: auto; position: relative; scroll-behavior: smooth; }
         .content-container { max-width: 700px; margin: 0 auto; padding: 60px 40px 60px 40px; line-height: 1.8; font-size: 1.15em; color: #212529; background: #fff; position: relative; z-index: 1; }
         .content-toolbar { display: flex; justify-content: flex-end; gap: 10px; margin-bottom: 25px; font-family: -apple-system, sans-serif; flex-wrap: wrap; }
+        .content-toolbar.pdf-toolbar { position: sticky; top: 0; background: #fff; padding: 15px 10px 15px 10px; margin: -15px -10px 25px -10px; z-index: 50; border-radius: 0 0 8px 8px; transition: box-shadow 0.3s ease; }
+        .content-toolbar.pdf-toolbar.stuck { box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
         .toolbar-btn { border: 1px solid #ddd; background: #fff; color: #495057; padding: 9px 16px; border-radius: 5px; cursor: pointer; font-size: 0.9em; font-weight: 500; transition: all 0.2s ease; }
         .toolbar-btn:hover { background: #495057; color: #fff; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); }
         .toolbar-btn:active { transform: scale(0.97); }
@@ -137,6 +139,9 @@
         .pdf-multi-copy-btn { display: none; background: #3498db; color: #fff; border: none; }
         .pdf-multi-copy-btn:hover { background: #2980b9; }
         .pdf-multi-copy-btn.visible { display: inline-flex; }
+        .pdf-clear-btn { display: none; background: #e74c3c; color: #fff; border: none; }
+        .pdf-clear-btn:hover { background: #c0392b; }
+        .pdf-clear-btn.visible { display: inline-flex; }
         
         /* PDF floating page indicator */
         #pdf-page-indicator { position: fixed; bottom: 30px; right: 30px; background: rgba(0,0,0,0.8); color: #fff; padding: 10px 18px; border-radius: 25px; font-family: -apple-system, sans-serif; font-size: 0.9em; z-index: 100; opacity: 0; transition: opacity 0.3s ease; pointer-events: none; }
@@ -655,10 +660,11 @@
     <!-- MAIN CONTENT -->
     <div id="main">
         <div class="content-container">
-            <div class="content-toolbar">
+            <div class="content-toolbar {% if is_pdf %}pdf-toolbar{% endif %}">
                 {% if is_pdf %}
                 <button class="toolbar-btn" type="button" onclick="togglePageJump()" title="Jump to a specific page"><i class="fa-solid fa-hashtag"></i> Go to Page</button>
                 <button class="toolbar-btn pdf-multi-copy-btn" type="button" onclick="copySelectedPagesAsImage()" id="pdf-multi-copy-btn" title="Copy selected pages as a combined image"><i class="fa-regular fa-images"></i> Copy Selected (<span id="pdf-selected-count">0</span>)</button>
+                <button class="toolbar-btn pdf-clear-btn" type="button" onclick="clearPdfSelection()" id="pdf-clear-btn" title="Clear selection"><i class="fa-solid fa-xmark"></i> Clear</button>
                 <button class="toolbar-btn" type="button" onclick="toggleSelectAllPages()" id="pdf-select-all-btn" title="Select/Deselect all loaded pages"><i class="fa-regular fa-square-check"></i> Select All</button>
                 {% else %}
                 <button class="toolbar-btn" type="button" onclick="copyAllLoaded()" id="copy-all-btn" title="Copy all loaded content"><i class="fa-regular fa-copy"></i> Copy All</button>
@@ -1887,14 +1893,17 @@
         // Update the multi-copy button visibility and count
         function updatePdfMultiCopyButton() {
             const btn = document.getElementById('pdf-multi-copy-btn');
+            const clearBtn = document.getElementById('pdf-clear-btn');
             const countSpan = document.getElementById('pdf-selected-count');
             
             if (btn && countSpan) {
                 countSpan.textContent = selectedPdfPages.size;
                 if (selectedPdfPages.size > 0) {
                     btn.classList.add('visible');
+                    clearBtn?.classList.add('visible');
                 } else {
                     btn.classList.remove('visible');
+                    clearBtn?.classList.remove('visible');
                 }
             }
         }
@@ -1913,6 +1922,24 @@
             const btn = document.getElementById('pdf-select-all-btn');
             if (btn) {
                 btn.innerHTML = allChecked ? '<i class="fa-regular fa-square-check"></i> Select All' : '<i class="fa-regular fa-square"></i> Deselect All';
+            }
+        }
+        
+        // Clear all PDF page selections
+        function clearPdfSelection() {
+            const checkboxes = document.querySelectorAll('.pdf-page-select');
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = false;
+                const pageEl = checkbox.closest('.pdf-page');
+                pageEl?.classList.remove('selected');
+            });
+            selectedPdfPages.clear();
+            updatePdfMultiCopyButton();
+            
+            // Reset select all button text
+            const selectAllBtn = document.getElementById('pdf-select-all-btn');
+            if (selectAllBtn) {
+                selectAllBtn.innerHTML = '<i class="fa-regular fa-square-check"></i> Select All';
             }
         }
         
@@ -2336,11 +2363,22 @@
             // Initialize progress bar
             updateProgressBar();
             
-            // Track scroll for page indicator
+            // Track scroll for page indicator and sticky toolbar
             let scrollTimeout;
+            const pdfToolbar = document.querySelector('.content-toolbar.pdf-toolbar');
             document.getElementById('main').addEventListener('scroll', () => {
                 clearTimeout(scrollTimeout);
                 scrollTimeout = setTimeout(trackVisiblePage, 100);
+                
+                // Add/remove stuck class for sticky toolbar shadow
+                if (pdfToolbar) {
+                    const mainEl = document.getElementById('main');
+                    if (mainEl.scrollTop > 20) {
+                        pdfToolbar.classList.add('stuck');
+                    } else {
+                        pdfToolbar.classList.remove('stuck');
+                    }
+                }
             });
         });
         
