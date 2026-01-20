@@ -1020,7 +1020,7 @@ async def get_pdf_page_info(book_id: str, page_num: int):
         "word_count": page_data.word_count,
         "has_images": page_data.has_images,
         "annotation_count": len(page_data.annotations),
-        "text_block_count": len(page_data.text_blocks)
+        "text_block_count": 0  # Text blocks now extracted on-demand
     }
 
 
@@ -1140,7 +1140,12 @@ async def get_pdf_text_layer(book_id: str, page_num: int):
     """
     Get the text layer (positioned text blocks) for a PDF page.
     Useful for implementing accurate text selection and highlighting.
+    
+    Text blocks are now extracted on-demand from the source PDF
+    to reduce pickle file size and memory usage.
     """
+    from reader3 import get_pdf_text_blocks_for_page
+    
     book = load_book_cached(book_id)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
@@ -1151,10 +1156,15 @@ async def get_pdf_text_layer(book_id: str, page_num: int):
     if page_num < 0 or page_num >= book.pdf_total_pages:
         raise HTTPException(status_code=404, detail="Page not found")
 
-    if page_num not in book.pdf_page_data:
-        return {"page": page_num, "text_blocks": []}
-
-    page_data = book.pdf_page_data[page_num]
+    # Get page dimensions from stored data
+    page_data = book.pdf_page_data.get(page_num)
+    width = page_data.width if page_data else 0
+    height = page_data.height if page_data else 0
+    
+    # Extract text blocks on-demand from source PDF
+    book_dir = os.path.join(BOOKS_DIR, book_id)
+    text_blocks = get_pdf_text_blocks_for_page(book, page_num, book_dir)
+    
     blocks = [
         {
             "text": b.text,
@@ -1166,13 +1176,13 @@ async def get_pdf_text_layer(book_id: str, page_num: int):
             "line_no": b.line_no,
             "word_no": b.word_no
         }
-        for b in page_data.text_blocks
+        for b in text_blocks
     ]
 
     return {
         "page": page_num,
-        "width": page_data.width,
-        "height": page_data.height,
+        "width": width,
+        "height": height,
         "text_blocks": blocks
     }
 

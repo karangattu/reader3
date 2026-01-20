@@ -85,7 +85,7 @@ class PDFPageData:
     width: float
     height: float
     rotation: int
-    text_blocks: List[PDFTextBlock] = field(default_factory=list)
+    # Note: text_blocks removed - now generated on-demand from source PDF to reduce pickle size
     annotations: List[PDFAnnotation] = field(default_factory=list)
     has_images: bool = False
     word_count: int = 0
@@ -113,6 +113,7 @@ class Book:
     pdf_total_pages: int = 0
     pdf_has_toc: bool = False  # True if PDF has native outline/bookmarks
     pdf_thumbnails_generated: bool = False
+    pdf_source_path: Optional[str] = None  # Path to stored PDF for on-demand text extraction
 
 
 # --- Utilities ---
@@ -444,6 +445,11 @@ def process_pdf(pdf_path: str, output_dir: str,
     os.makedirs(images_dir, exist_ok=True)
     if generate_thumbnails:
         os.makedirs(thumbs_dir, exist_ok=True)
+    
+    # Copy original PDF to _data folder for on-demand text extraction
+    pdf_copy_name = 'source.pdf'
+    pdf_copy_path = os.path.join(output_dir, pdf_copy_name)
+    shutil.copy2(pdf_path, pdf_copy_path)
 
     spine_chapters = []
     image_map = {}
@@ -471,8 +477,7 @@ def process_pdf(pdf_path: str, output_dir: str,
         page_image_path = generate_pdf_page_image(page, i, images_dir)
         image_map[f"page_{i+1}"] = page_image_path
 
-        # Extract text blocks with positions (for advanced features)
-        text_blocks = extract_pdf_text_blocks(page)
+        # Note: text_blocks no longer stored - extracted on-demand from source.pdf
 
         # Extract annotations
         annotations = extract_pdf_annotations(page)
@@ -481,13 +486,12 @@ def process_pdf(pdf_path: str, output_dir: str,
         if generate_thumbnails:
             generate_pdf_thumbnail(page, i, thumbs_dir)
 
-        # Store page-specific data
+        # Store page-specific data (without text_blocks to reduce pickle size)
         pdf_page_data[i] = PDFPageData(
             page_num=i,
             width=width,
             height=height,
             rotation=page.rotation,
-            text_blocks=text_blocks,
             annotations=annotations,
             has_images=True,  # We render the whole page as image
             word_count=len(page_text.split())
@@ -536,7 +540,8 @@ def process_pdf(pdf_path: str, output_dir: str,
         pdf_page_data=pdf_page_data,
         pdf_total_pages=total_pages,
         pdf_has_toc=has_native_toc,
-        pdf_thumbnails_generated=generate_thumbnails
+        pdf_thumbnails_generated=generate_thumbnails,
+        pdf_source_path=pdf_copy_name  # Relative path to source.pdf
     )
 
     return final_book
@@ -575,12 +580,56 @@ def export_pdf_pages(book: Book, output_path: str, start_page: int,
         return False
 
 
+def get_pdf_text_blocks_for_page(book: Book, page_num: int,
+                                  book_dir: str) -> List[PDFTextBlock]:
+    """
+    Extract text blocks from a PDF page on-demand.
+    This avoids storing large text_blocks data in the pickle.
+    
+    Args:
+        book: The Book object
+        page_num: Page number (0-indexed)
+        book_dir: Directory where the book data is stored (contains source.pdf)
+    
+    Returns:
+        List of PDFTextBlock objects for the page
+    """
+    import fitz
+    
+    if not book.is_pdf or not book.pdf_source_path:
+        return []
+    
+    pdf_path = os.path.join(book_dir, book.pdf_source_path)
+    if not os.path.exists(pdf_path):
+        print(f"Warning: Source PDF not found at {pdf_path}")
+        return []
+    
+    try:
+        doc = fitz.open(pdf_path)
+        if page_num < 0 or page_num >= len(doc):
+            doc.close()
+            return []
+        
+        page = doc[page_num]
+        blocks = extract_pdf_text_blocks(page)
+        doc.close()
+        return blocks
+    except Exception as e:
+        print(f"Error extracting text blocks from page {page_num}: {e}")
+        return []
+
+
 def search_pdf_text_positions(book: Book, query: str,
-                              page_num: int = None) -> List[dict]:
+                              page_num: int = None,
+                              book_dir: str = None) -> List[dict]:
     """
     Search for text in PDF and return positions for highlighting.
     Returns list of matches with page number and bounding box coordinates.
+    
+    Note: This now extracts text blocks on-demand from the source PDF.
     """
+    import fitz
+    
     if not book.is_pdf:
         return []
 
@@ -592,31 +641,72 @@ def search_pdf_text_positions(book: Book, query: str,
         [page_num] if page_num is not None
         else range(book.pdf_total_pages)
     )
+    
+    # Open PDF once for all page searches
+    pdf_path = None
+    if book.pdf_source_path and book_dir:
+        pdf_path = os.path.join(book_dir, book.pdf_source_path)
+    
+    if not pdf_path or not os.path.exists(pdf_path):
+        # Fallback: search using stored plain text (less accurate positioning)
+        return _search_pdf_text_fallback(book, query, pages_to_search)
+    
+    try:
+        doc = fitz.open(pdf_path)
+        
+        for page_idx in pages_to_search:
+            if page_idx < 0 or page_idx >= len(doc):
+                continue
 
+            page = doc[page_idx]
+            text_blocks = extract_pdf_text_blocks(page)
+
+            # Simple word-by-word matching
+            for block in text_blocks:
+                if query_lower in block.text.lower():
+                    results.append({
+                        "page": page_idx,
+                        "text": block.text,
+                        "rect": [block.x0, block.y0, block.x1, block.y1],
+                        "match_type": "exact"
+                    })
+                elif any(w in block.text.lower() for w in query_words):
+                    results.append({
+                        "page": page_idx,
+                        "text": block.text,
+                        "rect": [block.x0, block.y0, block.x1, block.y1],
+                        "match_type": "partial"
+                    })
+        
+        doc.close()
+    except Exception as e:
+        print(f"Error searching PDF: {e}")
+
+    return results
+
+
+def _search_pdf_text_fallback(book: Book, query: str,
+                               pages_to_search) -> List[dict]:
+    """
+    Fallback text search using stored plain text when source PDF unavailable.
+    Returns matches without precise positioning.
+    """
+    results = []
+    query_lower = query.lower()
+    
     for page_idx in pages_to_search:
-        if page_idx not in book.pdf_page_data:
+        if page_idx >= len(book.spine):
             continue
-
-        page_data = book.pdf_page_data[page_idx]
-        text_blocks = page_data.text_blocks
-
-        # Simple word-by-word matching
-        for i, block in enumerate(text_blocks):
-            if query_lower in block.text.lower():
-                results.append({
-                    "page": page_idx,
-                    "text": block.text,
-                    "rect": [block.x0, block.y0, block.x1, block.y1],
-                    "match_type": "exact"
-                })
-            elif any(w in block.text.lower() for w in query_words):
-                results.append({
-                    "page": page_idx,
-                    "text": block.text,
-                    "rect": [block.x0, block.y0, block.x1, block.y1],
-                    "match_type": "partial"
-                })
-
+        
+        page_text = book.spine[page_idx].text.lower()
+        if query_lower in page_text:
+            results.append({
+                "page": page_idx,
+                "text": query,
+                "rect": [0, 0, 0, 0],  # No positioning available
+                "match_type": "text_only"
+            })
+    
     return results
 
 
