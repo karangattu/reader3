@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ book.metadata.title }}</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <style>
         /* Layout */
         body { margin: 0; padding: 0; display: flex; height: 100vh; overflow: hidden; font-family: "Georgia", serif; background: #fff; }
@@ -229,8 +230,8 @@
         .resume-dismiss { background: none; border: none; color: #999; cursor: pointer; font-size: 1.2em; }
         
         /* Dictionary/Definition popup */
-        #dictionary-popup { display: none; position: fixed; z-index: 1200; background: #fff; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.25); min-width: 300px; max-width: 400px; font-family: -apple-system, sans-serif; overflow: hidden; }
-        #dictionary-popup.visible { display: block; }
+        #dictionary-popup { display: none; position: fixed; z-index: 1200; background: #fff; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.25); min-width: 320px; max-width: 420px; font-family: -apple-system, sans-serif; overflow: hidden; left: 50%; top: 50%; transform: translate(-50%, -50%) scale(0.95); opacity: 0; transition: transform 0.2s ease, opacity 0.2s ease; }
+        #dictionary-popup.visible { display: block; transform: translate(-50%, -50%) scale(1); opacity: 1; }
         .dict-header { background: #f8f9fa; padding: 15px 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
         .dict-word { font-size: 1.3em; font-weight: 600; color: #333; }
         .dict-phonetic { font-size: 0.9em; color: #888; margin-left: 10px; font-style: italic; }
@@ -361,11 +362,11 @@
             <button class="highlight-color-btn pink" onclick="highlightSelection('pink')" title="Highlight pink"></button>
             <button class="highlight-color-btn purple" onclick="highlightSelection('purple')" title="Highlight purple"></button>
         </div>
-        <button onclick="addBookmark()" title="Bookmark this passage">🔖 Bookmark</button>
-        <button onclick="openAddNoteModal()" title="Add a note">📝 Note</button>
-        <button onclick="copySelectedText()" title="Copy selected text">📋 Copy</button>
-        <button onclick="appendToClipboard()" title="Add to existing clipboard">➕ Add to Batch</button>
-        <button onclick="clearSelection()" title="Clear selection">✕</button>
+        <button onclick="addBookmark()" title="Bookmark this passage"><i class="fa-regular fa-bookmark"></i> Bookmark</button>
+        <button onclick="openAddNoteModal()" title="Add a note"><i class="fa-regular fa-note-sticky"></i> Note</button>
+        <button onclick="copySelectedText()" title="Copy selected text"><i class="fa-regular fa-copy"></i> Copy</button>
+        <button onclick="appendToClipboard()" title="Add to existing clipboard"><i class="fa-solid fa-plus"></i> Add to Batch</button>
+        <button onclick="clearSelection()" title="Clear selection"><i class="fa-solid fa-xmark"></i></button>
     </div>
     
     <!-- Copy toast notification -->
@@ -380,13 +381,13 @@
             <div class="highlight-menu-color pink" onclick="changeHighlightColor('pink')" title="Pink"></div>
             <div class="highlight-menu-color purple" onclick="changeHighlightColor('purple')" title="Purple"></div>
         </div>
-        <div class="highlight-menu-item" onclick="copyHighlightText()">📋 Copy text</div>
-        <div class="highlight-menu-item delete" onclick="deleteCurrentHighlight()">🗑️ Delete highlight</div>
+        <div class="highlight-menu-item" onclick="copyHighlightText()"><i class="fa-regular fa-copy"></i> Copy text</div>
+        <div class="highlight-menu-item delete" onclick="deleteCurrentHighlight()"><i class="fa-regular fa-trash-can"></i> Delete highlight</div>
     </div>
     
     <!-- Keyboard shortcuts help -->
     <div id="keyboard-help">
-        <div style="font-weight: 600; margin-bottom: 10px;">⌨️ Keyboard Shortcuts</div>
+        <div style="font-weight: 600; margin-bottom: 10px;"><i class="fa-regular fa-keyboard"></i> Keyboard Shortcuts</div>
         <div class="shortcut-row"><span class="shortcut-key"><span class="kbd">←</span> <span class="kbd">→</span></span><span>Prev/Next chapter</span></div>
         <div class="shortcut-row"><span class="shortcut-key"><span class="kbd">⌘/Ctrl</span>+<span class="kbd">F</span></span><span>Search</span></div>
         <div class="shortcut-row"><span class="shortcut-key"><span class="kbd">⌘/Ctrl</span>+<span class="kbd">B</span></span><span>Bookmarks</span></div>
@@ -398,14 +399,14 @@
     <div id="resume-banner">
         <span class="resume-text">Continue reading from where you left off?</span>
         <button class="resume-btn" onclick="resumeReading()">Resume</button>
-        <button class="resume-dismiss" onclick="dismissResume()">✕</button>
+        <button class="resume-dismiss" onclick="dismissResume()"><i class="fa-solid fa-xmark"></i></button>
     </div>
     
     <!-- Bookmarks/Highlights Panel -->
     <div id="bookmarks-panel">
         <div class="panel-header">
-            <span class="panel-title">📚 Your Notes</span>
-            <button class="panel-close" onclick="toggleBookmarksPanel()">✕</button>
+            <span class="panel-title"><i class="fa-solid fa-book-bookmark"></i> Your Notes</span>
+            <button class="panel-close" onclick="toggleBookmarksPanel()"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <div class="panel-tabs">
             <button class="panel-tab active" onclick="showPanelTab('bookmarks')">Bookmarks</button>
@@ -425,7 +426,7 @@
             <div class="search-header">
                 <div class="search-input-wrapper">
                     <input type="text" class="search-input" id="search-input" placeholder="Search in this book..." onkeydown="if(event.key==='Enter')performSearch()">
-                    <button class="search-btn" onclick="performSearch()">🔍 Search</button>
+                    <button class="search-btn" onclick="performSearch()"><i class="fa-solid fa-magnifying-glass"></i> Search</button>
                 </div>
             </div>
             <div class="search-results" id="search-results">
@@ -441,7 +442,7 @@
                 <span class="dict-word" id="dict-word"></span>
                 <span class="dict-phonetic" id="dict-phonetic"></span>
             </div>
-            <button class="dict-close" onclick="closeDictionary()">✕</button>
+            <button class="dict-close" onclick="closeDictionary()"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <div class="dict-content" id="dict-content">
             <div class="dict-loading">Loading definition...</div>
@@ -452,14 +453,14 @@
     <div id="vocabulary-panel">
         <div class="vocab-header">
             <div class="panel-header" style="padding: 0; border: none;">
-                <span class="panel-title">📖 Vocabulary</span>
-                <button class="panel-close" onclick="toggleVocabularyPanel()">✕</button>
+                <span class="panel-title"><i class="fa-solid fa-language"></i> Vocabulary</span>
+                <button class="panel-close" onclick="toggleVocabularyPanel()"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <input type="text" class="vocab-search" id="vocab-search" placeholder="Search saved words..." oninput="filterVocabulary()">
         </div>
         <div class="vocab-list" id="vocab-list">
             <div class="empty-state">
-                <div class="empty-state-icon">📖</div>
+                <div class="empty-state-icon"><i class="fa-solid fa-language" style="font-size: 2em; color: #ccc;"></i></div>
                 <div class="empty-state-text">No saved words yet</div>
                 <div class="empty-state-hint">Double-click any word to look it up and save it</div>
             </div>
@@ -473,8 +474,8 @@
     <div id="annotations-panel">
         <div class="annot-header">
             <div class="panel-header" style="padding: 0; border: none;">
-                <span class="panel-title">📝 Annotations</span>
-                <button class="panel-close" onclick="toggleAnnotationsPanel()">✕</button>
+                <span class="panel-title"><i class="fa-regular fa-note-sticky"></i> Annotations</span>
+                <button class="panel-close" onclick="toggleAnnotationsPanel()"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="annot-tabs">
                 <button class="annot-tab active" onclick="showAnnotTab('all')">All</button>
@@ -485,13 +486,13 @@
         </div>
         <div class="annot-list" id="annot-list">
             <div class="empty-state">
-                <div class="empty-state-icon">📝</div>
+                <div class="empty-state-icon"><i class="fa-regular fa-note-sticky" style="font-size: 2em; color: #ccc;"></i></div>
                 <div class="empty-state-text">No annotations yet</div>
                 <div class="empty-state-hint">Add notes to your highlights and bookmarks</div>
             </div>
         </div>
         <div class="annot-export">
-            <button class="annot-export-btn" onclick="exportAnnotations()">📤 Export Annotations</button>
+            <button class="annot-export-btn" onclick="exportAnnotations()"><i class="fa-solid fa-file-export"></i> Export Annotations</button>
         </div>
     </div>
     
@@ -519,12 +520,12 @@
             </div>
         </div>
         <div class="panel-header">
-            <span class="panel-title">📚 Reading History</span>
-            <button class="panel-close" onclick="toggleSessionPanel()">✕</button>
+            <span class="panel-title"><i class="fa-solid fa-clock-rotate-left"></i> Reading History</span>
+            <button class="panel-close" onclick="toggleSessionPanel()"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <div class="session-list" id="session-list">
             <div class="empty-state">
-                <div class="empty-state-icon">📚</div>
+                <div class="empty-state-icon"><i class="fa-solid fa-clock-rotate-left" style="font-size: 2em; color: #ccc;"></i></div>
                 <div class="empty-state-text">No reading sessions yet</div>
                 <div class="empty-state-hint">Your reading history will appear here</div>
             </div>
@@ -535,8 +536,8 @@
     <div id="add-note-modal">
         <div class="note-modal-content">
             <div class="note-modal-header">
-                <h3>📝 Add Note</h3>
-                <button class="panel-close" onclick="closeNoteModal()">✕</button>
+                <h3><i class="fa-regular fa-note-sticky"></i> Add Note</h3>
+                <button class="panel-close" onclick="closeNoteModal()"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="note-modal-body">
                 <textarea class="note-textarea" id="note-textarea" placeholder="Write your note here..."></textarea>
@@ -576,13 +577,13 @@
         
         <!-- Quick actions toolbar -->
         <div style="display: flex; gap: 8px; padding: 10px 15px; border-bottom: 1px solid #eee; flex-wrap: wrap;">
-            <button onclick="openSearch()" style="flex: 1; padding: 8px; border: 1px solid #ddd; background: #fff; border-radius: 4px; cursor: pointer; font-size: 0.85em;" title="Search (Ctrl/⌘+F)">🔍 Search</button>
-            <button onclick="toggleBookmarksPanel()" style="flex: 1; padding: 8px; border: 1px solid #ddd; background: #fff; border-radius: 4px; cursor: pointer; font-size: 0.85em;" title="Bookmarks & Highlights">📚 Notes</button>
+            <button onclick="openSearch()" style="flex: 1; padding: 8px; border: 1px solid #ddd; background: #fff; border-radius: 4px; cursor: pointer; font-size: 0.85em;" title="Search (Ctrl/⌘+F)"><i class="fa-solid fa-magnifying-glass"></i> Search</button>
+            <button onclick="toggleBookmarksPanel()" style="flex: 1; padding: 8px; border: 1px solid #ddd; background: #fff; border-radius: 4px; cursor: pointer; font-size: 0.85em;" title="Bookmarks & Highlights"><i class="fa-solid fa-book-bookmark"></i> Notes</button>
         </div>
         <div style="display: flex; gap: 8px; padding: 5px 15px 10px; border-bottom: 1px solid #eee; flex-wrap: wrap;">
-            <button onclick="toggleVocabularyPanel()" style="flex: 1; padding: 8px; border: 1px solid #ddd; background: #fff; border-radius: 4px; cursor: pointer; font-size: 0.85em;" title="Vocabulary List">📖 Vocab</button>
-            <button onclick="toggleAnnotationsPanel()" style="flex: 1; padding: 8px; border: 1px solid #ddd; background: #fff; border-radius: 4px; cursor: pointer; font-size: 0.85em;" title="Annotations">📝 Annot</button>
-            <button onclick="toggleSessionPanel()" style="flex: 1; padding: 8px; border: 1px solid #ddd; background: #fff; border-radius: 4px; cursor: pointer; font-size: 0.85em;" title="Reading History">📊 Stats</button>
+            <button onclick="toggleVocabularyPanel()" style="flex: 1; padding: 8px; border: 1px solid #ddd; background: #fff; border-radius: 4px; cursor: pointer; font-size: 0.85em;" title="Vocabulary List"><i class="fa-solid fa-language"></i> Vocab</button>
+            <button onclick="toggleAnnotationsPanel()" style="flex: 1; padding: 8px; border: 1px solid #ddd; background: #fff; border-radius: 4px; cursor: pointer; font-size: 0.85em;" title="Annotations"><i class="fa-regular fa-note-sticky"></i> Annot</button>
+            <button onclick="toggleSessionPanel()" style="flex: 1; padding: 8px; border: 1px solid #ddd; background: #fff; border-radius: 4px; cursor: pointer; font-size: 0.85em;" title="Reading History"><i class="fa-solid fa-chart-simple"></i> Stats</button>
         </div>
 
         <!-- Multi-chapter copy controls -->
@@ -656,12 +657,12 @@
         <div class="content-container">
             <div class="content-toolbar">
                 {% if is_pdf %}
-                <button class="toolbar-btn" type="button" onclick="togglePageJump()" title="Jump to a specific page">🔢 Go to Page</button>
-                <button class="toolbar-btn pdf-multi-copy-btn" type="button" onclick="copySelectedPagesAsImage()" id="pdf-multi-copy-btn" title="Copy selected pages as a combined image">📷 Copy Selected (<span id="pdf-selected-count">0</span>)</button>
-                <button class="toolbar-btn" type="button" onclick="toggleSelectAllPages()" id="pdf-select-all-btn" title="Select/Deselect all loaded pages">☑️ Select All</button>
+                <button class="toolbar-btn" type="button" onclick="togglePageJump()" title="Jump to a specific page"><i class="fa-solid fa-hashtag"></i> Go to Page</button>
+                <button class="toolbar-btn pdf-multi-copy-btn" type="button" onclick="copySelectedPagesAsImage()" id="pdf-multi-copy-btn" title="Copy selected pages as a combined image"><i class="fa-regular fa-images"></i> Copy Selected (<span id="pdf-selected-count">0</span>)</button>
+                <button class="toolbar-btn" type="button" onclick="toggleSelectAllPages()" id="pdf-select-all-btn" title="Select/Deselect all loaded pages"><i class="fa-regular fa-square-check"></i> Select All</button>
                 {% else %}
-                <button class="toolbar-btn" type="button" onclick="copyAllLoaded()" id="copy-all-btn" title="Copy all loaded content">📋 Copy All</button>
-                <button class="toolbar-btn" type="button" onclick="showBatchClipboard()" id="batch-clipboard-btn" style="display: none;">🗂️ Batch (<span id="batch-count">0</span>)</button>
+                <button class="toolbar-btn" type="button" onclick="copyAllLoaded()" id="copy-all-btn" title="Copy all loaded content"><i class="fa-regular fa-copy"></i> Copy All</button>
+                <button class="toolbar-btn" type="button" onclick="showBatchClipboard()" id="batch-clipboard-btn" style="display: none;"><i class="fa-regular fa-folder-open"></i> Batch (<span id="batch-count">0</span>)</button>
                 {% endif %}
             </div>
             <div id="copy-status" aria-live="polite"></div>
@@ -673,7 +674,7 @@
                         <span class="pdf-page-number">Page {{ chapter_index + 1 }}</span>
                         <div class="pdf-page-actions">
                             <button class="pdf-copy-image-btn" onclick="copyPageImage(this, {{ chapter_index }})" title="Copy page as image to clipboard">
-                                📷 Copy Page
+                                <i class="fa-regular fa-image"></i> Copy Page
                             </button>
                         </div>
                     </div>
@@ -708,7 +709,7 @@
                     <span id="page-count">Page {{ chapter_index + 1 }} of {{ book.spine|length }}</span>
                 </div>
                 <div style="display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;">
-                    <button class="toolbar-btn" onclick="scrollToTop()" title="Back to top">↑ Top</button>
+                    <button class="toolbar-btn" onclick="scrollToTop()" title="Back to top"><i class="fa-solid fa-arrow-up"></i> Top</button>
                     <button class="toolbar-btn" onclick="loadAllPages()" id="load-all-btn" title="Load all remaining pages">Load All Pages</button>
                 </div>
             </div>
@@ -747,7 +748,7 @@
         async function reprocessPDF() {
             const banner = document.getElementById('pdf-reprocess-banner');
             if (banner) {
-                banner.innerHTML = '<span style="font-size: 1.1em;">⏳ Reprocessing PDF... This may take a moment.</span>';
+                banner.innerHTML = '<span style="font-size: 1.1em;"><i class="fa-solid fa-spinner fa-spin"></i> Reprocessing PDF... This may take a moment.</span>';
             }
             
             try {
@@ -978,7 +979,7 @@
                     // Reload bookmarks to get full data
                     await loadBookmarksFromServer();
                     renderBookmarksList();
-                    showToast('Bookmark added! 🔖');
+                    showToast('Bookmark added!');
                     hideSelectionToolbar();
                 } else {
                     showToast('Failed to add bookmark', 'error');
@@ -1031,7 +1032,7 @@
             if (userBookmarks.length === 0) {
                 list.innerHTML = `
                     <div class="empty-state">
-                        <div class="empty-state-icon">🔖</div>
+                        <div class="empty-state-icon"><i class="fa-regular fa-bookmark" style="font-size: 2em; color: #ccc;"></i></div>
                         <div class="empty-state-text">No bookmarks yet</div>
                         <div class="empty-state-hint">Select text and click the bookmark button to save passages</div>
                     </div>
@@ -1042,7 +1043,7 @@
             list.innerHTML = userBookmarks.map(b => `
                 <div class="bookmark-item">
                     <div class="bookmark-actions">
-                        <button class="bookmark-action-btn" onclick="deleteBookmark('${b.id}')" title="Delete">🗑️</button>
+                        <button class="bookmark-action-btn" onclick="deleteBookmark('${b.id}')" title="Delete"><i class="fa-regular fa-trash-can"></i></button>
                     </div>
                     <div class="bookmark-title" onclick="goToBookmark(${JSON.stringify(b).replace(/"/g, '&quot;')})">"${escapeHtml(b.title || 'Bookmark')}"</div>
                     <div class="bookmark-meta">Chapter ${b.chapter_index + 1} • ${new Date(b.created_at).toLocaleDateString()}</div>
@@ -1287,7 +1288,7 @@
             if (userHighlights.length === 0) {
                 list.innerHTML = `
                     <div class="empty-state">
-                        <div class="empty-state-icon">🖍️</div>
+                        <div class="empty-state-icon"><i class="fa-solid fa-highlighter" style="font-size: 2em; color: #ccc;"></i></div>
                         <div class="empty-state-text">No highlights yet</div>
                         <div class="empty-state-hint">Select text and choose a color to highlight important passages</div>
                     </div>
@@ -1298,7 +1299,7 @@
             list.innerHTML = userHighlights.map(h => `
                 <div class="highlight-item">
                     <div class="bookmark-actions">
-                        <button class="bookmark-action-btn" onclick="deleteHighlight('${h.id}')" title="Delete">🗑️</button>
+                        <button class="bookmark-action-btn" onclick="deleteHighlight('${h.id}')" title="Delete"><i class="fa-regular fa-trash-can"></i></button>
                     </div>
                     <div class="highlight-text highlight-${h.color}">"${escapeHtml((h.text || '').substring(0, 150))}${(h.text || '').length > 150 ? '...' : ''}"</div>
                     <div class="bookmark-meta">Chapter ${h.chapter_index + 1} • ${new Date(h.created_at).toLocaleDateString()}</div>
@@ -1407,7 +1408,7 @@
             if (results.length === 0) {
                 container.innerHTML = `
                     <div class="empty-state">
-                        <div class="empty-state-icon">🔍</div>
+                        <div class="empty-state-icon"><i class="fa-solid fa-magnifying-glass" style="font-size: 2em; color: #ccc;"></i></div>
                         <div class="empty-state-text">No results found</div>
                         <div class="empty-state-hint">Try different keywords or check spelling</div>
                     </div>
@@ -1743,7 +1744,7 @@
             loadingPages = false;
             
             if (btn) {
-                btn.textContent = 'All Pages Loaded ✓';
+                btn.innerHTML = '<i class="fa-solid fa-check"></i> All Pages Loaded';
                 btn.disabled = true;
             }
             
@@ -1786,7 +1787,7 @@
             const btn = document.getElementById('selection-mode-btn');
             if (btn) {
                 btn.classList.toggle('active', isSelectionMode);
-                btn.textContent = isSelectionMode ? '✓ Selection Mode' : '📝 Select Text';
+                btn.innerHTML = isSelectionMode ? '<i class="fa-solid fa-check"></i> Selection Mode' : '<i class="fa-regular fa-edit"></i> Select Text';
             }
             if (!isSelectionMode) {
                 hideSelectionToolbar();
@@ -1812,7 +1813,7 @@
                 // Show success state on button
                 button.classList.add('copied');
                 const originalText = button.innerHTML;
-                button.innerHTML = '✓ Copied!';
+                button.innerHTML = '<i class="fa-solid fa-check"></i> Copied!';
                 showCopyToast('Page text copied!', 'success');
                 
                 // Reset button after delay
@@ -1853,7 +1854,7 @@
 
                 button.classList.add('copied');
                 const originalText = button.innerHTML;
-                button.innerHTML = '✓ Copied!';
+                button.innerHTML = '<i class="fa-solid fa-check"></i> Copied!';
                 showCopyToast('Page image copied!', 'success');
                 setTimeout(() => {
                     button.classList.remove('copied');
@@ -1911,7 +1912,7 @@
             // Update button text
             const btn = document.getElementById('pdf-select-all-btn');
             if (btn) {
-                btn.textContent = allChecked ? '☑️ Select All' : '☐ Deselect All';
+                btn.innerHTML = allChecked ? '<i class="fa-regular fa-square-check"></i> Select All' : '<i class="fa-regular fa-square"></i> Deselect All';
             }
         }
         
@@ -1929,7 +1930,7 @@
             
             const btn = document.getElementById('pdf-multi-copy-btn');
             const originalText = btn?.innerHTML || '';
-            if (btn) btn.innerHTML = '⏳ Processing...';
+            if (btn) btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing...';
             
             try {
                 // Sort selected pages by index
@@ -1990,7 +1991,7 @@
                 
                 if (btn) {
                     btn.classList.add('copied');
-                    btn.innerHTML = '✓ Copied!';
+                    btn.innerHTML = '<i class="fa-solid fa-check"></i> Copied!';
                 }
                 showCopyToast(`${images.length} page${images.length > 1 ? 's' : ''} copied as image!`, 'success');
                 
@@ -2259,7 +2260,7 @@
                                     <span class="pdf-page-number">${page.title}</span>
                                     <div class="pdf-page-actions">
                                         <button class="pdf-copy-image-btn" onclick="copyPageImage(this, ${page.index})" title="Copy page as image to clipboard">
-                                            📷 Copy Page
+                                            <i class="fa-regular fa-image"></i> Copy Page
                                         </button>
                                     </div>
                                 </div>
@@ -2289,7 +2290,7 @@
             // Update load all button state
             const loadAllBtn = document.getElementById('load-all-btn');
             if (loadAllBtn && currentPageIndex >= totalPages - 1) {
-                loadAllBtn.textContent = 'All Pages Loaded ✓';
+                loadAllBtn.innerHTML = '<i class="fa-solid fa-check"></i> All Pages Loaded';
                 loadAllBtn.disabled = true;
             }
         }
@@ -2844,7 +2845,7 @@
             if (readingSessions.length === 0) {
                 list.innerHTML = `
                     <div class="empty-state">
-                        <div class="empty-state-icon">📚</div>
+                        <div class="empty-state-icon"><i class="fa-solid fa-clock-rotate-left" style="font-size: 2em; color: #ccc;"></i></div>
                         <div class="empty-state-text">No reading sessions yet</div>
                         <div class="empty-state-hint">Your reading history will appear here</div>
                     </div>
@@ -2895,9 +2896,7 @@
             phoneticEl.textContent = '';
             contentEl.innerHTML = '<div class="dict-loading">Looking up definition...</div>';
             
-            // Position popup
-            popup.style.left = `${Math.min(x, window.innerWidth - 420)}px`;
-            popup.style.top = `${Math.min(y + 20, window.innerHeight - 400)}px`;
+            // Show centered popup (CSS handles positioning)
             popup.classList.add('visible');
             
             try {
@@ -2942,7 +2941,7 @@
                 html += `
                     <div class="dict-actions">
                         <button class="dict-btn dict-btn-primary" onclick="saveToVocabulary('${escapeHtml(word)}', ${JSON.stringify(entry).replace(/'/g, "\\'")}, '${escapeHtml(context)}')">
-                            📖 Save to Vocabulary
+                            <i class="fa-solid fa-plus"></i> Save to Vocabulary
                         </button>
                         <button class="dict-btn dict-btn-secondary" onclick="closeDictionary()">
                             Close
@@ -3018,7 +3017,7 @@
                 });
                 
                 if (response.ok) {
-                    showToast('Word saved to vocabulary! 📖');
+                    showToast('Word saved to vocabulary!');
                     closeDictionary();
                     
                     // Reload vocabulary
@@ -3050,7 +3049,7 @@
             if (userVocabulary.length === 0) {
                 list.innerHTML = `
                     <div class="empty-state">
-                        <div class="empty-state-icon">📖</div>
+                        <div class="empty-state-icon"><i class="fa-solid fa-language" style="font-size: 2em; color: #ccc;"></i></div>
                         <div class="empty-state-text">No saved words yet</div>
                         <div class="empty-state-hint">Double-click any word to look it up and save it</div>
                     </div>
@@ -3061,7 +3060,7 @@
             
             list.innerHTML = userVocabulary.map(w => `
                 <div class="vocab-item">
-                    <button class="vocab-delete" onclick="deleteVocabWord('${w.id}')" title="Delete">🗑️</button>
+                    <button class="vocab-delete" onclick="deleteVocabWord('${w.id}')" title="Delete"><i class="fa-regular fa-trash-can"></i></button>
                     <div>
                         <span class="vocab-word">${escapeHtml(w.word)}</span>
                         <span class="vocab-pos">${escapeHtml(w.part_of_speech || '')}</span>
@@ -3122,7 +3121,7 @@
             if (annotations.length === 0) {
                 list.innerHTML = `
                     <div class="empty-state">
-                        <div class="empty-state-icon">📝</div>
+                        <div class="empty-state-icon"><i class="fa-regular fa-note-sticky" style="font-size: 2em; color: #ccc;"></i></div>
                         <div class="empty-state-text">No annotations ${filter === 'chapter' ? 'in this chapter' : 'yet'}</div>
                         <div class="empty-state-hint">Add notes to your highlights and bookmarks</div>
                     </div>
@@ -3133,8 +3132,8 @@
             list.innerHTML = annotations.map(a => `
                 <div class="annot-item">
                     <div class="annot-actions">
-                        <button onclick="editAnnotation('${a.id}')" title="Edit">✏️</button>
-                        <button onclick="deleteAnnotation('${a.id}')" title="Delete">🗑️</button>
+                        <button onclick="editAnnotation('${a.id}')" title="Edit"><i class="fa-regular fa-pen-to-square"></i></button>
+                        <button onclick="deleteAnnotation('${a.id}')" title="Delete"><i class="fa-regular fa-trash-can"></i></button>
                     </div>
                     <div class="annot-chapter">Chapter ${a.chapter_index + 1}</div>
                     <div class="annot-text">${escapeHtml(a.note_text)}</div>
@@ -3204,7 +3203,7 @@
                 });
                 
                 if (response.ok) {
-                    showToast('Note saved! 📝');
+                    showToast('Note saved!');
                     closeNoteModal();
                     
                     // Reload annotations
@@ -3257,7 +3256,7 @@
                     a.download = `${bookId}_annotations.md`;
                     a.click();
                     URL.revokeObjectURL(url);
-                    showToast('Annotations exported! 📤');
+                    showToast('Annotations exported!');
                 }
             } catch (error) {
                 console.error('Export failed:', error);
