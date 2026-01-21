@@ -422,6 +422,43 @@ async def reprocess_pdf(book_id: str):
 # ============================================================================
 
 
+@app.get("/api/recently-read")
+async def get_recently_read_books(limit: int = 5):
+    """Get recently read books sorted by last_read time."""
+    recently_read = []
+    
+    # Scan all book folders
+    if os.path.exists(BOOKS_DIR):
+        for item in os.listdir(BOOKS_DIR):
+            if item.endswith("_data") and os.path.isdir(os.path.join(BOOKS_DIR, item)):
+                progress = user_data_manager.get_progress(item)
+                if progress and progress.last_read:
+                    book = load_book_cached(item)
+                    if book:
+                        # Calculate progress percentage
+                        chapter_progress = user_data_manager.get_chapter_progress(item)
+                        overall_progress = 0.0
+                        if chapter_progress and len(book.spine) > 0:
+                            total_progress = sum(chapter_progress.values())
+                            overall_progress = total_progress / len(book.spine)
+                        
+                        recently_read.append({
+                            "id": item,
+                            "title": book.metadata.title,
+                            "author": ", ".join(book.metadata.authors),
+                            "cover_image": book.cover_image,
+                            "last_read": progress.last_read,
+                            "chapter_index": progress.chapter_index,
+                            "progress_percent": overall_progress,
+                            "reading_time_seconds": progress.reading_time_seconds,
+                        })
+    
+    # Sort by last_read descending
+    recently_read.sort(key=lambda x: x["last_read"], reverse=True)
+    
+    return {"books": recently_read[:limit]}
+
+
 @app.get("/api/progress/{book_id}")
 async def get_reading_progress(book_id: str):
     """Get reading progress for a book."""
