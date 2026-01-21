@@ -29,6 +29,7 @@ from user_data import (
     ReadingSession,
     VocabularyWord,
     Annotation,
+    Collection,
     generate_id,
 )
 
@@ -362,6 +363,8 @@ async def delete_book(book_id: str):
         load_book_cached.cache_clear()
         # Clean up user data for this book
         user_data_manager.cleanup_book_data(safe_book_id)
+        # Remove book from all collections
+        user_data_manager.cleanup_collection_books(safe_book_id)
         return {"status": "deleted"}
     except Exception as e:
         print(f"Error deleting book {safe_book_id}: {e}")
@@ -415,6 +418,40 @@ async def reprocess_pdf(book_id: str):
         raise HTTPException(
             status_code=500, detail=f"Failed to reprocess PDF: {str(e)}"
         )
+
+
+# ============================================================================
+# Chapter Reading Time API
+# ============================================================================
+
+
+@app.get("/api/reading-times/{book_id}")
+async def get_chapter_reading_times(book_id: str):
+    """Get estimated reading times for all chapters in a book."""
+    book = load_book_cached(book_id)
+    if not book:
+        raise HTTPException(status_code=404, detail="Book not found")
+    
+    # Average reading speed: ~200 words per minute
+    WORDS_PER_MINUTE = 200
+    
+    reading_times = {}
+    
+    for chapter in book.spine:
+        # Count words in the chapter's plain text
+        text = chapter.text or ""
+        word_count = len(text.split())
+        
+        # Calculate reading time in minutes
+        minutes = max(1, round(word_count / WORDS_PER_MINUTE))
+        
+        reading_times[chapter.href] = {
+            "word_count": word_count,
+            "minutes": minutes,
+            "formatted": f"~{minutes} min" if minutes < 60 else f"~{minutes // 60}h {minutes % 60}m"
+        }
+    
+    return {"book_id": book_id, "reading_times": reading_times}
 
 
 # ============================================================================
@@ -1527,6 +1564,188 @@ async def export_annotations(book_id: str, format: str = "markdown"):
                     f"attachment; filename={book_id}_annotations.json"
             }
         )
+
+
+# ========== Collections API ==========
+
+@app.get("/api/collections")
+async def get_collections():
+    """Get all collections."""
+    collections = user_data_manager.get_collections()
+    return {
+        "collections": [
+            {
+                "id": c.id,
+                "name": c.name,
+                "description": c.description,
+                "icon": c.icon,
+                "color": c.color,
+                "book_count": len(c.book_ids),
+                "book_ids": c.book_ids,
+                "created_at": c.created_at,
+                "updated_at": c.updated_at,
+            }
+            for c in collections
+        ]
+    }
+
+
+@app.post("/api/collections")
+async def create_collection(request: Request):
+    """Create a new collection."""
+    data = await request.json()
+    name = data.get("name", "").strip()
+    
+    if not name:
+        raise HTTPException(status_code=400, detail="Collection name is required")
+    
+    description = data.get("description", "")
+    icon = data.get("icon", "folder")
+    color = data.get("color", "#3498db")
+    
+    collection = user_data_manager.create_collection(
+        name=name,
+        description=description,
+        icon=icon,
+        color=color
+    )
+    
+    return {
+        "id": collection.id,
+        "name": collection.name,
+        "description": collection.description,
+        "icon": collection.icon,
+        "color": collection.color,
+        "book_count": 0,
+        "book_ids": [],
+        "created_at": collection.created_at,
+    }
+
+
+@app.get("/api/collections/{collection_id}")
+async def get_collection(collection_id: str):
+    """Get a single collection."""
+    collection = user_data_manager.get_collection(collection_id)
+    if not collection:
+        raise HTTPException(status_code=404, detail="Collection not found")
+    
+    return {
+        "id": collection.id,
+        "name": collection.name,
+        "description": collection.description,
+        "icon": collection.icon,
+        "color": collection.color,
+        "book_count": len(collection.book_ids),
+        "book_ids": collection.book_ids,
+        "created_at": collection.created_at,
+        "updated_at": collection.updated_at,
+    }
+
+
+@app.put("/api/collections/{collection_id}")
+async def update_collection(collection_id: str, request: Request):
+    """Update a collection."""
+    data = await request.json()
+    
+    success = user_data_manager.update_collection(
+        collection_id=collection_id,
+        name=data.get("name"),
+        description=data.get("description"),
+        icon=data.get("icon"),
+        color=data.get("color")
+    )
+    
+    if not success:
+        raise HTTPException(status_code=404, detail="Collection not found")
+    
+    # Return updated collection
+    collection = user_data_manager.get_collection(collection_id)
+    return {
+        "id": collection.id,
+        "name": collection.name,
+        "description": collection.description,
+        "icon": collection.icon,
+        "color": collection.color,
+        "book_count": len(collection.book_ids),
+        "book_ids": collection.book_ids,
+        "updated_at": collection.updated_at,
+    }
+
+
+@app.delete("/api/collections/{collection_id}")
+async def delete_collection(collection_id: str):
+    """Delete a collection."""
+    if user_data_manager.delete_collection(collection_id):
+        return {"status": "deleted"}
+    raise HTTPException(status_code=404, detail="Collection not found")
+
+
+@app.post("/api/collections/{collection_id}/books/{book_id}")
+async def add_book_to_collection(collection_id: str, book_id: str):
+    """Add a book to a collection."""
+    if user_data_manager.add_book_to_collection(collection_id, book_id):
+        return {"status": "added", "collection_id": collection_id, "book_id": book_id}
+    raise HTTPException(status_code=404, detail="Collection not found")
+
+
+@app.delete("/api/collections/{collection_id}/books/{book_id}")
+async def remove_book_from_collection(collection_id: str, book_id: str):
+    """Remove a book from a collection."""
+    if user_data_manager.remove_book_from_collection(collection_id, book_id):
+        return {"status": "removed", "collection_id": collection_id, "book_id": book_id}
+    raise HTTPException(status_code=404, detail="Collection not found")
+
+
+@app.get("/api/books/{book_id}/collections")
+async def get_book_collections(book_id: str):
+    """Get all collections that contain a specific book."""
+    collections = user_data_manager.get_book_collections(book_id)
+    return {
+        "book_id": book_id,
+        "collections": [
+            {
+                "id": c.id,
+                "name": c.name,
+                "icon": c.icon,
+                "color": c.color,
+            }
+            for c in collections
+        ]
+    }
+
+
+@app.put("/api/books/{book_id}/collections")
+async def set_book_collections(book_id: str, request: Request):
+    """Set which collections a book belongs to."""
+    data = await request.json()
+    collection_ids = data.get("collection_ids", [])
+    
+    user_data_manager.set_book_collections(book_id, collection_ids)
+    
+    # Return updated list
+    collections = user_data_manager.get_book_collections(book_id)
+    return {
+        "book_id": book_id,
+        "collections": [
+            {
+                "id": c.id,
+                "name": c.name,
+                "icon": c.icon,
+                "color": c.color,
+            }
+            for c in collections
+        ]
+    }
+
+
+@app.put("/api/collections/reorder")
+async def reorder_collections(request: Request):
+    """Reorder collections."""
+    data = await request.json()
+    collection_ids = data.get("collection_ids", [])
+    
+    user_data_manager.reorder_collections(collection_ids)
+    return {"status": "reordered"}
 
 
 if __name__ == "__main__":

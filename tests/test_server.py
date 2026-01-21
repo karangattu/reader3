@@ -1037,3 +1037,877 @@ class TestPDFAPIResponseFormats:
         """Test expected text layer response structure."""
         expected_fields = ["page", "width", "height", "text_blocks"]
         assert len(expected_fields) == 4
+
+
+# ============================================================================
+# Collections API Tests
+# ============================================================================
+
+
+class TestCollectionsAPI:
+    """Tests for collections API endpoints."""
+
+    def test_get_collections_empty(self, client):
+        """Test getting collections when none exist (may already have some)."""
+        response = client.get("/api/collections")
+        assert response.status_code == 200
+        data = response.json()
+        assert "collections" in data
+        assert isinstance(data["collections"], list)
+
+    def test_create_collection(self, client):
+        """Test creating a collection."""
+        import uuid
+        name = f"Test Collection {uuid.uuid4().hex[:8]}"
+        
+        response = client.post(
+            "/api/collections",
+            json={
+                "name": name,
+                "description": "A test collection",
+                "icon": "star",
+                "color": "#e74c3c"
+            }
+        )
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert data["name"] == name
+        assert data["description"] == "A test collection"
+        assert data["icon"] == "star"
+        assert data["color"] == "#e74c3c"
+        assert "id" in data
+        assert data["book_count"] == 0
+
+    def test_create_collection_minimal(self, client):
+        """Test creating a collection with only required fields."""
+        import uuid
+        name = f"Minimal Collection {uuid.uuid4().hex[:8]}"
+        
+        response = client.post(
+            "/api/collections",
+            json={"name": name}
+        )
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert data["name"] == name
+        assert "id" in data
+
+    def test_create_collection_empty_name(self, client):
+        """Test that creating a collection with empty name fails."""
+        response = client.post(
+            "/api/collections",
+            json={"name": ""}
+        )
+        assert response.status_code == 400
+
+    def test_create_collection_whitespace_name(self, client):
+        """Test that creating a collection with whitespace-only name fails."""
+        response = client.post(
+            "/api/collections",
+            json={"name": "   "}
+        )
+        assert response.status_code == 400
+
+    def test_get_collection_by_id(self, client):
+        """Test getting a single collection by ID."""
+        import uuid
+        name = f"Get By ID {uuid.uuid4().hex[:8]}"
+        
+        # Create collection
+        create_response = client.post(
+            "/api/collections",
+            json={"name": name}
+        )
+        collection_id = create_response.json()["id"]
+        
+        # Get by ID
+        get_response = client.get(f"/api/collections/{collection_id}")
+        assert get_response.status_code == 200
+        
+        data = get_response.json()
+        assert data["id"] == collection_id
+        assert data["name"] == name
+
+    def test_get_collection_not_found(self, client):
+        """Test getting a non-existent collection."""
+        response = client.get("/api/collections/nonexistent_id_12345")
+        assert response.status_code == 404
+
+    def test_update_collection(self, client):
+        """Test updating a collection."""
+        import uuid
+        name = f"Update Test {uuid.uuid4().hex[:8]}"
+        
+        # Create collection
+        create_response = client.post(
+            "/api/collections",
+            json={"name": name}
+        )
+        collection_id = create_response.json()["id"]
+        
+        # Update collection
+        update_response = client.put(
+            f"/api/collections/{collection_id}",
+            json={
+                "name": "Updated Name",
+                "description": "Updated description",
+                "icon": "heart",
+                "color": "#2ecc71"
+            }
+        )
+        assert update_response.status_code == 200
+        
+        data = update_response.json()
+        assert data["name"] == "Updated Name"
+        assert data["description"] == "Updated description"
+        assert data["icon"] == "heart"
+        assert data["color"] == "#2ecc71"
+
+    def test_update_collection_partial(self, client):
+        """Test updating only some collection fields."""
+        import uuid
+        name = f"Partial Update {uuid.uuid4().hex[:8]}"
+        
+        # Create collection
+        create_response = client.post(
+            "/api/collections",
+            json={
+                "name": name,
+                "description": "Original",
+                "icon": "folder",
+                "color": "#3498db"
+            }
+        )
+        collection_id = create_response.json()["id"]
+        
+        # Update only name
+        update_response = client.put(
+            f"/api/collections/{collection_id}",
+            json={"name": "New Name Only"}
+        )
+        assert update_response.status_code == 200
+        
+        # Verify other fields unchanged
+        get_response = client.get(f"/api/collections/{collection_id}")
+        data = get_response.json()
+        assert data["name"] == "New Name Only"
+        assert data["description"] == "Original"
+        assert data["icon"] == "folder"
+
+    def test_update_collection_not_found(self, client):
+        """Test updating a non-existent collection."""
+        response = client.put(
+            "/api/collections/nonexistent_id_12345",
+            json={"name": "Test"}
+        )
+        assert response.status_code == 404
+
+    def test_delete_collection(self, client):
+        """Test deleting a collection."""
+        import uuid
+        name = f"Delete Test {uuid.uuid4().hex[:8]}"
+        
+        # Create collection
+        create_response = client.post(
+            "/api/collections",
+            json={"name": name}
+        )
+        collection_id = create_response.json()["id"]
+        
+        # Delete collection
+        delete_response = client.delete(f"/api/collections/{collection_id}")
+        assert delete_response.status_code == 200
+        assert delete_response.json()["status"] == "deleted"
+        
+        # Verify deleted
+        get_response = client.get(f"/api/collections/{collection_id}")
+        assert get_response.status_code == 404
+
+    def test_delete_collection_not_found(self, client):
+        """Test deleting a non-existent collection."""
+        response = client.delete("/api/collections/nonexistent_id_12345")
+        assert response.status_code == 404
+
+    def test_add_book_to_collection(self, client):
+        """Test adding a book to a collection."""
+        import uuid
+        name = f"Add Book Test {uuid.uuid4().hex[:8]}"
+        book_id = f"test_book_{uuid.uuid4().hex[:8]}"
+        
+        # Create collection
+        create_response = client.post(
+            "/api/collections",
+            json={"name": name}
+        )
+        collection_id = create_response.json()["id"]
+        
+        # Add book
+        add_response = client.post(
+            f"/api/collections/{collection_id}/books/{book_id}"
+        )
+        assert add_response.status_code == 200
+        assert add_response.json()["status"] == "added"
+        
+        # Verify book is in collection
+        get_response = client.get(f"/api/collections/{collection_id}")
+        data = get_response.json()
+        assert book_id in data["book_ids"]
+        assert data["book_count"] == 1
+
+    def test_add_book_to_nonexistent_collection(self, client):
+        """Test adding a book to a non-existent collection."""
+        response = client.post(
+            "/api/collections/nonexistent_id/books/some_book"
+        )
+        assert response.status_code == 404
+
+    def test_remove_book_from_collection(self, client):
+        """Test removing a book from a collection."""
+        import uuid
+        name = f"Remove Book Test {uuid.uuid4().hex[:8]}"
+        book_id = f"test_book_{uuid.uuid4().hex[:8]}"
+        
+        # Create collection and add book
+        create_response = client.post(
+            "/api/collections",
+            json={"name": name}
+        )
+        collection_id = create_response.json()["id"]
+        client.post(f"/api/collections/{collection_id}/books/{book_id}")
+        
+        # Remove book
+        remove_response = client.delete(
+            f"/api/collections/{collection_id}/books/{book_id}"
+        )
+        assert remove_response.status_code == 200
+        assert remove_response.json()["status"] == "removed"
+        
+        # Verify book is removed
+        get_response = client.get(f"/api/collections/{collection_id}")
+        data = get_response.json()
+        assert book_id not in data["book_ids"]
+
+    def test_get_book_collections(self, client):
+        """Test getting all collections a book belongs to."""
+        import uuid
+        book_id = f"test_book_{uuid.uuid4().hex[:8]}"
+        
+        # Create two collections and add the book to both
+        col1_response = client.post(
+            "/api/collections",
+            json={"name": f"Col1 {uuid.uuid4().hex[:8]}"}
+        )
+        col1_id = col1_response.json()["id"]
+        
+        col2_response = client.post(
+            "/api/collections",
+            json={"name": f"Col2 {uuid.uuid4().hex[:8]}"}
+        )
+        col2_id = col2_response.json()["id"]
+        
+        client.post(f"/api/collections/{col1_id}/books/{book_id}")
+        client.post(f"/api/collections/{col2_id}/books/{book_id}")
+        
+        # Get book's collections
+        response = client.get(f"/api/books/{book_id}/collections")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert data["book_id"] == book_id
+        assert len(data["collections"]) == 2
+        collection_ids = [c["id"] for c in data["collections"]]
+        assert col1_id in collection_ids
+        assert col2_id in collection_ids
+
+    def test_set_book_collections(self, client):
+        """Test setting all collections for a book at once."""
+        import uuid
+        book_id = f"test_book_{uuid.uuid4().hex[:8]}"
+        
+        # Create three collections
+        col1_response = client.post(
+            "/api/collections",
+            json={"name": f"Set1 {uuid.uuid4().hex[:8]}"}
+        )
+        col1_id = col1_response.json()["id"]
+        
+        col2_response = client.post(
+            "/api/collections",
+            json={"name": f"Set2 {uuid.uuid4().hex[:8]}"}
+        )
+        col2_id = col2_response.json()["id"]
+        
+        col3_response = client.post(
+            "/api/collections",
+            json={"name": f"Set3 {uuid.uuid4().hex[:8]}"}
+        )
+        col3_id = col3_response.json()["id"]
+        
+        # Add book to col1 initially
+        client.post(f"/api/collections/{col1_id}/books/{book_id}")
+        
+        # Set book to col2 and col3 (should remove from col1)
+        set_response = client.put(
+            f"/api/books/{book_id}/collections",
+            json={"collection_ids": [col2_id, col3_id]}
+        )
+        assert set_response.status_code == 200
+        
+        # Verify
+        data = set_response.json()
+        collection_ids = [c["id"] for c in data["collections"]]
+        assert col1_id not in collection_ids
+        assert col2_id in collection_ids
+        assert col3_id in collection_ids
+
+    def test_reorder_collections(self, client):
+        """Test reordering collections."""
+        import uuid
+        
+        # Create three collections
+        col1_response = client.post(
+            "/api/collections",
+            json={"name": f"Order1 {uuid.uuid4().hex[:8]}"}
+        )
+        col1_id = col1_response.json()["id"]
+        
+        col2_response = client.post(
+            "/api/collections",
+            json={"name": f"Order2 {uuid.uuid4().hex[:8]}"}
+        )
+        col2_id = col2_response.json()["id"]
+        
+        col3_response = client.post(
+            "/api/collections",
+            json={"name": f"Order3 {uuid.uuid4().hex[:8]}"}
+        )
+        col3_id = col3_response.json()["id"]
+        
+        # Reorder: col3, col1, col2
+        reorder_response = client.put(
+            "/api/collections/reorder",
+            json={"collection_ids": [col3_id, col1_id, col2_id]}
+        )
+        assert reorder_response.status_code == 200
+        assert reorder_response.json()["status"] == "reordered"
+
+    def test_collection_response_includes_book_ids(self, client):
+        """Test that collection response includes book_ids array."""
+        import uuid
+        name = f"Book IDs Test {uuid.uuid4().hex[:8]}"
+        
+        response = client.post(
+            "/api/collections",
+            json={"name": name}
+        )
+        data = response.json()
+        
+        assert "book_ids" in data
+        assert isinstance(data["book_ids"], list)
+
+    def test_collection_response_includes_timestamps(self, client):
+        """Test that collection response includes timestamps."""
+        import uuid
+        name = f"Timestamps Test {uuid.uuid4().hex[:8]}"
+        
+        create_response = client.post(
+            "/api/collections",
+            json={"name": name}
+        )
+        collection_id = create_response.json()["id"]
+        
+        get_response = client.get(f"/api/collections/{collection_id}")
+        data = get_response.json()
+        
+        assert "created_at" in data
+        assert "updated_at" in data
+
+
+# ============================================================================
+# Reading Sessions API Tests
+# ============================================================================
+
+
+class TestReadingSessionsAPI:
+    """Tests for reading sessions API endpoints."""
+
+    def test_start_reading_session(self, client):
+        """Test starting a reading session."""
+        import uuid
+        book_id = f"test_book_{uuid.uuid4().hex[:8]}"
+        
+        response = client.post(
+            "/api/sessions/start",
+            json={
+                "book_id": book_id,
+                "book_title": "Test Book",
+                "chapter_index": 0,
+                "chapter_title": "Chapter 1"
+            }
+        )
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert "id" in data
+        assert data["book_id"] == book_id
+        assert data["book_title"] == "Test Book"
+
+    def test_end_reading_session(self, client):
+        """Test ending a reading session."""
+        import uuid
+        book_id = f"test_book_{uuid.uuid4().hex[:8]}"
+        
+        # Start session
+        start_response = client.post(
+            "/api/sessions/start",
+            json={
+                "book_id": book_id,
+                "book_title": "Test Book",
+                "chapter_index": 0,
+                "chapter_title": "Chapter 1"
+            }
+        )
+        session_id = start_response.json()["id"]
+        
+        # End session
+        end_response = client.post(
+            f"/api/sessions/{session_id}/end",
+            json={
+                "duration_seconds": 600,
+                "pages_read": 10,
+                "scroll_position": 0.5
+            }
+        )
+        assert end_response.status_code == 200
+        assert end_response.json()["status"] == "ended"
+
+    def test_end_nonexistent_session(self, client):
+        """Test ending a session that doesn't exist."""
+        response = client.post(
+            "/api/sessions/nonexistent_session_id/end",
+            json={
+                "duration_seconds": 100,
+                "pages_read": 5,
+                "scroll_position": 0.25
+            }
+        )
+        assert response.status_code == 404
+
+    def test_get_sessions(self, client):
+        """Test getting reading sessions."""
+        response = client.get("/api/sessions")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert "sessions" in data
+        assert isinstance(data["sessions"], list)
+
+    def test_get_sessions_with_book_filter(self, client):
+        """Test getting sessions filtered by book."""
+        import uuid
+        book_id = f"test_book_{uuid.uuid4().hex[:8]}"
+        
+        # Create a session for this book
+        client.post(
+            "/api/sessions/start",
+            json={
+                "book_id": book_id,
+                "book_title": "Test Book",
+                "chapter_index": 0,
+                "chapter_title": "Chapter 1"
+            }
+        )
+        
+        response = client.get(f"/api/sessions?book_id={book_id}")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert "sessions" in data
+
+    def test_get_sessions_with_limit(self, client):
+        """Test getting sessions with limit parameter."""
+        response = client.get("/api/sessions?limit=5")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert len(data["sessions"]) <= 5
+
+    def test_get_reading_stats(self, client):
+        """Test getting reading statistics."""
+        response = client.get("/api/sessions/stats")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert "total_time_seconds" in data
+        assert "total_pages" in data
+        assert "session_count" in data
+        assert "streak_days" in data
+
+    def test_get_reading_stats_for_book(self, client):
+        """Test getting reading statistics for a specific book."""
+        import uuid
+        book_id = f"test_book_{uuid.uuid4().hex[:8]}"
+        
+        response = client.get(f"/api/sessions/stats?book_id={book_id}")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert "total_time_seconds" in data
+
+
+# ============================================================================
+# Vocabulary API Tests
+# ============================================================================
+
+
+class TestVocabularyAPI:
+    """Tests for vocabulary API endpoints."""
+
+    def test_add_vocabulary_word(self, client):
+        """Test adding a vocabulary word."""
+        import uuid
+        book_id = f"test_book_{uuid.uuid4().hex[:8]}"
+        
+        response = client.post(
+            f"/api/vocabulary/{book_id}",
+            json={
+                "word": "ephemeral",
+                "definition": "lasting for a very short time",
+                "phonetic": "/ɪˈfɛm(ə)r(ə)l/",
+                "part_of_speech": "adjective",
+                "context": "The ephemeral beauty of cherry blossoms."
+            }
+        )
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert data["word"] == "ephemeral"
+        assert "id" in data
+
+    def test_add_vocabulary_minimal(self, client):
+        """Test adding a word with only required fields."""
+        import uuid
+        book_id = f"test_book_{uuid.uuid4().hex[:8]}"
+        
+        response = client.post(
+            f"/api/vocabulary/{book_id}",
+            json={
+                "word": "serendipity",
+                "definition": "the occurrence of events by chance in a happy way"
+            }
+        )
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert data["word"] == "serendipity"
+
+    def test_get_vocabulary_for_book(self, client):
+        """Test getting vocabulary for a specific book."""
+        import uuid
+        book_id = f"test_book_{uuid.uuid4().hex[:8]}"
+        
+        # Add a word first
+        client.post(
+            f"/api/vocabulary/{book_id}",
+            json={
+                "word": "test_word",
+                "definition": "a test definition"
+            }
+        )
+        
+        response = client.get(f"/api/vocabulary/{book_id}")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert "vocabulary" in data
+        assert len(data["vocabulary"]) >= 1
+
+    def test_get_vocabulary_empty(self, client):
+        """Test getting vocabulary for a book with none."""
+        import uuid
+        book_id = f"test_book_empty_{uuid.uuid4().hex[:8]}"
+        
+        response = client.get(f"/api/vocabulary/{book_id}")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert data["vocabulary"] == []
+
+    def test_get_all_vocabulary(self, client):
+        """Test getting all vocabulary across books."""
+        response = client.get("/api/vocabulary")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert "vocabulary" in data
+        assert isinstance(data["vocabulary"], list)
+
+    def test_delete_vocabulary_word(self, client):
+        """Test deleting a vocabulary word."""
+        import uuid
+        book_id = f"test_book_{uuid.uuid4().hex[:8]}"
+        
+        # Add a word
+        add_response = client.post(
+            f"/api/vocabulary/{book_id}",
+            json={
+                "word": "to_delete",
+                "definition": "will be deleted"
+            }
+        )
+        word_id = add_response.json()["id"]
+        
+        # Delete the word
+        delete_response = client.delete(f"/api/vocabulary/{book_id}/{word_id}")
+        assert delete_response.status_code == 200
+        assert delete_response.json()["status"] == "deleted"
+
+    def test_delete_nonexistent_vocabulary(self, client):
+        """Test deleting a word that doesn't exist."""
+        response = client.delete("/api/vocabulary/some_book/nonexistent_id")
+        assert response.status_code == 404
+
+    def test_search_vocabulary(self, client):
+        """Test searching vocabulary."""
+        import uuid
+        book_id = f"test_book_{uuid.uuid4().hex[:8]}"
+        
+        # Add a word
+        client.post(
+            f"/api/vocabulary/{book_id}",
+            json={
+                "word": "ubiquitous",
+                "definition": "present everywhere"
+            }
+        )
+        
+        # Search for it
+        response = client.get("/api/vocabulary/search?q=ubiquitous")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert "results" in data
+
+    def test_search_vocabulary_short_query(self, client):
+        """Test that short queries return empty results."""
+        response = client.get("/api/vocabulary/search?q=a")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert data["results"] == []
+
+
+# ============================================================================
+# User Annotations API Tests
+# ============================================================================
+
+
+class TestUserAnnotationsAPI:
+    """Tests for user annotations API endpoints (not PDF annotations)."""
+
+    def test_create_annotation(self, client):
+        """Test creating an annotation."""
+        import uuid
+        book_id = f"test_book_{uuid.uuid4().hex[:8]}"
+        
+        response = client.post(
+            f"/api/annotations/{book_id}",
+            json={
+                "chapter_index": 0,
+                "note_text": "This is an important point!",
+                "tags": ["important", "review"]
+            }
+        )
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert data["status"] == "created"
+        assert "id" in data
+
+    def test_create_annotation_minimal(self, client):
+        """Test creating an annotation with only required fields."""
+        import uuid
+        book_id = f"test_book_{uuid.uuid4().hex[:8]}"
+        
+        response = client.post(
+            f"/api/annotations/{book_id}",
+            json={
+                "chapter_index": 0,
+                "note_text": "A simple note"
+            }
+        )
+        assert response.status_code == 200
+
+    def test_get_annotations_for_book(self, client):
+        """Test getting annotations for a book."""
+        import uuid
+        book_id = f"test_book_{uuid.uuid4().hex[:8]}"
+        
+        # Create an annotation
+        client.post(
+            f"/api/annotations/{book_id}",
+            json={
+                "chapter_index": 0,
+                "note_text": "Test note"
+            }
+        )
+        
+        response = client.get(f"/api/annotations/{book_id}")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert "annotations" in data
+        assert len(data["annotations"]) >= 1
+
+    def test_get_annotations_with_chapter_filter(self, client):
+        """Test getting annotations filtered by chapter."""
+        import uuid
+        book_id = f"test_book_{uuid.uuid4().hex[:8]}"
+        
+        # Create annotations in different chapters
+        client.post(
+            f"/api/annotations/{book_id}",
+            json={"chapter_index": 0, "note_text": "Chapter 0 note"}
+        )
+        client.post(
+            f"/api/annotations/{book_id}",
+            json={"chapter_index": 1, "note_text": "Chapter 1 note"}
+        )
+        
+        response = client.get(f"/api/annotations/{book_id}?chapter=0")
+        assert response.status_code == 200
+
+    def test_get_annotations_empty(self, client):
+        """Test getting annotations for a book with none."""
+        import uuid
+        book_id = f"test_book_empty_{uuid.uuid4().hex[:8]}"
+        
+        response = client.get(f"/api/annotations/{book_id}")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert data["annotations"] == []
+
+    def test_update_annotation(self, client):
+        """Test updating an annotation."""
+        import uuid
+        book_id = f"test_book_{uuid.uuid4().hex[:8]}"
+        
+        # Create annotation
+        create_response = client.post(
+            f"/api/annotations/{book_id}",
+            json={
+                "chapter_index": 0,
+                "note_text": "Original note",
+                "tags": ["original"]
+            }
+        )
+        annotation_id = create_response.json()["id"]
+        
+        # Update it
+        update_response = client.put(
+            f"/api/annotations/{book_id}/{annotation_id}",
+            json={
+                "note_text": "Updated note",
+                "tags": ["updated", "modified"]
+            }
+        )
+        assert update_response.status_code == 200
+        assert update_response.json()["status"] == "updated"
+
+    def test_update_nonexistent_annotation(self, client):
+        """Test updating an annotation that doesn't exist."""
+        response = client.put(
+            "/api/annotations/some_book/nonexistent_id",
+            json={"note_text": "Test"}
+        )
+        assert response.status_code == 404
+
+    def test_delete_annotation(self, client):
+        """Test deleting an annotation."""
+        import uuid
+        book_id = f"test_book_{uuid.uuid4().hex[:8]}"
+        
+        # Create annotation
+        create_response = client.post(
+            f"/api/annotations/{book_id}",
+            json={
+                "chapter_index": 0,
+                "note_text": "To be deleted"
+            }
+        )
+        annotation_id = create_response.json()["id"]
+        
+        # Delete it
+        delete_response = client.delete(
+            f"/api/annotations/{book_id}/{annotation_id}"
+        )
+        assert delete_response.status_code == 200
+        assert delete_response.json()["status"] == "deleted"
+
+    def test_delete_nonexistent_annotation(self, client):
+        """Test deleting an annotation that doesn't exist."""
+        response = client.delete("/api/annotations/some_book/nonexistent_id")
+        assert response.status_code == 404
+
+    def test_search_annotations(self, client):
+        """Test searching annotations."""
+        import uuid
+        book_id = f"test_book_{uuid.uuid4().hex[:8]}"
+        
+        # Create annotation with searchable text
+        client.post(
+            f"/api/annotations/{book_id}",
+            json={
+                "chapter_index": 0,
+                "note_text": "This is about quantum mechanics",
+                "tags": ["physics", "quantum"]
+            }
+        )
+        
+        # Search by text
+        response = client.get(f"/api/annotations/{book_id}/search?q=quantum")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert "results" in data
+
+    def test_search_annotations_short_query(self, client):
+        """Test that short queries return empty results."""
+        import uuid
+        book_id = f"test_book_{uuid.uuid4().hex[:8]}"
+        
+        response = client.get(f"/api/annotations/{book_id}/search?q=a")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert data["results"] == []
+
+    def test_export_annotations_markdown(self, client):
+        """Test exporting annotations as markdown."""
+        import uuid
+        book_id = f"test_book_{uuid.uuid4().hex[:8]}"
+        
+        # Create an annotation
+        client.post(
+            f"/api/annotations/{book_id}",
+            json={
+                "chapter_index": 0,
+                "note_text": "Export test note"
+            }
+        )
+        
+        response = client.get(f"/api/annotations/{book_id}/export?format=markdown")
+        assert response.status_code == 200
+        assert "markdown" in response.headers["content-type"] or "text" in response.headers["content-type"]
+
+    def test_export_annotations_json(self, client):
+        """Test exporting annotations as JSON."""
+        import uuid
+        book_id = f"test_book_{uuid.uuid4().hex[:8]}"
+        
+        response = client.get(f"/api/annotations/{book_id}/export?format=json")
+        assert response.status_code == 200
+        assert "json" in response.headers["content-type"]

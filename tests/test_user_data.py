@@ -12,6 +12,7 @@ from user_data import (
     Highlight,
     ReadingProgress,
     SearchQuery,
+    Collection,
     generate_id
 )
 
@@ -1472,3 +1473,373 @@ class TestDataPersistence:
         
         assert len(sessions) == 1
         assert sessions[0].book_title == "Test Book"
+
+
+# ============================================================================
+# Collection Tests
+# ============================================================================
+
+
+class TestCollections:
+    """Tests for collection functionality."""
+
+    def test_create_collection(self, manager):
+        """Test creating a collection."""
+        collection = manager.create_collection(
+            name="Fiction",
+            description="Fiction books",
+            icon="book",
+            color="#e74c3c"
+        )
+        
+        assert collection.id is not None
+        assert collection.name == "Fiction"
+        assert collection.description == "Fiction books"
+        assert collection.icon == "book"
+        assert collection.color == "#e74c3c"
+        assert collection.book_ids == []
+        assert collection.sort_order == 0
+
+    def test_create_multiple_collections(self, manager):
+        """Test creating multiple collections with sequential sort order."""
+        col1 = manager.create_collection(name="Fiction")
+        col2 = manager.create_collection(name="Non-Fiction")
+        col3 = manager.create_collection(name="Currently Reading")
+        
+        assert col1.sort_order == 0
+        assert col2.sort_order == 1
+        assert col3.sort_order == 2
+
+    def test_get_collections_empty(self, manager):
+        """Test getting collections when none exist."""
+        collections = manager.get_collections()
+        assert collections == []
+
+    def test_get_collections(self, manager):
+        """Test getting all collections."""
+        manager.create_collection(name="Fiction")
+        manager.create_collection(name="Non-Fiction")
+        
+        collections = manager.get_collections()
+        assert len(collections) == 2
+        assert collections[0].name == "Fiction"
+        assert collections[1].name == "Non-Fiction"
+
+    def test_get_collections_sorted_by_order(self, manager):
+        """Test that collections are returned sorted by sort_order."""
+        col1 = manager.create_collection(name="A")
+        col2 = manager.create_collection(name="B")
+        col3 = manager.create_collection(name="C")
+        
+        # Manually change sort order
+        data = manager.load()
+        for c in data.collections:
+            if c.name == "C":
+                c.sort_order = 0
+            elif c.name == "A":
+                c.sort_order = 2
+        manager.save()
+        
+        collections = manager.get_collections()
+        assert collections[0].name == "C"
+        assert collections[1].name == "B"
+        assert collections[2].name == "A"
+
+    def test_get_collection_by_id(self, manager):
+        """Test getting a single collection by ID."""
+        created = manager.create_collection(name="Test Collection")
+        
+        retrieved = manager.get_collection(created.id)
+        assert retrieved is not None
+        assert retrieved.id == created.id
+        assert retrieved.name == "Test Collection"
+
+    def test_get_collection_nonexistent(self, manager):
+        """Test getting a collection that doesn't exist."""
+        result = manager.get_collection("nonexistent_id")
+        assert result is None
+
+    def test_update_collection(self, manager):
+        """Test updating a collection's properties."""
+        collection = manager.create_collection(name="Original")
+        
+        success = manager.update_collection(
+            collection.id,
+            name="Updated",
+            description="New description",
+            icon="star",
+            color="#2ecc71"
+        )
+        
+        assert success is True
+        updated = manager.get_collection(collection.id)
+        assert updated.name == "Updated"
+        assert updated.description == "New description"
+        assert updated.icon == "star"
+        assert updated.color == "#2ecc71"
+
+    def test_update_collection_partial(self, manager):
+        """Test updating only some collection properties."""
+        collection = manager.create_collection(
+            name="Original",
+            description="Original desc",
+            icon="folder",
+            color="#3498db"
+        )
+        
+        # Only update name
+        manager.update_collection(collection.id, name="New Name")
+        
+        updated = manager.get_collection(collection.id)
+        assert updated.name == "New Name"
+        assert updated.description == "Original desc"  # Unchanged
+        assert updated.icon == "folder"  # Unchanged
+        assert updated.color == "#3498db"  # Unchanged
+
+    def test_update_collection_nonexistent(self, manager):
+        """Test updating a collection that doesn't exist."""
+        result = manager.update_collection("nonexistent_id", name="Test")
+        assert result is False
+
+    def test_delete_collection(self, manager):
+        """Test deleting a collection."""
+        collection = manager.create_collection(name="To Delete")
+        
+        result = manager.delete_collection(collection.id)
+        assert result is True
+        
+        # Verify deleted
+        assert manager.get_collection(collection.id) is None
+        assert len(manager.get_collections()) == 0
+
+    def test_delete_collection_nonexistent(self, manager):
+        """Test deleting a collection that doesn't exist."""
+        result = manager.delete_collection("nonexistent_id")
+        assert result is False
+
+    def test_add_book_to_collection(self, manager):
+        """Test adding a book to a collection."""
+        collection = manager.create_collection(name="My Books")
+        
+        result = manager.add_book_to_collection(collection.id, "book1")
+        assert result is True
+        
+        updated = manager.get_collection(collection.id)
+        assert "book1" in updated.book_ids
+
+    def test_add_book_to_collection_twice(self, manager):
+        """Test that adding same book twice doesn't duplicate."""
+        collection = manager.create_collection(name="My Books")
+        
+        manager.add_book_to_collection(collection.id, "book1")
+        manager.add_book_to_collection(collection.id, "book1")
+        
+        updated = manager.get_collection(collection.id)
+        assert updated.book_ids.count("book1") == 1
+
+    def test_add_book_to_nonexistent_collection(self, manager):
+        """Test adding a book to a collection that doesn't exist."""
+        result = manager.add_book_to_collection("nonexistent", "book1")
+        assert result is False
+
+    def test_remove_book_from_collection(self, manager):
+        """Test removing a book from a collection."""
+        collection = manager.create_collection(name="My Books")
+        manager.add_book_to_collection(collection.id, "book1")
+        
+        result = manager.remove_book_from_collection(collection.id, "book1")
+        assert result is True
+        
+        updated = manager.get_collection(collection.id)
+        assert "book1" not in updated.book_ids
+
+    def test_remove_book_not_in_collection(self, manager):
+        """Test removing a book that isn't in the collection."""
+        collection = manager.create_collection(name="My Books")
+        
+        # Should return True (operation completed) even if book wasn't there
+        result = manager.remove_book_from_collection(collection.id, "book1")
+        assert result is True
+
+    def test_remove_book_from_nonexistent_collection(self, manager):
+        """Test removing a book from a collection that doesn't exist."""
+        result = manager.remove_book_from_collection("nonexistent", "book1")
+        assert result is False
+
+    def test_get_book_collections(self, manager):
+        """Test getting all collections a book belongs to."""
+        col1 = manager.create_collection(name="Fiction")
+        col2 = manager.create_collection(name="Favorites")
+        col3 = manager.create_collection(name="To Read")
+        
+        manager.add_book_to_collection(col1.id, "book1")
+        manager.add_book_to_collection(col2.id, "book1")
+        # Don't add to col3
+        
+        book_collections = manager.get_book_collections("book1")
+        assert len(book_collections) == 2
+        collection_names = [c.name for c in book_collections]
+        assert "Fiction" in collection_names
+        assert "Favorites" in collection_names
+        assert "To Read" not in collection_names
+
+    def test_get_book_collections_empty(self, manager):
+        """Test getting collections for a book in no collections."""
+        manager.create_collection(name="Fiction")
+        
+        book_collections = manager.get_book_collections("book_not_in_any")
+        assert book_collections == []
+
+    def test_set_book_collections(self, manager):
+        """Test setting all collections for a book at once."""
+        col1 = manager.create_collection(name="Fiction")
+        col2 = manager.create_collection(name="Favorites")
+        col3 = manager.create_collection(name="To Read")
+        
+        # Add book to col1 initially
+        manager.add_book_to_collection(col1.id, "book1")
+        
+        # Set to col2 and col3 (should remove from col1)
+        manager.set_book_collections("book1", [col2.id, col3.id])
+        
+        book_collections = manager.get_book_collections("book1")
+        collection_ids = [c.id for c in book_collections]
+        
+        assert col1.id not in collection_ids
+        assert col2.id in collection_ids
+        assert col3.id in collection_ids
+
+    def test_set_book_collections_empty(self, manager):
+        """Test removing a book from all collections."""
+        col1 = manager.create_collection(name="Fiction")
+        manager.add_book_to_collection(col1.id, "book1")
+        
+        manager.set_book_collections("book1", [])
+        
+        book_collections = manager.get_book_collections("book1")
+        assert len(book_collections) == 0
+
+    def test_reorder_collections(self, manager):
+        """Test reordering collections."""
+        col1 = manager.create_collection(name="A")
+        col2 = manager.create_collection(name="B")
+        col3 = manager.create_collection(name="C")
+        
+        # Reorder: C, A, B
+        manager.reorder_collections([col3.id, col1.id, col2.id])
+        
+        collections = manager.get_collections()
+        assert collections[0].name == "C"
+        assert collections[1].name == "A"
+        assert collections[2].name == "B"
+
+    def test_get_books_in_collection(self, manager):
+        """Test getting all book IDs in a collection."""
+        collection = manager.create_collection(name="My Books")
+        manager.add_book_to_collection(collection.id, "book1")
+        manager.add_book_to_collection(collection.id, "book2")
+        manager.add_book_to_collection(collection.id, "book3")
+        
+        book_ids = manager.get_books_in_collection(collection.id)
+        assert len(book_ids) == 3
+        assert "book1" in book_ids
+        assert "book2" in book_ids
+        assert "book3" in book_ids
+
+    def test_get_books_in_collection_nonexistent(self, manager):
+        """Test getting books from a nonexistent collection."""
+        book_ids = manager.get_books_in_collection("nonexistent")
+        assert book_ids == []
+
+    def test_cleanup_collection_books(self, manager):
+        """Test removing a deleted book from all collections."""
+        col1 = manager.create_collection(name="Fiction")
+        col2 = manager.create_collection(name="Favorites")
+        
+        manager.add_book_to_collection(col1.id, "book1")
+        manager.add_book_to_collection(col2.id, "book1")
+        manager.add_book_to_collection(col1.id, "book2")
+        
+        # Simulate book deletion
+        manager.cleanup_collection_books("book1")
+        
+        col1_updated = manager.get_collection(col1.id)
+        col2_updated = manager.get_collection(col2.id)
+        
+        assert "book1" not in col1_updated.book_ids
+        assert "book1" not in col2_updated.book_ids
+        assert "book2" in col1_updated.book_ids  # Other book unchanged
+
+    def test_collection_default_values(self, manager):
+        """Test that collections have correct default values."""
+        collection = manager.create_collection(name="Test")
+        
+        assert collection.description == ""
+        assert collection.icon == "folder"
+        assert collection.color == "#3498db"
+        assert collection.is_smart is False
+
+    def test_collection_timestamps(self, manager):
+        """Test that collection timestamps are set."""
+        collection = manager.create_collection(name="Test")
+        
+        assert collection.created_at is not None
+        assert collection.updated_at is not None
+
+    def test_collection_updated_at_changes(self, manager):
+        """Test that updated_at changes when collection is modified."""
+        import time
+        
+        collection = manager.create_collection(name="Test")
+        original_updated = collection.updated_at
+        
+        time.sleep(0.01)  # Small delay
+        manager.update_collection(collection.id, name="Updated")
+        
+        updated = manager.get_collection(collection.id)
+        assert updated.updated_at != original_updated
+
+
+class TestCollectionPersistence:
+    """Tests for collection data persistence."""
+
+    def test_collection_persistence(self, temp_data_dir):
+        """Test that collections persist across manager instances."""
+        manager1 = UserDataManager(temp_data_dir)
+        collection = manager1.create_collection(
+            name="Persistent",
+            description="Test",
+            icon="star",
+            color="#ff0000"
+        )
+        manager1.add_book_to_collection(collection.id, "book1")
+        
+        # New manager instance
+        manager2 = UserDataManager(temp_data_dir)
+        manager2._data = None  # Force reload
+        
+        collections = manager2.get_collections()
+        assert len(collections) == 1
+        assert collections[0].name == "Persistent"
+        assert collections[0].description == "Test"
+        assert collections[0].icon == "star"
+        assert collections[0].color == "#ff0000"
+        assert "book1" in collections[0].book_ids
+
+    def test_multiple_collections_persistence(self, temp_data_dir):
+        """Test that multiple collections persist correctly."""
+        manager1 = UserDataManager(temp_data_dir)
+        manager1.create_collection(name="Col1")
+        manager1.create_collection(name="Col2")
+        manager1.create_collection(name="Col3")
+        
+        # New manager instance
+        manager2 = UserDataManager(temp_data_dir)
+        manager2._data = None  # Force reload
+        
+        collections = manager2.get_collections()
+        assert len(collections) == 3
+        names = [c.name for c in collections]
+        assert "Col1" in names
+        assert "Col2" in names
+        assert "Col3" in names

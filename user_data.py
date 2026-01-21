@@ -104,6 +104,21 @@ class Annotation:
 
 
 @dataclass
+class Collection:
+    """A collection/shelf to organize books."""
+    id: str
+    name: str
+    description: str = ""
+    icon: str = "folder"  # Font Awesome icon name (folder, book, star, heart, etc.)
+    color: str = "#3498db"  # Hex color for the collection
+    book_ids: List[str] = field(default_factory=list)
+    created_at: str = field(default_factory=lambda: datetime.now().isoformat())
+    updated_at: str = field(default_factory=lambda: datetime.now().isoformat())
+    is_smart: bool = False  # For future: smart collections based on rules
+    sort_order: int = 0  # For custom ordering of collections
+
+
+@dataclass
 class UserData:
     """All user data for Reader3."""
     highlights: Dict[str, List[Highlight]] = field(default_factory=dict)
@@ -114,7 +129,8 @@ class UserData:
     reading_sessions: List[ReadingSession] = field(default_factory=list)
     vocabulary: Dict[str, List[VocabularyWord]] = field(default_factory=dict)
     annotations: Dict[str, List[Annotation]] = field(default_factory=dict)
-    version: str = "1.1"
+    collections: List[Collection] = field(default_factory=list)
+    version: str = "1.2"
 
 
 def generate_id() -> str:
@@ -184,7 +200,10 @@ class UserDataManager:
                     book_id: [Annotation(**a) for a in annots]
                     for book_id, annots in raw.get('annotations', {}).items()
                 },
-                version=raw.get('version', '1.1')
+                collections=[
+                    Collection(**c) for c in raw.get('collections', [])
+                ],
+                version=raw.get('version', '1.2')
             )
         except Exception as e:
             print(f"Error loading user data: {e}")
@@ -224,6 +243,7 @@ class UserDataManager:
                 book_id: [asdict(a) for a in annots]
                 for book_id, annots in self._data.annotations.items()
             },
+            'collections': [asdict(c) for c in self._data.collections],
             'version': self._data.version
         }
         
@@ -779,3 +799,161 @@ class UserDataManager:
                 lines.append("")
         
         return "\n".join(lines)
+
+    # ========== Collections ==========
+    
+    def create_collection(self, name: str, description: str = "",
+                          icon: str = "folder", color: str = "#3498db") -> Collection:
+        """Create a new collection."""
+        data = self.load()
+        
+        # Generate unique ID
+        collection_id = generate_id()
+        
+        # Determine sort order (add to end)
+        max_order = max((c.sort_order for c in data.collections), default=-1)
+        
+        collection = Collection(
+            id=collection_id,
+            name=name,
+            description=description,
+            icon=icon,
+            color=color,
+            book_ids=[],
+            sort_order=max_order + 1
+        )
+        
+        data.collections.append(collection)
+        self.save()
+        return collection
+    
+    def get_collections(self) -> List[Collection]:
+        """Get all collections, sorted by sort_order."""
+        data = self.load()
+        return sorted(data.collections, key=lambda c: c.sort_order)
+    
+    def get_collection(self, collection_id: str) -> Optional[Collection]:
+        """Get a single collection by ID."""
+        data = self.load()
+        for c in data.collections:
+            if c.id == collection_id:
+                return c
+        return None
+    
+    def update_collection(self, collection_id: str, name: str = None,
+                          description: str = None, icon: str = None,
+                          color: str = None) -> bool:
+        """Update a collection's properties."""
+        data = self.load()
+        for c in data.collections:
+            if c.id == collection_id:
+                if name is not None:
+                    c.name = name
+                if description is not None:
+                    c.description = description
+                if icon is not None:
+                    c.icon = icon
+                if color is not None:
+                    c.color = color
+                c.updated_at = datetime.now().isoformat()
+                self.save()
+                return True
+        return False
+    
+    def delete_collection(self, collection_id: str) -> bool:
+        """Delete a collection (books are not deleted, just removed from collection)."""
+        data = self.load()
+        original_len = len(data.collections)
+        data.collections = [c for c in data.collections if c.id != collection_id]
+        
+        if len(data.collections) < original_len:
+            self.save()
+            return True
+        return False
+    
+    def add_book_to_collection(self, collection_id: str, book_id: str) -> bool:
+        """Add a book to a collection."""
+        data = self.load()
+        for c in data.collections:
+            if c.id == collection_id:
+                if book_id not in c.book_ids:
+                    c.book_ids.append(book_id)
+                    c.updated_at = datetime.now().isoformat()
+                    self.save()
+                return True
+        return False
+    
+    def remove_book_from_collection(self, collection_id: str, book_id: str) -> bool:
+        """Remove a book from a collection."""
+        data = self.load()
+        for c in data.collections:
+            if c.id == collection_id:
+                if book_id in c.book_ids:
+                    c.book_ids.remove(book_id)
+                    c.updated_at = datetime.now().isoformat()
+                    self.save()
+                return True
+        return False
+    
+    def get_book_collections(self, book_id: str) -> List[Collection]:
+        """Get all collections that contain a specific book."""
+        data = self.load()
+        return [c for c in data.collections if book_id in c.book_ids]
+    
+    def set_book_collections(self, book_id: str, collection_ids: List[str]) -> bool:
+        """Set which collections a book belongs to (replaces existing)."""
+        data = self.load()
+        changed = False
+        
+        for c in data.collections:
+            should_have_book = c.id in collection_ids
+            has_book = book_id in c.book_ids
+            
+            if should_have_book and not has_book:
+                c.book_ids.append(book_id)
+                c.updated_at = datetime.now().isoformat()
+                changed = True
+            elif not should_have_book and has_book:
+                c.book_ids.remove(book_id)
+                c.updated_at = datetime.now().isoformat()
+                changed = True
+        
+        if changed:
+            self.save()
+        return True
+    
+    def reorder_collections(self, collection_ids: List[str]) -> bool:
+        """Reorder collections based on the provided list of IDs."""
+        data = self.load()
+        
+        # Create a mapping of id to new order
+        order_map = {cid: idx for idx, cid in enumerate(collection_ids)}
+        
+        for c in data.collections:
+            if c.id in order_map:
+                c.sort_order = order_map[c.id]
+        
+        self.save()
+        return True
+    
+    def get_books_in_collection(self, collection_id: str) -> List[str]:
+        """Get all book IDs in a collection."""
+        data = self.load()
+        for c in data.collections:
+            if c.id == collection_id:
+                return c.book_ids.copy()
+        return []
+    
+    def cleanup_collection_books(self, book_id: str):
+        """Remove a deleted book from all collections."""
+        data = self.load()
+        changed = False
+        
+        for c in data.collections:
+            if book_id in c.book_ids:
+                c.book_ids.remove(book_id)
+                c.updated_at = datetime.now().isoformat()
+                changed = True
+        
+        if changed:
+            self.save()

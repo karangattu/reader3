@@ -63,7 +63,7 @@
         .chapter-progress { display: flex; align-items: center; gap: 8px; padding: 2px 12px 8px; }
         .chapter-progress-bar { flex: 1; height: 3px; background: #e9ecef; border-radius: 2px; overflow: hidden; }
         .chapter-progress-fill { height: 100%; background: linear-gradient(90deg, #3498db, #9b59b6); transition: width 0.3s; }
-        .chapter-reading-time { font-size: 0.75em; color: #888; white-space: nowrap; }
+        .chapter-reading-time { font-size: 0.75em; color: #666; white-space: nowrap; background: #f0f0f0; padding: 2px 6px; border-radius: 10px; }
         a.toc-link.read { position: relative; }
         a.toc-link.read::after { content: '✓'; position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 0.8em; color: #27ae60; }
         a.toc-link.active::after { color: rgba(255,255,255,0.8); }
@@ -2755,22 +2755,23 @@
                 const response = await fetch(`/api/reading-times/${encodeURIComponent(bookId)}`);
                 if (response.ok) {
                     const data = await response.json();
-                    applyReadingTimes(data.times || {});
+                    applyReadingTimes(data.reading_times || {});
                 }
             } catch (error) {
                 // Silent fail - reading times are not critical
+                console.error('Failed to fetch reading times:', error);
             }
         }
         
         function applyReadingTimes(timesData) {
-            Object.keys(spineMap).forEach(href => {
-                const chapterIndex = spineMap[href];
-                const minutes = timesData[chapterIndex];
-                
-                if (minutes !== undefined) {
+            // timesData is keyed by chapter href
+            Object.keys(timesData).forEach(href => {
+                const timeInfo = timesData[href];
+                if (timeInfo && timeInfo.formatted) {
                     const timeElem = document.querySelector(`.chapter-progress[data-href="${href}"] .chapter-reading-time`);
-                    if (timeElem && timeElem.textContent === '--') {
-                        timeElem.textContent = formatReadingTime(minutes);
+                    if (timeElem) {
+                        timeElem.textContent = timeInfo.formatted;
+                        timeElem.title = `${timeInfo.word_count.toLocaleString()} words`;
                     }
                 }
             });
@@ -2778,10 +2779,10 @@
         
         function formatReadingTime(minutes) {
             if (minutes < 1) return '<1 min';
-            if (minutes < 60) return `${minutes} min`;
+            if (minutes < 60) return `~${minutes} min`;
             const hours = Math.floor(minutes / 60);
             const mins = minutes % 60;
-            return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+            return mins > 0 ? `~${hours}h ${mins}m` : `~${hours}h`;
         }
         
         // ===== READING SESSIONS =====
