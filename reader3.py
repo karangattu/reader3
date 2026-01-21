@@ -181,13 +181,37 @@ def parse_toc_recursive(toc_list, depth=0) -> List[TOCEntry]:
     return result
 
 
+def is_content_document(item) -> bool:
+    """
+    Check if an item is a content document (HTML/XHTML).
+    Extends ebooklib's ITEM_DOCUMENT detection to also check media type and file extension.
+    This ensures TOC entries map to real chapters and produces a complete spine.
+    """
+    # First check ebooklib's native detection
+    if item.get_type() == ebooklib.ITEM_DOCUMENT:
+        return True
+    
+    # Check media type for HTML content
+    media_type = getattr(item, 'media_type', '') or ''
+    if media_type in ('text/html', 'application/xhtml+xml'):
+        return True
+    
+    # Check file extension as fallback
+    name = item.get_name() or ''
+    name_lower = name.lower()
+    if name_lower.endswith(('.html', '.xhtml', '.htm')):
+        return True
+    
+    return False
+
+
 def get_fallback_toc(book_obj) -> List[TOCEntry]:
     """
     If TOC is missing, build a flat one from the Spine.
     """
     toc = []
     for item in book_obj.get_items():
-        if item.get_type() == ebooklib.ITEM_DOCUMENT:
+        if is_content_document(item):
             name = item.get_name()
             # Try to guess a title from the content or ID
             title = item.get_name().replace('.html', '').replace('.xhtml', '').replace('_', ' ').title()
@@ -897,7 +921,7 @@ def process_epub(epub_path: str, output_dir: str) -> Book:
         if not item:
             continue
 
-        if item.get_type() == ebooklib.ITEM_DOCUMENT:
+        if is_content_document(item):
             # Raw content
             raw_content = item.get_content().decode('utf-8', errors='ignore')
             soup = BeautifulSoup(raw_content, 'html.parser')

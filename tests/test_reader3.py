@@ -15,8 +15,10 @@ from reader3 import (
     PDFPageData,
     get_pdf_page_stats,
     search_pdf_text_positions,
+    is_content_document,
 )
 from bs4 import BeautifulSoup
+import ebooklib
 
 
 class TestBookMetadata:
@@ -63,6 +65,97 @@ class TestChapterContent:
         assert chapter.id == "ch1"
         assert chapter.href == "chapter1.html"
         assert chapter.order == 0
+
+
+class TestIsContentDocument:
+    """Tests for is_content_document helper function."""
+
+    def test_item_document_type(self):
+        """Test that ebooklib ITEM_DOCUMENT items are detected."""
+        class MockItem:
+            def get_type(self):
+                return ebooklib.ITEM_DOCUMENT
+            def get_name(self):
+                return "chapter.html"
+        
+        assert is_content_document(MockItem()) is True
+
+    def test_html_media_type(self):
+        """Test that text/html media type is detected."""
+        class MockItem:
+            media_type = "text/html"
+            def get_type(self):
+                return ebooklib.ITEM_UNKNOWN
+            def get_name(self):
+                return "chapter.html"
+        
+        assert is_content_document(MockItem()) is True
+
+    def test_xhtml_media_type(self):
+        """Test that application/xhtml+xml media type is detected."""
+        class MockItem:
+            media_type = "application/xhtml+xml"
+            def get_type(self):
+                return ebooklib.ITEM_UNKNOWN
+            def get_name(self):
+                return "chapter.xhtml"
+        
+        assert is_content_document(MockItem()) is True
+
+    def test_html_extension(self):
+        """Test that .html extension is detected."""
+        class MockItem:
+            media_type = ""
+            def get_type(self):
+                return ebooklib.ITEM_UNKNOWN
+            def get_name(self):
+                return "content/chapter.html"
+        
+        assert is_content_document(MockItem()) is True
+
+    def test_xhtml_extension(self):
+        """Test that .xhtml extension is detected."""
+        class MockItem:
+            media_type = ""
+            def get_type(self):
+                return ebooklib.ITEM_UNKNOWN
+            def get_name(self):
+                return "OEBPS/chapter.xhtml"
+        
+        assert is_content_document(MockItem()) is True
+
+    def test_htm_extension(self):
+        """Test that .htm extension is detected."""
+        class MockItem:
+            media_type = ""
+            def get_type(self):
+                return ebooklib.ITEM_UNKNOWN
+            def get_name(self):
+                return "chapter.HTM"  # Test case insensitivity
+        
+        assert is_content_document(MockItem()) is True
+
+    def test_non_document_item(self):
+        """Test that non-document items return False."""
+        class MockItem:
+            media_type = "image/jpeg"
+            def get_type(self):
+                return ebooklib.ITEM_IMAGE
+            def get_name(self):
+                return "image.jpg"
+        
+        assert is_content_document(MockItem()) is False
+
+    def test_css_file_not_detected(self):
+        """Test that CSS files are not detected as content documents."""
+        class MockItem:
+            media_type = "text/css"
+            def get_type(self):
+                return ebooklib.ITEM_STYLE
+            def get_name(self):
+                return "styles.css"
+        
+        assert is_content_document(MockItem()) is False
 
 
 class TestTOCEntry:
