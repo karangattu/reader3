@@ -1333,6 +1333,29 @@ async def get_reading_stats(book_id: str = None):
 # ============================================================================
 
 
+@app.get("/api/vocabulary/search")
+async def search_vocabulary(q: str):
+    """Search vocabulary words."""
+    if not q or len(q) < 2:
+        return {"results": [], "query": q}
+    
+    words = user_data_manager.search_vocabulary(q)
+    return {
+        "query": q,
+        "results": [
+            {
+                "id": w.id,
+                "book_id": w.book_id,
+                "word": w.word,
+                "definition": w.definition,
+                "phonetic": w.phonetic,
+                "part_of_speech": w.part_of_speech,
+            }
+            for w in words
+        ]
+    }
+
+
 @app.post("/api/vocabulary/{book_id}")
 async def add_vocabulary_word(book_id: str, request: Request):
     """Add a word to vocabulary."""
@@ -1407,29 +1430,6 @@ async def delete_vocabulary_word(book_id: str, word_id: str):
     if user_data_manager.delete_vocabulary_word(book_id, word_id):
         return {"status": "deleted"}
     raise HTTPException(status_code=404, detail="Word not found")
-
-
-@app.get("/api/vocabulary/search")
-async def search_vocabulary(q: str):
-    """Search vocabulary words."""
-    if not q or len(q) < 2:
-        return {"results": [], "query": q}
-    
-    words = user_data_manager.search_vocabulary(q)
-    return {
-        "query": q,
-        "results": [
-            {
-                "id": w.id,
-                "book_id": w.book_id,
-                "word": w.word,
-                "definition": w.definition,
-                "phonetic": w.phonetic,
-                "part_of_speech": w.part_of_speech,
-            }
-            for w in words
-        ]
-    }
 
 
 # ============================================================================
@@ -1590,6 +1590,16 @@ async def get_collections():
     }
 
 
+@app.put("/api/collections/reorder")
+async def reorder_collections(request: Request):
+    """Reorder collections."""
+    data = await request.json()
+    collection_ids = data.get("collection_ids", [])
+    
+    user_data_manager.reorder_collections(collection_ids)
+    return {"status": "reordered"}
+
+
 @app.post("/api/collections")
 async def create_collection(request: Request):
     """Create a new collection."""
@@ -1736,16 +1746,6 @@ async def set_book_collections(book_id: str, request: Request):
             for c in collections
         ]
     }
-
-
-@app.put("/api/collections/reorder")
-async def reorder_collections(request: Request):
-    """Reorder collections."""
-    data = await request.json()
-    collection_ids = data.get("collection_ids", [])
-    
-    user_data_manager.reorder_collections(collection_ids)
-    return {"status": "reordered"}
 
 
 if __name__ == "__main__":

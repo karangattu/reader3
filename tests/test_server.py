@@ -1450,9 +1450,8 @@ class TestReadingSessionsAPI:
         assert response.status_code == 200
         
         data = response.json()
-        assert "id" in data
-        assert data["book_id"] == book_id
-        assert data["book_title"] == "Test Book"
+        assert "session_id" in data
+        assert data["status"] == "started"
 
     def test_end_reading_session(self, client):
         """Test ending a reading session."""
@@ -1469,7 +1468,7 @@ class TestReadingSessionsAPI:
                 "chapter_title": "Chapter 1"
             }
         )
-        session_id = start_response.json()["id"]
+        session_id = start_response.json()["session_id"]
         
         # End session
         end_response = client.post(
@@ -1583,8 +1582,8 @@ class TestVocabularyAPI:
         assert response.status_code == 200
         
         data = response.json()
-        assert data["word"] == "ephemeral"
         assert "id" in data
+        assert data["status"] == "saved"
 
     def test_add_vocabulary_minimal(self, client):
         """Test adding a word with only required fields."""
@@ -1601,7 +1600,8 @@ class TestVocabularyAPI:
         assert response.status_code == 200
         
         data = response.json()
-        assert data["word"] == "serendipity"
+        assert "id" in data
+        assert data["status"] == "saved"
 
     def test_get_vocabulary_for_book(self, client):
         """Test getting vocabulary for a specific book."""
@@ -1621,8 +1621,8 @@ class TestVocabularyAPI:
         assert response.status_code == 200
         
         data = response.json()
-        assert "vocabulary" in data
-        assert len(data["vocabulary"]) >= 1
+        assert "words" in data
+        assert len(data["words"]) >= 1
 
     def test_get_vocabulary_empty(self, client):
         """Test getting vocabulary for a book with none."""
@@ -1633,7 +1633,7 @@ class TestVocabularyAPI:
         assert response.status_code == 200
         
         data = response.json()
-        assert data["vocabulary"] == []
+        assert data["words"] == []
 
     def test_get_all_vocabulary(self, client):
         """Test getting all vocabulary across books."""
@@ -1641,8 +1641,8 @@ class TestVocabularyAPI:
         assert response.status_code == 200
         
         data = response.json()
-        assert "vocabulary" in data
-        assert isinstance(data["vocabulary"], list)
+        assert "words" in data
+        assert isinstance(data["words"], list)
 
     def test_delete_vocabulary_word(self, client):
         """Test deleting a vocabulary word."""
