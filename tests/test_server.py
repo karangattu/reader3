@@ -435,6 +435,16 @@ class TestSearchAPI:
         assert response.status_code == 200
         assert "results" in response.json()
 
+    def test_search_semantic_mode(self, client):
+        """Test semantic search mode response structure."""
+        response = client.get(
+            "/api/search?q=test&book_id=nonexistent_book&mode=semantic"
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["mode"] == "semantic"
+        assert "results" in data
+
     def test_search_history(self, client):
         """Test search history endpoint."""
         response = client.get("/api/search/history")

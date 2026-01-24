@@ -302,6 +302,18 @@
         .search-input:focus {
             border-color: #3498db;
         }
+        .search-mode {
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            padding: 10px 12px;
+            font-size: 0.95em;
+            background: #fff;
+            color: #333;
+        }
+        .search-mode:focus {
+            outline: none;
+            border-color: #3498db;
+        }
         .search-btn {
             background: #3498db;
             color: white;
@@ -1198,6 +1210,10 @@
         <!-- Global Search -->
         <div class="search-bar">
             <input type="text" class="search-input" id="global-search" placeholder="Search across all books..." onkeydown="if(event.key==='Enter')performGlobalSearch()">
+            <select class="search-mode" id="search-mode" aria-label="Search mode">
+                <option value="semantic" selected>Semantic</option>
+                <option value="exact">Exact</option>
+            </select>
             <button class="search-btn" onclick="performGlobalSearch()"><i class="fa-solid fa-magnifying-glass"></i> Search</button>
         </div>
         <div id="search-results-container" style="display: none;"></div>
@@ -1612,13 +1628,14 @@
         async function performGlobalSearch() {
             const query = document.getElementById('global-search').value.trim();
             if (!query) return;
+            const mode = document.getElementById('search-mode')?.value || 'exact';
             
             const container = document.getElementById('search-results-container');
             container.style.display = 'block';
             container.innerHTML = '<div class="search-results"><div class="no-results">Searching...</div></div>';
             
             try {
-                const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+                const response = await fetch(`/api/search?q=${encodeURIComponent(query)}&mode=${encodeURIComponent(mode)}`);
                 if (response.ok) {
                     const data = await response.json();
                     renderGlobalSearchResults(data.results, query);

@@ -20,6 +20,7 @@ from reader3 import (
     get_pdf_page_stats,
     search_pdf_text_positions,
 )
+from semantic_search import semantic_search_books
 from user_data import (
     UserDataManager,
     Highlight,
@@ -706,13 +707,13 @@ def get_all_book_ids():
 
 
 @app.get("/api/search")
-async def search_books(q: str, book_id: str = None):
+async def search_books(q: str, book_id: str = None, mode: str = "exact"):
     """
     Search for text across all books or within a specific book.
-    Returns all matching passages with context and position data.
+    Supports "exact" (full-text) and "semantic" ranking modes.
     """
     if not q or len(q) < 2:
-        return {"results": [], "query": q, "total": 0}
+        return {"results": [], "query": q, "total": 0, "mode": mode}
 
     results = []
     query_lower = q.lower()
@@ -722,70 +723,79 @@ async def search_books(q: str, book_id: str = None):
     # Determine which books to search
     book_ids = [book_id] if book_id else get_all_book_ids()
 
-    for bid in book_ids:
-        if len(results) >= max_total_results:
-            break
-
-        book = load_book_cached(bid)
-        if not book:
-            continue
-
-        book_title = book.metadata.title
-
-        for idx, chapter in enumerate(book.spine):
+    if mode == "semantic":
+        results = semantic_search_books(
+            query=q,
+            book_ids=book_ids,
+            books_dir=BOOKS_DIR,
+            load_book_fn=load_book_cached,
+            limit=max_total_results,
+        )
+    else:
+        for bid in book_ids:
             if len(results) >= max_total_results:
                 break
 
-            # Search in plain text
-            text = getattr(chapter, "text", "") or ""
-            if not text:
+            book = load_book_cached(bid)
+            if not book:
                 continue
 
-            text_lower = text.lower()
+            book_title = book.metadata.title
 
-            # Quick check: skip if query not in chapter at all
-            if query_lower not in text_lower:
-                continue
-
-            # Find ALL occurrences in this chapter
-            start = 0
-            while True:
-                pos = text_lower.find(query_lower, start)
-                if pos == -1:
-                    break
-
-                # Extract context (100 chars before and after)
-                context_start = max(0, pos - 100)
-                context_end = min(len(text), pos + len(q) + 100)
-                context = text[context_start:context_end]
-
-                # Clean up context - trim to word boundaries
-                if context_start > 0:
-                    space_idx = context.find(" ")
-                    if space_idx > 0 and space_idx < 30:
-                        context = context[space_idx + 1:]
-                    context = "..." + context
-                if context_end < len(text):
-                    space_idx = context.rfind(" ")
-                    if space_idx > len(context) - 30:
-                        context = context[:space_idx]
-                    context = context + "..."
-
-                results.append({
-                    "book_id": bid,
-                    "book_title": book_title,
-                    "chapter_index": idx,
-                    "chapter_href": chapter.href,
-                    "chapter_title": chapter.title,
-                    "context": context.strip(),
-                    "position": pos,
-                    "match_length": len(q),
-                })
-
+            for idx, chapter in enumerate(book.spine):
                 if len(results) >= max_total_results:
                     break
 
-                start = pos + len(q)  # Skip past this match
+                # Search in plain text
+                text = getattr(chapter, "text", "") or ""
+                if not text:
+                    continue
+
+                text_lower = text.lower()
+
+                # Quick check: skip if query not in chapter at all
+                if query_lower not in text_lower:
+                    continue
+
+                # Find ALL occurrences in this chapter
+                start = 0
+                while True:
+                    pos = text_lower.find(query_lower, start)
+                    if pos == -1:
+                        break
+
+                    # Extract context (100 chars before and after)
+                    context_start = max(0, pos - 100)
+                    context_end = min(len(text), pos + len(q) + 100)
+                    context = text[context_start:context_end]
+
+                    # Clean up context - trim to word boundaries
+                    if context_start > 0:
+                        space_idx = context.find(" ")
+                        if space_idx > 0 and space_idx < 30:
+                            context = context[space_idx + 1:]
+                        context = "..." + context
+                    if context_end < len(text):
+                        space_idx = context.rfind(" ")
+                        if space_idx > len(context) - 30:
+                            context = context[:space_idx]
+                        context = context + "..."
+
+                    results.append({
+                        "book_id": bid,
+                        "book_title": book_title,
+                        "chapter_index": idx,
+                        "chapter_href": chapter.href,
+                        "chapter_title": chapter.title,
+                        "context": context.strip(),
+                        "position": pos,
+                        "match_length": len(q),
+                    })
+
+                    if len(results) >= max_total_results:
+                        break
+
+                    start = pos + len(q)  # Skip past this match
 
     # Record search in history
     search_query = SearchQuery(
@@ -793,7 +803,7 @@ async def search_books(q: str, book_id: str = None):
     )
     user_data_manager.add_search(search_query)
 
-    return {"query": q, "results": results, "total": len(results)}
+    return {"query": q, "results": results, "total": len(results), "mode": mode}
 
 
 @app.get("/api/search/history")
