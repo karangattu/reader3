@@ -2,6 +2,58 @@
 
 All notable changes to Reader3 will be documented in this file.
 
+## [1.6.0] - 2026-01-31
+
+### Added - Performance & Usability Improvements 🚀
+
+#### Cached Reading Time Computation
+- **LRU-Cached Reading Times** — Reading time estimates are now cached per book, eliminating redundant computation on every request
+- **Unified Endpoint** — Removed duplicate `/api/reading-times` endpoint that had conflicting response formats
+- **Automatic Cache Invalidation** — Cache clears on book delete, reprocess, or upload
+
+#### Lightweight Metadata Indexing
+- **Fast Library Loading** — Library view now uses lightweight `book_meta.json` files instead of loading full pickle files
+- **Metadata Cache** — In-memory LRU cache for book metadata reduces disk I/O
+- **Automatic Metadata Generation** — Metadata files are auto-generated on book processing and on-demand for existing books
+- **Metadata Rebuild Endpoint** — New endpoint to rebuild metadata for all books: `POST /api/metadata/rebuild?force=true`
+
+#### Background PDF Processing
+- **Async Upload Processing** — Large PDFs can now be processed in the background with `POST /upload?background=true`
+- **Upload Status Tracking** — Poll processing status via `GET /api/upload/status/{upload_id}`
+- **Progress Updates** — Status includes progress percentage and stage messages
+- **Status Listing** — View all recent upload jobs via `GET /api/upload/status`
+- **Automatic Cleanup** — Completed job statuses are cleaned up after 1 hour
+
+#### Consolidated Progress Saving
+- **Single Request Progress** — The `/api/progress/{book_id}` endpoint now also saves chapter progress when `progress_percent` is provided
+- **Reduced Network Calls** — Frontend no longer needs separate calls to save chapter and overall progress
+- **Bandwidth Savings** — Removed unused `text` field from PDF infinite-scroll page payloads
+
+### New API Endpoints
+- `POST /api/metadata/rebuild` — Rebuild lightweight metadata files for all books (optional `?force=true`)
+- `GET /api/upload/status/{upload_id}` — Get status of background upload processing
+- `GET /api/upload/status` — List all recent upload processing jobs
+
+### Changed
+- `POST /upload` now accepts `?background=true` parameter for async processing
+- `POST /api/progress/{book_id}` now accepts `progress_percent` to update chapter progress in one call
+- Removed duplicate `/api/reading-times/{book_id}` endpoint (index-keyed) in favor of href-keyed version
+- PDF page payloads no longer include unused `text` field
+
+### Technical
+- Added `get_cached_reading_times()` with `@lru_cache(maxsize=200)`
+- Added `load_book_metadata()` with `@lru_cache(maxsize=200)`
+- Added `write_book_metadata()` helper for consistent metadata writing
+- Added thread-safe upload status tracking with `threading.Lock()`
+- Book processing now writes `book_meta.json` alongside `book.pkl`
+- All caches properly invalidated on book mutations (delete, reprocess, upload)
+
+### Tests
+- Added 14 new tests for metadata rebuild, background uploads, consolidated progress, and caching
+- Total: 404 tests passing
+
+---
+
 ## [1.5.0] - 2025-06-01
 
 ### Added - Enhanced EPUB Reading Experience 📚

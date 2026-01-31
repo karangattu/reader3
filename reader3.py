@@ -5,6 +5,7 @@ Parses an EPUB file into a structured object that can be used to serve the book 
 import os
 import pickle
 import shutil
+import json
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional
 from datetime import datetime
@@ -983,6 +984,25 @@ def save_to_pickle(book: Book, output_dir: str):
     with open(p_path, 'wb') as f:
         pickle.dump(book, f)
     print(f"Saved structured data to {p_path}")
+
+    meta_path = os.path.join(output_dir, 'book_meta.json')
+    metadata = {
+        "title": book.metadata.title,
+        "authors": book.metadata.authors,
+        "chapters": len(book.spine),
+        "added_at": book.added_at or book.processed_at,
+        "processed_at": book.processed_at,
+        "cover_image": book.cover_image,
+        "is_pdf": book.is_pdf,
+        "language": book.metadata.language,
+        "source_file": book.source_file,
+    }
+    try:
+        with open(meta_path, 'w', encoding='utf-8') as f:
+            json.dump(metadata, f, ensure_ascii=False)
+        print(f"Saved metadata to {meta_path}")
+    except Exception as e:
+        print(f"Error saving metadata to {meta_path}: {e}")
 
 
 # --- CLI ---

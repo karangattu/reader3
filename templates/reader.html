@@ -2278,9 +2278,6 @@
                             pageWrapper.className = 'pdf-page';
                             pageWrapper.dataset.pageIndex = page.index;
                             
-                            // Escape text for safe insertion into HTML
-                            const escapedText = page.text ? page.text.replace(/</g, '&lt;').replace(/>/g, '&gt;') : '';
-                            
                             pageWrapper.innerHTML = `
                                 <div class="pdf-page-header">
                                     <input type="checkbox" class="pdf-page-select" data-page-index="${page.index}" onchange="updatePdfPageSelection(this)" title="Select page for multi-copy">
@@ -2988,13 +2985,6 @@
                     </div>
                 `;
                 
-                contentEl.innerHTML = html;
-                
-            } catch (error) {
-                console.error('Dictionary lookup failed:', error);
-                contentEl.innerHTML = `
-                    <div class="dict-error">
-                        <p>Failed to look up word</p>
                         <p style="font-size: 0.85em; color: #888; margin-top: 10px;">Check your internet connection</p>
                     </div>
                 `;

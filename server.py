@@ -1,15 +1,20 @@
 import os
 import pickle
+import json
+import threading
+import uuid
 from functools import lru_cache
-from typing import Optional
+from typing import Optional, Dict
+from datetime import datetime
 import tempfile
 import shutil
-from fastapi import FastAPI, Request, HTTPException, UploadFile, File
+from fastapi import FastAPI, Request, HTTPException, UploadFile, File, BackgroundTasks
 from fastapi.responses import (
     HTMLResponse,
     FileResponse,
     RedirectResponse,
     PlainTextResponse,
+    JSONResponse,
 )
 from fastapi.templating import Jinja2Templates
 
@@ -37,6 +42,31 @@ from user_data import (
 import sys
 
 app = FastAPI()
+
+# Upload processing status tracking
+# Keys: upload_id -> {status, progress, message, book_id, filename, started_at, completed_at}
+upload_status: Dict[str, dict] = {}
+upload_status_lock = threading.Lock()
+
+
+def update_upload_status(upload_id: str, **kwargs):
+    """Thread-safe update of upload status."""
+    with upload_status_lock:
+        if upload_id in upload_status:
+            upload_status[upload_id].update(kwargs)
+
+
+def cleanup_old_statuses():
+    """Remove completed statuses older than 1 hour."""
+    cutoff = datetime.now().timestamp() - 3600
+    with upload_status_lock:
+        to_remove = [
+            uid for uid, status in upload_status.items()
+            if status.get("completed_at") and status["completed_at"] < cutoff
+        ]
+        for uid in to_remove:
+            del upload_status[uid]
+
 
 # Determine base path for resources (templates)
 if getattr(sys, "frozen", False):
@@ -94,6 +124,84 @@ def load_book_cached(folder_name: str) -> Optional[Book]:
         return None
 
 
+@lru_cache(maxsize=200)
+def load_book_metadata(folder_name: str) -> Optional[dict]:
+    """Load lightweight metadata for a book without unpickling if possible."""
+    meta_path = os.path.join(BOOKS_DIR, folder_name, "book_meta.json")
+    if os.path.exists(meta_path):
+        try:
+            with open(meta_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"Error reading metadata for {folder_name}: {e}")
+
+    book = load_book_cached(folder_name)
+    if not book:
+        return None
+
+    return write_book_metadata(folder_name, book)
+
+
+def write_book_metadata(folder_name: str, book: Book) -> dict:
+    """Write lightweight metadata to disk and return it."""
+    meta_path = os.path.join(BOOKS_DIR, folder_name, "book_meta.json")
+    metadata = {
+        "title": book.metadata.title,
+        "authors": book.metadata.authors,
+        "chapters": len(book.spine),
+        "added_at": book.added_at or book.processed_at,
+        "processed_at": book.processed_at,
+        "cover_image": book.cover_image,
+        "is_pdf": book.is_pdf,
+        "language": book.metadata.language,
+        "source_file": book.source_file,
+    }
+
+    try:
+        with open(meta_path, "w", encoding="utf-8") as f:
+            json.dump(metadata, f, ensure_ascii=False)
+    except Exception as e:
+        print(f"Error writing metadata for {folder_name}: {e}")
+
+    return metadata
+
+
+@lru_cache(maxsize=200)
+def get_cached_reading_times(book_id: str) -> Optional[dict]:
+    """Compute and cache per-chapter reading times for a book."""
+    book = load_book_cached(book_id)
+    if not book:
+        return None
+
+    # Average reading speed: ~200-250 words per minute
+    words_per_minute = 225
+    reading_times = {}
+
+    for chapter in book.spine:
+        text = getattr(chapter, "text", "") or ""
+        if not text:
+            import re
+
+            content = chapter.content or ""
+            text = re.sub(r"<[^>]+>", " ", content)
+
+        word_count = len(text.split())
+        minutes = max(1, round(word_count / words_per_minute))
+        formatted = (
+            f"~{minutes} min"
+            if minutes < 60
+            else f"~{minutes // 60}h {minutes % 60}m"
+        )
+
+        reading_times[chapter.href] = {
+            "word_count": word_count,
+            "minutes": minutes,
+            "formatted": formatted,
+        }
+
+    return reading_times
+
+
 @app.get("/", response_class=HTMLResponse)
 async def library_view(request: Request, sort: str = "recent"):
     """Lists all available processed books."""
@@ -104,17 +212,17 @@ async def library_view(request: Request, sort: str = "recent"):
         for item in os.listdir(BOOKS_DIR):
             item_path = os.path.join(BOOKS_DIR, item)
             if item.endswith("_data") and os.path.isdir(item_path):
-                # Try to load it to get the title
-                book = load_book_cached(item)
-                if book:
+                # Try to load lightweight metadata
+                meta = load_book_metadata(item)
+                if meta:
                     books.append(
                         {
                             "id": item,
-                            "title": book.metadata.title,
-                            "author": ", ".join(book.metadata.authors),
-                            "chapters": len(book.spine),
-                            "added_at": book.added_at or book.processed_at,
-                            "cover_image": book.cover_image,
+                            "title": meta.get("title", "Untitled"),
+                            "author": ", ".join(meta.get("authors", [])),
+                            "chapters": meta.get("chapters", 0),
+                            "added_at": meta.get("added_at"),
+                            "cover_image": meta.get("cover_image"),
                         }
                     )
 
@@ -134,15 +242,16 @@ async def library_view(request: Request, sort: str = "recent"):
 @app.get("/cover/{book_id}")
 async def get_cover_image(book_id: str):
     """Serve cover image for a book."""
-    book = load_book_cached(book_id)
-    if not book:
+    meta = load_book_metadata(book_id)
+    if not meta:
         raise HTTPException(status_code=404, detail="Book not found")
 
-    if not book.cover_image:
+    cover_image = meta.get("cover_image")
+    if not cover_image:
         raise HTTPException(status_code=404, detail="No cover image available")
 
     # Construct the full path to the cover image
-    cover_path = os.path.join(BOOKS_DIR, book_id, book.cover_image)
+    cover_path = os.path.join(BOOKS_DIR, book_id, cover_image)
 
     # Security: ensure the path is within the book directory
     safe_book_id = os.path.basename(book_id)
@@ -156,13 +265,89 @@ async def get_cover_image(book_id: str):
     return FileResponse(cover_path)
 
 
-@app.post("/upload")
-async def upload_book(file: UploadFile = File(...)):
-    """Handle EPUB file uploads."""
+@app.post("/api/metadata/rebuild")
+async def rebuild_metadata(force: bool = False):
+    """Rebuild lightweight metadata files for all books."""
+    updated = 0
+    errors = []
 
-    # Create a temp file to store the upload
-    # We use delete=False so we can close it and then read it in process_epub
-    # We need to preserve the .epub/.pdf extension for some libraries/checks
+    if os.path.exists(BOOKS_DIR):
+        for item in os.listdir(BOOKS_DIR):
+            item_path = os.path.join(BOOKS_DIR, item)
+            if item.endswith("_data") and os.path.isdir(item_path):
+                meta_path = os.path.join(item_path, "book_meta.json")
+                if not force and os.path.exists(meta_path):
+                    continue
+
+                book = load_book_cached(item)
+                if not book:
+                    errors.append({"book_id": item, "error": "Book not found"})
+                    continue
+
+                try:
+                    write_book_metadata(item, book)
+                    updated += 1
+                except Exception as e:
+                    errors.append({"book_id": item, "error": str(e)})
+
+    load_book_metadata.cache_clear()
+
+    return {"status": "ok", "updated": updated, "errors": errors}
+
+
+def process_book_background(upload_id: str, temp_path: str, suffix: str, full_out_dir: str, out_dir: str):
+    """Background task to process a book (PDF or EPUB)."""
+    try:
+        update_upload_status(upload_id, status="processing", progress=10, message="Starting processing...")
+
+        if suffix == ".pdf":
+            from reader3 import process_pdf
+            update_upload_status(upload_id, progress=20, message="Extracting PDF pages...")
+            book_obj = process_pdf(temp_path, full_out_dir)
+        else:
+            update_upload_status(upload_id, progress=20, message="Parsing EPUB structure...")
+            book_obj = process_epub(temp_path, full_out_dir)
+
+        update_upload_status(upload_id, progress=80, message="Saving book data...")
+        save_to_pickle(book_obj, full_out_dir)
+
+        # Clear caches
+        load_book_cached.cache_clear()
+        get_cached_reading_times.cache_clear()
+        load_book_metadata.cache_clear()
+
+        update_upload_status(
+            upload_id,
+            status="completed",
+            progress=100,
+            message="Processing complete!",
+            book_id=out_dir,
+            completed_at=datetime.now().timestamp()
+        )
+        print(f"Background processing completed for {out_dir}")
+
+    except Exception as e:
+        print(f"Error processing book in background: {e}")
+        # Clean up partial data if failed
+        if os.path.exists(full_out_dir):
+            shutil.rmtree(full_out_dir)
+        update_upload_status(
+            upload_id,
+            status="failed",
+            progress=0,
+            message=f"Failed to process book: {str(e)}",
+            completed_at=datetime.now().timestamp()
+        )
+    finally:
+        # Clean up temp file
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
+
+@app.post("/upload")
+async def upload_book(file: UploadFile = File(...), background: bool = False, background_tasks: BackgroundTasks = None):
+    """Handle EPUB/PDF file uploads. Use ?background=true for async processing."""
+
     suffix = os.path.splitext(file.filename)[1].lower()
     if suffix not in [".epub", ".pdf"]:
         raise HTTPException(
@@ -173,40 +358,85 @@ async def upload_book(file: UploadFile = File(...)):
         shutil.copyfileobj(file.file, tmp)
         temp_path = tmp.name
 
-    try:
-        # Determine output directory based on original filename
-        safe_filename = os.path.basename(file.filename)
-        out_dir = os.path.splitext(safe_filename)[0] + "_data"
-        # Ensure we use the BOOKS_DIR as the base
-        full_out_dir = os.path.join(BOOKS_DIR, out_dir)
+    safe_filename = os.path.basename(file.filename)
+    out_dir = os.path.splitext(safe_filename)[0] + "_data"
+    full_out_dir = os.path.join(BOOKS_DIR, out_dir)
 
+    # Background processing for PDFs (they're slower) or when explicitly requested
+    if background or (suffix == ".pdf" and background_tasks is not None):
+        upload_id = str(uuid.uuid4())
+        cleanup_old_statuses()
+
+        with upload_status_lock:
+            upload_status[upload_id] = {
+                "status": "queued",
+                "progress": 0,
+                "message": "Upload received, queued for processing...",
+                "filename": safe_filename,
+                "book_id": None,
+                "started_at": datetime.now().timestamp(),
+                "completed_at": None,
+            }
+
+        # Run in background thread for true async processing
+        thread = threading.Thread(
+            target=process_book_background,
+            args=(upload_id, temp_path, suffix, full_out_dir, out_dir),
+            daemon=True
+        )
+        thread.start()
+
+        return JSONResponse(
+            status_code=202,
+            content={"upload_id": upload_id, "status": "processing", "message": "Processing started in background"}
+        )
+
+    # Synchronous processing (original behavior for EPUBs)
+    try:
         print(f"Processing {temp_path} -> {full_out_dir}")
 
-        # Process the Book
         if suffix == ".pdf":
             from reader3 import process_pdf
-
             book_obj = process_pdf(temp_path, full_out_dir)
         else:
             book_obj = process_epub(temp_path, full_out_dir)
 
         save_to_pickle(book_obj, full_out_dir)
 
-        # Clear cache for this book if it existed
         load_book_cached.cache_clear()
+        get_cached_reading_times.cache_clear()
+        load_book_metadata.cache_clear()
 
     except Exception as e:
         print(f"Error processing book: {e}")
-        # Clean up partial data if failed
-        if "full_out_dir" in locals() and os.path.exists(full_out_dir):
+        if os.path.exists(full_out_dir):
             shutil.rmtree(full_out_dir)
         raise HTTPException(status_code=500, detail=f"Failed to process book: {str(e)}")
     finally:
-        # Clean up temp file
-        if "temp_path" in locals() and os.path.exists(temp_path):
+        if os.path.exists(temp_path):
             os.remove(temp_path)
 
     return RedirectResponse(url="/", status_code=303)
+
+
+@app.get("/api/upload/status/{upload_id}")
+async def get_upload_status(upload_id: str):
+    """Get the status of a background upload processing job."""
+    with upload_status_lock:
+        status = upload_status.get(upload_id)
+
+    if not status:
+        raise HTTPException(status_code=404, detail="Upload not found")
+
+    return status
+
+
+@app.get("/api/upload/status")
+async def list_upload_statuses():
+    """List all recent upload processing jobs."""
+    cleanup_old_statuses()
+    with upload_status_lock:
+        return {"uploads": list(upload_status.values())}
 
 
 @app.get("/read/{book_id}", response_class=HTMLResponse)
@@ -260,7 +490,7 @@ async def read_chapter(request: Request, book_id: str, chapter_index: int):
 async def get_pages(book_id: str, start: int, count: int):
     """
     Fetches multiple pages for infinite scrolling (PDF only).
-    Returns JSON with array of page content including text for copy.
+    Returns JSON with array of page content.
     """
     book = load_book_cached(book_id)
     if not book:
@@ -281,8 +511,7 @@ async def get_pages(book_id: str, start: int, count: int):
         pages.append({
             "index": i,
             "title": chapter.title,
-            "content": chapter.content,
-            "text": chapter.text  # Include text for copy functionality
+            "content": chapter.content
         })
 
     return {"pages": pages, "total": total}
@@ -362,6 +591,8 @@ async def delete_book(book_id: str):
         shutil.rmtree(book_path)
         # Clear the cache
         load_book_cached.cache_clear()
+        get_cached_reading_times.cache_clear()
+        load_book_metadata.cache_clear()
         # Clean up user data for this book
         user_data_manager.cleanup_book_data(safe_book_id)
         # Remove book from all collections
@@ -412,6 +643,8 @@ async def reprocess_pdf(book_id: str):
 
         # Clear cache
         load_book_cached.cache_clear()
+        get_cached_reading_times.cache_clear()
+        load_book_metadata.cache_clear()
 
         return {"status": "success", "message": "PDF reprocessed successfully"}
     except Exception as e:
@@ -429,29 +662,10 @@ async def reprocess_pdf(book_id: str):
 @app.get("/api/reading-times/{book_id}")
 async def get_chapter_reading_times(book_id: str):
     """Get estimated reading times for all chapters in a book."""
-    book = load_book_cached(book_id)
-    if not book:
+    reading_times = get_cached_reading_times(book_id)
+    if reading_times is None:
         raise HTTPException(status_code=404, detail="Book not found")
-    
-    # Average reading speed: ~200 words per minute
-    WORDS_PER_MINUTE = 200
-    
-    reading_times = {}
-    
-    for chapter in book.spine:
-        # Count words in the chapter's plain text
-        text = chapter.text or ""
-        word_count = len(text.split())
-        
-        # Calculate reading time in minutes
-        minutes = max(1, round(word_count / WORDS_PER_MINUTE))
-        
-        reading_times[chapter.href] = {
-            "word_count": word_count,
-            "minutes": minutes,
-            "formatted": f"~{minutes} min" if minutes < 60 else f"~{minutes // 60}h {minutes % 60}m"
-        }
-    
+
     return {"book_id": book_id, "reading_times": reading_times}
 
 
@@ -471,20 +685,21 @@ async def get_recently_read_books(limit: int = 5):
             if item.endswith("_data") and os.path.isdir(os.path.join(BOOKS_DIR, item)):
                 progress = user_data_manager.get_progress(item)
                 if progress and progress.last_read:
-                    book = load_book_cached(item)
-                    if book:
+                    meta = load_book_metadata(item)
+                    if meta:
                         # Calculate progress percentage
                         chapter_progress = user_data_manager.get_chapter_progress(item)
                         overall_progress = 0.0
-                        if chapter_progress and len(book.spine) > 0:
+                        total_chapters = meta.get("chapters", 0)
+                        if chapter_progress and total_chapters > 0:
                             total_progress = sum(chapter_progress.values())
-                            overall_progress = total_progress / len(book.spine)
+                            overall_progress = total_progress / total_chapters
                         
                         recently_read.append({
                             "id": item,
-                            "title": book.metadata.title,
-                            "author": ", ".join(book.metadata.authors),
-                            "cover_image": book.cover_image,
+                            "title": meta.get("title", "Untitled"),
+                            "author": ", ".join(meta.get("authors", [])),
+                            "cover_image": meta.get("cover_image"),
                             "last_read": progress.last_read,
                             "chapter_index": progress.chapter_index,
                             "progress_percent": overall_progress,
@@ -506,14 +721,13 @@ async def get_reading_progress(book_id: str):
     # Calculate overall progress percentage from chapter progress
     overall_progress = 0.0
     if chapter_progress:
-        # Get the book to know total chapters
-        book = load_book_cached(book_id)
-        if book and len(book.spine) > 0:
-            total_chapters = len(book.spine)
-            # Sum up all chapter progress and divide by total chapters
+        # Use metadata if available to avoid loading full book
+        meta = load_book_metadata(book_id)
+        total_chapters = meta.get("chapters", 0) if meta else 0
+        if total_chapters > 0:
             total_progress = sum(chapter_progress.values())
             overall_progress = total_progress / total_chapters
-        elif chapter_progress:
+        else:
             # Fallback: average of recorded chapters
             overall_progress = sum(chapter_progress.values()) / len(chapter_progress)
     
@@ -540,6 +754,8 @@ async def save_reading_progress(book_id: str, request: Request):
     """Save reading progress for a book."""
     data = await request.json()
 
+    progress_percent = data.get("progress_percent")
+
     progress = ReadingProgress(
         book_id=book_id,
         chapter_index=data.get("chapter_index", 0),
@@ -548,6 +764,11 @@ async def save_reading_progress(book_id: str, request: Request):
         reading_time_seconds=data.get("reading_time_seconds", 0),
     )
     user_data_manager.save_progress(progress)
+
+    if progress_percent is not None:
+        user_data_manager.save_chapter_progress(
+            book_id, progress.chapter_index, progress_percent
+        )
     return {"status": "saved"}
 
 
@@ -906,40 +1127,6 @@ async def save_chapter_progress(
         book_id, chapter_index, progress_percent
     )
     return {"status": "saved"}
-
-
-# ============================================================================
-# Reading Time Estimates API
-# ============================================================================
-
-
-@app.get("/api/reading-times/{book_id}")
-async def get_reading_times(book_id: str):
-    """Get estimated reading times for all chapters in a book."""
-    book = load_book_cached(book_id)
-    if not book:
-        raise HTTPException(status_code=404, detail="Book not found")
-
-    # Average reading speed: 225 words per minute
-    words_per_minute = 225
-    times = {}
-
-    for idx, chapter in enumerate(book.spine):
-        # Get text content
-        text = getattr(chapter, "text", "") or ""
-        if not text:
-            # Fallback: strip HTML tags from content
-            import re
-
-            content = chapter.content or ""
-            text = re.sub(r"<[^>]+>", " ", content)
-
-        # Count words
-        word_count = len(text.split())
-        minutes = max(1, round(word_count / words_per_minute))
-        times[idx] = minutes
-
-    return {"book_id": book_id, "times": times}
 
 
 # ============================================================================

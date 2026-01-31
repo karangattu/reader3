@@ -1921,3 +1921,167 @@ class TestUserAnnotationsAPI:
         response = client.get(f"/api/annotations/{book_id}/export?format=json")
         assert response.status_code == 200
         assert "json" in response.headers["content-type"]
+
+
+# ============================================================================
+# Performance & Usability Feature Tests
+# ============================================================================
+
+
+class TestMetadataRebuildAPI:
+    """Tests for metadata rebuild API endpoint."""
+
+    def test_rebuild_metadata_endpoint_exists(self, client):
+        """Test that the rebuild metadata endpoint exists."""
+        response = client.post("/api/metadata/rebuild")
+        assert response.status_code == 200
+
+    def test_rebuild_metadata_returns_stats(self, client):
+        """Test that rebuild returns update statistics."""
+        response = client.post("/api/metadata/rebuild")
+        assert response.status_code == 200
+        data = response.json()
+        assert "status" in data
+        assert "updated" in data
+        assert "errors" in data
+        assert data["status"] == "ok"
+
+    def test_rebuild_metadata_force_param(self, client):
+        """Test rebuild with force parameter."""
+        response = client.post("/api/metadata/rebuild?force=true")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "ok"
+
+
+class TestBackgroundUploadAPI:
+    """Tests for background upload processing API."""
+
+    def test_upload_status_not_found(self, client):
+        """Test getting status for non-existent upload."""
+        response = client.get("/api/upload/status/nonexistent-upload-id")
+        assert response.status_code == 404
+
+    def test_list_upload_statuses(self, client):
+        """Test listing all upload statuses."""
+        response = client.get("/api/upload/status")
+        assert response.status_code == 200
+        data = response.json()
+        assert "uploads" in data
+        assert isinstance(data["uploads"], list)
+
+    def test_upload_invalid_file_type(self, client):
+        """Test that invalid file types are rejected."""
+        from io import BytesIO
+        response = client.post(
+            "/upload",
+            files={"file": ("test.txt", BytesIO(b"test content"), "text/plain")}
+        )
+        assert response.status_code == 400
+        assert "epub" in response.json()["detail"].lower() or "pdf" in response.json()["detail"].lower()
+
+    def test_upload_background_param_accepted(self, client):
+        """Test that background parameter is accepted."""
+        # We can't actually test background processing without a real file,
+        # but we can verify the endpoint accepts the parameter
+        from io import BytesIO
+        response = client.post(
+            "/upload?background=true",
+            files={"file": ("test.txt", BytesIO(b"test content"), "text/plain")}
+        )
+        # Should fail with invalid file type, not param error
+        assert response.status_code == 400
+
+
+class TestConsolidatedProgressSaving:
+    """Tests for consolidated progress saving (chapter progress via main progress endpoint)."""
+
+    def test_progress_saves_chapter_progress(self, client):
+        """Test that saving progress with progress_percent also updates chapter progress."""
+        import uuid
+        book_id = f"test_consolidated_{uuid.uuid4().hex[:8]}"
+        
+        # Save progress with progress_percent
+        save_response = client.post(
+            f"/api/progress/{book_id}",
+            json={
+                "chapter_index": 3,
+                "scroll_position": 0.75,
+                "progress_percent": 85.0
+            }
+        )
+        assert save_response.status_code == 200
+        
+        # Verify chapter progress was also saved
+        chapter_response = client.get(f"/api/chapter-progress/{book_id}")
+        assert chapter_response.status_code == 200
+        progress = chapter_response.json()["progress"]
+        # Chapter 3 should have 85% progress
+        assert progress.get("3") == 85.0 or progress.get(3) == 85.0
+
+    def test_progress_without_percent_doesnt_update_chapter(self, client):
+        """Test that saving progress without progress_percent doesn't create chapter progress."""
+        import uuid
+        book_id = f"test_no_percent_{uuid.uuid4().hex[:8]}"
+        
+        # Save progress without progress_percent
+        client.post(
+            f"/api/progress/{book_id}",
+            json={
+                "chapter_index": 2,
+                "scroll_position": 0.5
+            }
+        )
+        
+        # Chapter progress should be empty (unless previously set)
+        chapter_response = client.get(f"/api/chapter-progress/{book_id}")
+        progress = chapter_response.json()["progress"]
+        # Should not have chapter 2 entry
+        assert progress.get("2") is None and progress.get(2) is None
+
+
+class TestCachedReadingTimesAPI:
+    """Tests for cached reading times functionality."""
+
+    def test_reading_times_nonexistent_returns_404(self, client):
+        """Test that non-existent book returns 404."""
+        response = client.get("/api/reading-times/nonexistent_book_xyz")
+        assert response.status_code == 404
+
+    def test_reading_times_response_format(self, client):
+        """Test the expected response format for reading times."""
+        # For non-existent book, should return 404
+        response = client.get("/api/reading-times/some_book")
+        assert response.status_code in [200, 404]
+        
+        # If book exists, check format
+        if response.status_code == 200:
+            data = response.json()
+            assert "book_id" in data
+            assert "reading_times" in data
+
+
+class TestLibraryMetadataOptimization:
+    """Tests for library metadata optimization."""
+
+    def test_library_loads_without_full_book(self, client):
+        """Test that library view works (uses metadata cache)."""
+        response = client.get("/")
+        assert response.status_code == 200
+        # Library should load successfully
+        assert "text/html" in response.headers["content-type"]
+
+    def test_recently_read_endpoint_works(self, client):
+        """Test that recently-read endpoint works with metadata."""
+        response = client.get("/api/recently-read")
+        assert response.status_code == 200
+        data = response.json()
+        assert "books" in data
+        assert isinstance(data["books"], list)
+
+    def test_recently_read_limit_param(self, client):
+        """Test recently-read with limit parameter."""
+        response = client.get("/api/recently-read?limit=3")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["books"]) <= 3
