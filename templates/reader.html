@@ -2985,6 +2985,12 @@
                     </div>
                 `;
                 
+                contentEl.innerHTML = html;
+            } catch (error) {
+                console.error('Dictionary lookup failed:', error);
+                contentEl.innerHTML = `
+                    <div class="dict-error">
+                        <p>Failed to look up "${escapeHtml(word)}"</p>
                         <p style="font-size: 0.85em; color: #888; margin-top: 10px;">Check your internet connection</p>
                     </div>
                 `;
