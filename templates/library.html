@@ -1564,7 +1564,7 @@
 
             // Handle completion
             xhr.addEventListener('load', function() {
-                if (xhr.status === 303 || xhr.status === 200) {
+                if (xhr.status === 303 || xhr.status === 200 || xhr.status === 202) {
                     // Upload successful, now processing
                     progressFill.style.width = '100%';
                     progressText.textContent = '100%';
