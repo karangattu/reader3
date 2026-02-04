@@ -663,6 +663,14 @@
             <div class="content-toolbar {% if is_pdf %}pdf-toolbar{% endif %}">
                 {% if is_pdf %}
                 <button class="toolbar-btn" type="button" onclick="togglePageJump()" title="Jump to a specific page"><i class="fa-solid fa-hashtag"></i> Go to Page</button>
+                <div style="display: flex; align-items: center; gap: 5px; border-left: 1px solid #ddd; padding-left: 10px; margin-left: 5px;">
+                    <input type="number" id="page-range-input" min="1" max="50" value="3" 
+                           style="width: 50px; padding: 6px 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 0.9em; text-align: center;"
+                           title="Number of pages to select after current page">
+                    <button class="toolbar-btn" type="button" onclick="selectPageRange()" title="Select N pages after current page">
+                        <i class="fa-solid fa-layer-group"></i> Select Range
+                    </button>
+                </div>
                 <button class="toolbar-btn pdf-multi-copy-btn" type="button" onclick="copySelectedPagesAsImage()" id="pdf-multi-copy-btn" title="Copy selected pages as a combined image"><i class="fa-regular fa-images"></i> Copy Selected (<span id="pdf-selected-count">0</span>)</button>
                 <button class="toolbar-btn pdf-clear-btn" type="button" onclick="clearPdfSelection()" id="pdf-clear-btn" title="Clear selection"><i class="fa-solid fa-xmark"></i> Clear</button>
                 <button class="toolbar-btn" type="button" onclick="toggleSelectAllPages()" id="pdf-select-all-btn" title="Select/Deselect all loaded pages"><i class="fa-regular fa-square-check"></i> Select All</button>
@@ -1923,6 +1931,108 @@
             if (btn) {
                 btn.innerHTML = allChecked ? '<i class="fa-regular fa-square-check"></i> Select All' : '<i class="fa-regular fa-square"></i> Deselect All';
             }
+        }
+
+        // Select a range of pages starting from current page
+        async function selectPageRange() {
+            const input = document.getElementById('page-range-input');
+            const numPages = parseInt(input.value);
+            
+            if (!numPages || numPages < 1) {
+                showCopyToast('Enter a valid number of pages', 'error');
+                return;
+            }
+
+            // Clear existing selection first
+            clearPdfSelection();
+
+            // Get the visible page (the one currently in view)
+            const pages = document.querySelectorAll('.pdf-page');
+            let startPageIndex = currentPageIndex;
+            
+            // Find which page is most visible in the viewport
+            const mainContent = document.getElementById('main');
+            const viewportCenter = mainContent.scrollTop + mainContent.clientHeight / 2;
+            
+            pages.forEach(page => {
+                const pageIndex = parseInt(page.dataset.pageIndex);
+                const rect = page.getBoundingClientRect();
+                const pageCenter = rect.top + rect.height / 2;
+                
+                // If this page is closer to center, use it as start
+                if (Math.abs(pageCenter - mainContent.clientHeight / 2) < mainContent.clientHeight / 3) {
+                    startPageIndex = pageIndex;
+                }
+            });
+
+            // Calculate range
+            const endPageIndex = Math.min(startPageIndex + numPages - 1, totalPages - 1);
+            
+            // First, ensure all pages in range are loaded
+            if (endPageIndex > currentPageIndex) {
+                showCopyToast(`Loading pages ${startPageIndex + 1}-${endPageIndex + 1}...`, 'success');
+                
+                // Load pages if needed
+                while (currentPageIndex < endPageIndex) {
+                    if (loadingPages) {
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                        continue;
+                    }
+                    
+                    loadingPages = true;
+                    const nextStart = currentPageIndex + 1;
+                    
+                    try {
+                        const resp = await fetch(`/read/${bookId}/pages/${nextStart}/10`);
+                        const data = await resp.json();
+                        
+                        if (data.pages && data.pages.length > 0) {
+                            const contentDiv = document.getElementById('book-content');
+                            data.pages.forEach(page => {
+                                const pageWrapper = document.createElement('div');
+                                pageWrapper.className = 'pdf-page';
+                                pageWrapper.dataset.pageIndex = page.index;
+                                
+                                pageWrapper.innerHTML = `
+                                    <div class="pdf-page-header">
+                                        <input type="checkbox" class="pdf-page-select" data-page-index="${page.index}" onchange="updatePdfPageSelection(this)" title="Select page for multi-copy">
+                                        <span class="pdf-page-number">${page.title}</span>
+                                        <div class="pdf-page-actions">
+                                            <button class="pdf-copy-image-btn" onclick="copyPageImage(this, ${page.index})" title="Copy page as image to clipboard">
+                                                <i class="fa-regular fa-image"></i> Copy Page
+                                            </button>
+                                        </div>
+                                    </div>
+                                    ${page.content}
+                                `;
+                                contentDiv.appendChild(pageWrapper);
+                            });
+                            
+                            currentPageIndex = Math.max(...data.pages.map(p => p.index));
+                            updatePageIndicator();
+                            updateProgressBar();
+                        } else {
+                            break;
+                        }
+                    } catch (err) {
+                        console.error('Failed to load pages:', err);
+                        break;
+                    } finally {
+                        loadingPages = false;
+                    }
+                }
+            }
+
+            // Now select all pages in the range
+            for (let i = startPageIndex; i <= endPageIndex; i++) {
+                const checkbox = document.querySelector(`.pdf-page-select[data-page-index="${i}"]`);
+                if (checkbox) {
+                    checkbox.checked = true;
+                    updatePdfPageSelection(checkbox);
+                }
+            }
+
+            showCopyToast(`Selected pages ${startPageIndex + 1}-${endPageIndex + 1} (${endPageIndex - startPageIndex + 1} pages)`, 'success');
         }
         
         // Clear all PDF page selections
