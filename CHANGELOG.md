@@ -2,6 +2,18 @@
 
 All notable changes to Reader3 will be documented in this file.
 
+## [1.6.2] - 2026-02-06
+
+### Fixed
+- **PDF Upload Auto-Refresh** — Fixed issue where PDFs wouldn't appear in the reading list after upload without manual page refresh. The frontend now polls the server for background processing completion before redirecting.
+
+### Technical
+- Modified upload completion handler in `library.html` to distinguish between synchronous (EPUB) and asynchronous (PDF) processing
+- Added `pollUploadStatus()` function that polls `/api/upload/status/{upload_id}` until processing completes
+- Shows real-time progress updates during PDF processing with status messages
+
+---
+
 ## [1.6.0] - 2026-01-31
 
 ### Added - Performance & Usability Improvements 🚀
