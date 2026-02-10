@@ -25,6 +25,7 @@ class AIConfig:
 class AIService:
     """
     AI Service that supports multiple LLM providers.
+    Reuses a persistent httpx.AsyncClient for connection pooling.
     
     Usage:
         ai = AIService()
@@ -34,6 +35,7 @@ class AIService:
     
     def __init__(self, config: Optional[AIConfig] = None):
         self.config = config or self._load_config()
+        self._client: Optional[httpx.AsyncClient] = None
     
     def _load_config(self) -> AIConfig:
         """Load config from file or environment."""
@@ -75,37 +77,53 @@ class AIService:
         with open(config_path, "w") as f:
             json.dump(data, f, indent=2)
     
+    async def _get_client(self) -> httpx.AsyncClient:
+        """Return a persistent httpx client (connection pooling)."""
+        if self._client is None or self._client.is_closed:
+            self._client = httpx.AsyncClient(timeout=120.0)
+        return self._client
+
+    async def close(self):
+        """Close the underlying HTTP client."""
+        if self._client and not self._client.is_closed:
+            await self._client.aclose()
+            self._client = None
+
     async def check_availability(self) -> dict:
         """Check if the AI service is available."""
         result = {"available": False, "provider": self.config.provider, "model": "", "error": None}
         
         try:
             if self.config.provider == "ollama":
-                async with httpx.AsyncClient(timeout=5.0) as client:
-                    response = await client.get(f"{self.config.ollama_base_url}/api/tags")
-                    if response.status_code == 200:
-                        result["available"] = True
-                        result["model"] = self.config.ollama_model
-                        # Check if the configured model is available
-                        models = response.json().get("models", [])
-                        model_names = [m.get("name", "").split(":")[0] for m in models]
-                        if self.config.ollama_model.split(":")[0] not in model_names:
-                            result["error"] = f"Model '{self.config.ollama_model}' not found. Available: {', '.join(model_names[:5])}"
+                client = await self._get_client()
+                response = await client.get(
+                    f"{self.config.ollama_base_url}/api/tags",
+                    timeout=5.0,
+                )
+                if response.status_code == 200:
+                    result["available"] = True
+                    result["model"] = self.config.ollama_model
+                    # Check if the configured model is available
+                    models = response.json().get("models", [])
+                    model_names = [m.get("name", "").split(":")[0] for m in models]
+                    if self.config.ollama_model.split(":")[0] not in model_names:
+                        result["error"] = f"Model '{self.config.ollama_model}' not found. Available: {', '.join(model_names[:5])}"
             
             elif self.config.provider == "gemini":
                 if not self.config.gemini_api_key:
                     result["error"] = "Gemini API key not configured"
                 else:
                     # Quick validation by listing models
-                    async with httpx.AsyncClient(timeout=5.0) as client:
-                        response = await client.get(
-                            f"https://generativelanguage.googleapis.com/v1beta/models?key={self.config.gemini_api_key}"
-                        )
-                        if response.status_code == 200:
-                            result["available"] = True
-                            result["model"] = self.config.gemini_model
-                        else:
-                            result["error"] = "Invalid API key"
+                    client = await self._get_client()
+                    response = await client.get(
+                        f"https://generativelanguage.googleapis.com/v1beta/models?key={self.config.gemini_api_key}",
+                        timeout=5.0,
+                    )
+                    if response.status_code == 200:
+                        result["available"] = True
+                        result["model"] = self.config.gemini_model
+                    else:
+                        result["error"] = "Invalid API key"
         
         except httpx.ConnectError:
             result["error"] = "Cannot connect to Ollama. Is it running?" if self.config.provider == "ollama" else "Network error"
@@ -219,42 +237,43 @@ Summary:"""
     
     async def _ollama_generate(self, prompt: str) -> str:
         """Generate using Ollama's local API."""
-        async with httpx.AsyncClient(timeout=120.0) as client:
-            response = await client.post(
-                f"{self.config.ollama_base_url}/api/generate",
-                json={
-                    "model": self.config.ollama_model,
-                    "prompt": prompt,
-                    "stream": False,
-                    "options": {
-                        "temperature": 0.7,
-                        "num_predict": 1024,
-                    }
+        client = await self._get_client()
+        response = await client.post(
+            f"{self.config.ollama_base_url}/api/generate",
+            json={
+                "model": self.config.ollama_model,
+                "prompt": prompt,
+                "stream": False,
+                "options": {
+                    "temperature": 0.7,
+                    "num_predict": 1024,
                 }
-            )
-            
-            if response.status_code != 200:
-                raise Exception(f"Ollama error: {response.text}")
-            
-            return response.json().get("response", "").strip()
+            }
+        )
+        
+        if response.status_code != 200:
+            raise Exception(f"Ollama error: {response.text}")
+        
+        return response.json().get("response", "").strip()
     
     async def _gemini_generate(self, prompt: str) -> str:
         """Generate using Google Gemini's API."""
         if not self.config.gemini_api_key:
             raise Exception("Gemini API key not configured. Set GEMINI_API_KEY or configure in settings.")
         
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.post(
-                f"https://generativelanguage.googleapis.com/v1beta/models/{self.config.gemini_model}:generateContent",
-                params={"key": self.config.gemini_api_key},
-                json={
-                    "contents": [{"parts": [{"text": prompt}]}],
-                    "generationConfig": {
-                        "temperature": 0.7,
-                        "maxOutputTokens": 1024,
-                    }
+        client = await self._get_client()
+        response = await client.post(
+            f"https://generativelanguage.googleapis.com/v1beta/models/{self.config.gemini_model}:generateContent",
+            params={"key": self.config.gemini_api_key},
+            json={
+                "contents": [{"parts": [{"text": prompt}]}],
+                "generationConfig": {
+                    "temperature": 0.7,
+                    "maxOutputTokens": 1024,
                 }
-            )
+            },
+            timeout=60.0,
+        )
             
             if response.status_code != 200:
                 error_msg = response.json().get("error", {}).get("message", response.text)

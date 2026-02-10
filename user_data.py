@@ -1,10 +1,13 @@
 """
 User data management for Reader3.
 Handles reading progress, bookmarks, highlights, and search history.
+Writes are debounced: changes are batched and flushed to disk after a
+configurable delay (default 2 s) or when the process shuts down.
 """
 
 import json
 import os
+import threading
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
 from typing import List, Dict, Optional
@@ -141,12 +144,17 @@ def generate_id() -> str:
 
 
 class UserDataManager:
-    """Manages user data persistence."""
+    """Manages user data persistence with debounced writes."""
     
+    DEBOUNCE_SECONDS = 2.0  # Flush after 2 seconds of inactivity
+
     def __init__(self, data_dir: str):
         self.data_dir = data_dir
         self.data_file = os.path.join(data_dir, "user_data.json")
         self._data: Optional[UserData] = None
+        self._dirty = False
+        self._lock = threading.Lock()
+        self._timer: Optional[threading.Timer] = None
     
     def _ensure_dir(self):
         """Ensure data directory exists."""
@@ -212,8 +220,39 @@ class UserDataManager:
         return self._data
     
     def save(self):
-        """Save user data to disk."""
-        if self._data is None:
+        """Persist data to disk immediately (atomic write)."""
+        self._dirty = True
+        self._do_flush()
+
+    def save_deferred(self):
+        """Mark data as dirty and schedule a debounced write.
+
+        Use this for high-frequency updates (e.g. scroll-position saves)
+        where batching is preferred over per-call I/O.
+        """
+        self._dirty = True
+        self._schedule_flush()
+
+    def _schedule_flush(self):
+        """Reset the debounce timer. The actual write happens after DEBOUNCE_SECONDS of inactivity."""
+        with self._lock:
+            if self._timer is not None:
+                self._timer.cancel()
+            self._timer = threading.Timer(self.DEBOUNCE_SECONDS, self._do_flush)
+            self._timer.daemon = True
+            self._timer.start()
+
+    def flush(self):
+        """Immediately write pending changes to disk (called on shutdown)."""
+        with self._lock:
+            if self._timer is not None:
+                self._timer.cancel()
+                self._timer = None
+        self._do_flush()
+
+    def _do_flush(self):
+        """Actually persist data to disk."""
+        if not self._dirty or self._data is None:
             return
         
         self._ensure_dir()
@@ -248,8 +287,12 @@ class UserDataManager:
         }
         
         try:
-            with open(self.data_file, 'w', encoding='utf-8') as f:
+            # Atomic write via temp-file + rename
+            tmp_path = self.data_file + ".tmp"
+            with open(tmp_path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
+            os.replace(tmp_path, self.data_file)
+            self._dirty = False
         except Exception as e:
             print(f"Error saving user data: {e}")
     
@@ -363,10 +406,10 @@ class UserDataManager:
     
     # Reading Progress
     def save_progress(self, progress: ReadingProgress):
-        """Save reading progress for a book."""
+        """Save reading progress for a book (deferred write)."""
         data = self.load()
         data.progress[progress.book_id] = progress
-        self.save()
+        self.save_deferred()
     
     def get_progress(self, book_id: str) -> Optional[ReadingProgress]:
         """Get reading progress for a book."""
@@ -374,11 +417,11 @@ class UserDataManager:
         return data.progress.get(book_id)
     
     def update_reading_time(self, book_id: str, seconds: int):
-        """Add to the reading time for a book."""
+        """Add to the reading time for a book (deferred write)."""
         data = self.load()
         if book_id in data.progress:
             data.progress[book_id].reading_time_seconds += seconds
-            self.save()
+            self.save_deferred()
     
     # Chapter Progress (per-chapter tracking)
     def get_chapter_progress(self, book_id: str) -> Dict[int, float]:

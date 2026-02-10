@@ -1,8 +1,12 @@
+import asyncio
+import logging
 import os
 import pickle
 import json
 import threading
 import uuid
+from contextlib import asynccontextmanager
+from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
 from typing import Optional, Dict
 from datetime import datetime
@@ -16,7 +20,9 @@ from fastapi.responses import (
     PlainTextResponse,
     JSONResponse,
 )
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from reader3 import (
     Book,
@@ -41,7 +47,87 @@ from user_data import (
 
 import sys
 
-app = FastAPI()
+# ---------------------------------------------------------------------------
+# Logging
+# ---------------------------------------------------------------------------
+logger = logging.getLogger("reader3")
+logging.basicConfig(
+    level=os.environ.get("LOG_LEVEL", "INFO").upper(),
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+
+# ---------------------------------------------------------------------------
+# Thread pool for blocking I/O inside async handlers
+# ---------------------------------------------------------------------------
+_io_executor = ThreadPoolExecutor(
+    max_workers=int(os.environ.get("IO_WORKERS", 4)),
+    thread_name_prefix="reader3-io",
+)
+
+# Maximum upload size: 200 MB (configurable via env)
+MAX_UPLOAD_BYTES = int(os.environ.get("MAX_UPLOAD_MB", 200)) * 1024 * 1024
+
+
+def _run_sync(fn, *args):
+    """Schedule a blocking function on the I/O thread pool."""
+    return asyncio.get_event_loop().run_in_executor(_io_executor, fn, *args)
+
+
+# ---------------------------------------------------------------------------
+# Security headers middleware
+# ---------------------------------------------------------------------------
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "SAMEORIGIN"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        return response
+
+
+# ---------------------------------------------------------------------------
+# Cache-Control middleware for static assets
+# ---------------------------------------------------------------------------
+class CacheControlMiddleware(BaseHTTPMiddleware):
+    """Adds Cache-Control headers for images and thumbnails."""
+
+    # Paths that benefit from aggressive caching (immutable book assets)
+    STATIC_PREFIXES = ("/read/",)
+    STATIC_SUFFIXES = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg")
+
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        path = request.url.path
+        if any(path.startswith(p) for p in self.STATIC_PREFIXES) and any(
+            path.endswith(s) for s in self.STATIC_SUFFIXES
+        ):
+            # Book images/thumbnails never change once processed
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        elif path.startswith("/cover/"):
+            response.headers["Cache-Control"] = "public, max-age=86400"
+        return response
+
+
+# ---------------------------------------------------------------------------
+# Lifespan: startup / shutdown hooks
+# ---------------------------------------------------------------------------
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("Reader3 starting up")
+    yield
+    logger.info("Reader3 shutting down – flushing user data")
+    user_data_manager.flush()
+    _io_executor.shutdown(wait=False)
+
+
+app = FastAPI(lifespan=lifespan)
+
+# --- Middleware (applied bottom-to-top, so GZip wraps everything) ---
+app.add_middleware(CacheControlMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(GZipMiddleware, minimum_size=500, compresslevel=6)
 
 # Upload processing status tracking
 # Keys: upload_id -> {status, progress, message, book_id, filename, started_at, completed_at}
@@ -100,9 +186,21 @@ else:
 # Initialize user data manager
 user_data_manager = UserDataManager(BOOKS_DIR)
 
-print(f"Books directory: {BOOKS_DIR}")
-print(f"Templates directory: {templates_dir}")
-print(f"Current working directory: {os.getcwd()}")
+logger.info("Books directory: %s", BOOKS_DIR)
+logger.info("Templates directory: %s", templates_dir)
+logger.info("Current working directory: %s", os.getcwd())
+
+
+# ---------------------------------------------------------------------------
+# Health check
+# ---------------------------------------------------------------------------
+@app.get("/health")
+async def health_check():
+    """Health check for load balancers and monitoring."""
+    return {
+        "status": "ok",
+        "books_dir_exists": os.path.exists(BOOKS_DIR),
+    }
 
 
 @lru_cache(maxsize=50)
@@ -120,7 +218,7 @@ def load_book_cached(folder_name: str) -> Optional[Book]:
             book = pickle.load(f)
         return book
     except Exception as e:
-        print(f"Error loading book {folder_name}: {e}")
+        logger.error("Error loading book %s: %s", folder_name, e)
         return None
 
 
@@ -133,7 +231,7 @@ def load_book_metadata(folder_name: str) -> Optional[dict]:
             with open(meta_path, "r", encoding="utf-8") as f:
                 return json.load(f)
         except Exception as e:
-            print(f"Error reading metadata for {folder_name}: {e}")
+            logger.error("Error reading metadata for %s: %s", folder_name, e)
 
     book = load_book_cached(folder_name)
     if not book:
@@ -161,7 +259,7 @@ def write_book_metadata(folder_name: str, book: Book) -> dict:
         with open(meta_path, "w", encoding="utf-8") as f:
             json.dump(metadata, f, ensure_ascii=False)
     except Exception as e:
-        print(f"Error writing metadata for {folder_name}: {e}")
+        logger.error("Error writing metadata for %s: %s", folder_name, e)
 
     return metadata
 
@@ -207,24 +305,28 @@ async def library_view(request: Request, sort: str = "recent"):
     """Lists all available processed books."""
     books = []
 
-    # Scan directory for folders ending in '_data' that have a book.pkl
-    if os.path.exists(BOOKS_DIR):
-        for item in os.listdir(BOOKS_DIR):
-            item_path = os.path.join(BOOKS_DIR, item)
-            if item.endswith("_data") and os.path.isdir(item_path):
-                # Try to load lightweight metadata
-                meta = load_book_metadata(item)
-                if meta:
-                    books.append(
-                        {
-                            "id": item,
-                            "title": meta.get("title", "Untitled"),
-                            "author": ", ".join(meta.get("authors", [])),
-                            "chapters": meta.get("chapters", 0),
-                            "added_at": meta.get("added_at"),
-                            "cover_image": meta.get("cover_image"),
-                        }
-                    )
+    def _scan_books():
+        """Blocking scan moved off the event loop."""
+        result = []
+        if os.path.exists(BOOKS_DIR):
+            for item in os.listdir(BOOKS_DIR):
+                item_path = os.path.join(BOOKS_DIR, item)
+                if item.endswith("_data") and os.path.isdir(item_path):
+                    meta = load_book_metadata(item)
+                    if meta:
+                        result.append(
+                            {
+                                "id": item,
+                                "title": meta.get("title", "Untitled"),
+                                "author": ", ".join(meta.get("authors", [])),
+                                "chapters": meta.get("chapters", 0),
+                                "added_at": meta.get("added_at"),
+                                "cover_image": meta.get("cover_image"),
+                            }
+                        )
+        return result
+
+    books = await _run_sync(_scan_books)
 
     # Sort books based on the sort parameter
     if sort == "recent":
@@ -324,10 +426,10 @@ def process_book_background(upload_id: str, temp_path: str, suffix: str, full_ou
             book_id=out_dir,
             completed_at=datetime.now().timestamp()
         )
-        print(f"Background processing completed for {out_dir}")
+        logger.info("Background processing completed for %s", out_dir)
 
     except Exception as e:
-        print(f"Error processing book in background: {e}")
+        logger.error("Error processing book in background: %s", e)
         # Clean up partial data if failed
         if os.path.exists(full_out_dir):
             shutil.rmtree(full_out_dir)
@@ -354,8 +456,19 @@ async def upload_book(file: UploadFile = File(...), background: bool = False, ba
             status_code=400, detail="Only .epub and .pdf files are supported"
         )
 
+    # Stream the upload to a temp file with size enforcement
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        shutil.copyfileobj(file.file, tmp)
+        bytes_written = 0
+        while chunk := await file.read(1024 * 256):  # 256 KB chunks
+            bytes_written += len(chunk)
+            if bytes_written > MAX_UPLOAD_BYTES:
+                tmp.close()
+                os.remove(tmp.name)
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"File too large. Maximum size is {MAX_UPLOAD_BYTES // (1024*1024)} MB.",
+                )
+            tmp.write(chunk)
         temp_path = tmp.name
 
     safe_filename = os.path.basename(file.filename)
@@ -393,7 +506,7 @@ async def upload_book(file: UploadFile = File(...), background: bool = False, ba
 
     # Synchronous processing (original behavior for EPUBs)
     try:
-        print(f"Processing {temp_path} -> {full_out_dir}")
+        logger.info("Processing %s -> %s", temp_path, full_out_dir)
 
         if suffix == ".pdf":
             from reader3 import process_pdf
@@ -408,7 +521,7 @@ async def upload_book(file: UploadFile = File(...), background: bool = False, ba
         load_book_metadata.cache_clear()
 
     except Exception as e:
-        print(f"Error processing book: {e}")
+        logger.error("Error processing book: %s", e)
         if os.path.exists(full_out_dir):
             shutil.rmtree(full_out_dir)
         raise HTTPException(status_code=500, detail=f"Failed to process book: {str(e)}")
@@ -599,7 +712,7 @@ async def delete_book(book_id: str):
         user_data_manager.cleanup_collection_books(safe_book_id)
         return {"status": "deleted"}
     except Exception as e:
-        print(f"Error deleting book {safe_book_id}: {e}")
+        logger.error("Error deleting book %s: %s", safe_book_id, e)
         raise HTTPException(
             status_code=500, detail=f"Failed to delete book: {str(e)}"
         )
@@ -648,7 +761,7 @@ async def reprocess_pdf(book_id: str):
 
         return {"status": "success", "message": "PDF reprocessed successfully"}
     except Exception as e:
-        print(f"Error reprocessing PDF {safe_book_id}: {e}")
+        logger.error("Error reprocessing PDF %s: %s", safe_book_id, e)
         raise HTTPException(
             status_code=500, detail=f"Failed to reprocess PDF: {str(e)}"
         )
@@ -936,23 +1049,26 @@ async def search_books(q: str, book_id: str = None, mode: str = "exact"):
     if not q or len(q) < 2:
         return {"results": [], "query": q, "total": 0, "mode": mode}
 
-    results = []
-    query_lower = q.lower()
     # Total results limit (allow more to show all instances)
     max_total_results = 500
 
     # Determine which books to search
     book_ids = [book_id] if book_id else get_all_book_ids()
 
-    if mode == "semantic":
-        results = semantic_search_books(
-            query=q,
-            book_ids=book_ids,
-            books_dir=BOOKS_DIR,
-            load_book_fn=load_book_cached,
-            limit=max_total_results,
-        )
-    else:
+    def _do_search():
+        """Run the actual search off the event loop."""
+        results = []
+        query_lower = q.lower()
+
+        if mode == "semantic":
+            return semantic_search_books(
+                query=q,
+                book_ids=book_ids,
+                books_dir=BOOKS_DIR,
+                load_book_fn=load_book_cached,
+                limit=max_total_results,
+            )
+
         for bid in book_ids:
             if len(results) >= max_total_results:
                 break
@@ -967,30 +1083,24 @@ async def search_books(q: str, book_id: str = None, mode: str = "exact"):
                 if len(results) >= max_total_results:
                     break
 
-                # Search in plain text
                 text = getattr(chapter, "text", "") or ""
                 if not text:
                     continue
 
                 text_lower = text.lower()
-
-                # Quick check: skip if query not in chapter at all
                 if query_lower not in text_lower:
                     continue
 
-                # Find ALL occurrences in this chapter
                 start = 0
                 while True:
                     pos = text_lower.find(query_lower, start)
                     if pos == -1:
                         break
 
-                    # Extract context (100 chars before and after)
                     context_start = max(0, pos - 100)
                     context_end = min(len(text), pos + len(q) + 100)
                     context = text[context_start:context_end]
 
-                    # Clean up context - trim to word boundaries
                     if context_start > 0:
                         space_idx = context.find(" ")
                         if space_idx > 0 and space_idx < 30:
@@ -1015,8 +1125,11 @@ async def search_books(q: str, book_id: str = None, mode: str = "exact"):
 
                     if len(results) >= max_total_results:
                         break
+                    start = pos + len(q)
 
-                    start = pos + len(q)  # Skip past this match
+        return results
+
+    results = await _run_sync(_do_search)
 
     # Record search in history
     search_query = SearchQuery(
@@ -1948,5 +2061,17 @@ async def set_book_collections(book_id: str, request: Request):
 if __name__ == "__main__":
     import uvicorn
 
-    print("Starting server at http://127.0.0.1:8123")
-    uvicorn.run(app, host="127.0.0.1", port=8123)
+    host = os.environ.get("HOST", "127.0.0.1")
+    port = int(os.environ.get("PORT", 8123))
+    workers = int(os.environ.get("WEB_CONCURRENCY", 1))
+
+    logger.info("Starting server at http://%s:%d (workers=%d)", host, port, workers)
+    uvicorn.run(
+        "server:app",
+        host=host,
+        port=port,
+        workers=workers,
+        log_level=os.environ.get("LOG_LEVEL", "info").lower(),
+        timeout_keep_alive=30,
+        limit_concurrency=100,
+    )

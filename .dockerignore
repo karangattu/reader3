@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pkl
+*.egg-info/
+.git/
+.venv/
+venv/
+build/
+dist/
+*.spec
+*.epub
+*.pdf
+node_modules/
+.pytest_cache/
+*_data/
+.DS_Store

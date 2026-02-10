@@ -2,13 +2,31 @@ services:
   - type: web
     name: reader3
     env: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
+    buildCommand: pip install --no-cache-dir -r requirements.txt
+    startCommand: >-
+      uvicorn server:app
+      --host 0.0.0.0
+      --port $PORT
+      --workers ${WEB_CONCURRENCY:-2}
+      --timeout-keep-alive 30
+      --limit-concurrency 100
+      --log-level info
+    healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
-        value: 3.11.9
+        value: 3.12.0
       - key: BOOKS_DIR
         value: /var/data/books
+      - key: READER3_BOOKS_DIR
+        value: /var/data/books
+      - key: WEB_CONCURRENCY
+        value: "2"
+      - key: IO_WORKERS
+        value: "4"
+      - key: MAX_UPLOAD_MB
+        value: "500"
+      - key: LOG_LEVEL
+        value: info
     disk:
       name: reader_data
       mountPath: /var/data
