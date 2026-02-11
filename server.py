@@ -19,6 +19,7 @@ from fastapi.responses import (
     RedirectResponse,
     PlainTextResponse,
     JSONResponse,
+    ORJSONResponse,
 )
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.templating import Jinja2Templates
@@ -122,7 +123,10 @@ async def lifespan(app: FastAPI):
     _io_executor.shutdown(wait=False)
 
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(
+    lifespan=lifespan,
+    default_response_class=ORJSONResponse,
+)
 
 # --- Middleware (applied bottom-to-top, so GZip wraps everything) ---
 app.add_middleware(CacheControlMiddleware)

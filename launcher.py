@@ -107,12 +107,17 @@ def main():
         threading.Thread(target=open_browser, daemon=True).start()
 
         # Run server
-        uvicorn.run(
-            app,
-            host="127.0.0.1",
-            port=8123,
-            log_level="info"
-        )
+        uvicorn_kwargs = {
+            "host": "127.0.0.1",
+            "port": 8123,
+            "log_level": "info",
+        }
+
+        # Prefer uvloop/httptools for faster event loop and HTTP parsing
+        if sys.platform != "win32":
+            uvicorn_kwargs.update({"loop": "uvloop", "http": "httptools"})
+
+        uvicorn.run(app, **uvicorn_kwargs)
     except Exception as e:
         # Log errors to a file when running as executable
         log_error(f"Fatal error: {e}")
