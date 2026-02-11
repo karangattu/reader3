@@ -2,6 +2,23 @@
 
 All notable changes to Reader3 will be documented in this file.
 
+## [1.6.3] - 2026-02-11
+
+### Added
+- Containerization and production readiness: Dockerfile/.dockerignore plus updated render.yaml make releases easier to build, health-checked, and run with sensible defaults.
+- ai_service now reuses an `httpx.AsyncClient` with timeouts so Gemini/Ollama calls keep connections pooled.
+
+### Changed
+- Server startup now prefers `uvloop`/`httptools`, runs uvicorn via a kwargs dict, and defaults to `ORJSONResponse` for faster serialization, making JSON APIs snappier.
+- Background I/O handling grew stronger with structured logging, sani-tized book fields, upload streaming guards, gzip/security/cache middleware, and helper utilities for offloading blocking work, plus the new health endpoint and executor lifecycle hooks.
+- PDF imports received thorough validation/sanitization, an atomic temp-dir build-and-swap, placeholder pages for recoverable issues, per-page error handling, richer status messaging, and expanded upload modal controls (cancel/retry/backoff and better error guidance).
+- Copy/clipboard flows gained a helper that works in constrained environments, a new info toast style, rename of page copy UI, text-layer fallbacks, inline heading copy buttons, and consistent shortcut/help messaging.
+
+### Technical
+- Tests now use a `conftest.py` fixture that isolates book data and clears caches so automation never touches real user files, while `user_data.py` introduces debounced/atomic writes and exposed flush helpers for the new lifecycle hooks.
+- The server now tracks active uploads, sanitizes filenames, and adds progress callbacks plus improved cleanup to keep partial uploads from leaking state.
+- launcher.py, server.py, and user_data.py gained new helpers for running blocking tasks on a ThreadPoolExecutor, triggering durable saves, and using environment-configurable host/port/workers.
+
 ## [1.6.2] - 2026-02-06
 
 ### Fixed
