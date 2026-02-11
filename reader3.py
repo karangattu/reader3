@@ -143,6 +143,70 @@ def extract_plain_text(soup: BeautifulSoup) -> str:
     return ' '.join(text.split())
 
 
+def sanitize_text(value: Optional[str]) -> Optional[str]:
+    """Replace invalid UTF-16 surrogate code points with the replacement char."""
+    if value is None or not isinstance(value, str):
+        return value
+    has_surrogates = False
+    for ch in value:
+        code = ord(ch)
+        if 0xD800 <= code <= 0xDFFF:
+            has_surrogates = True
+            break
+    if not has_surrogates:
+        return value
+    return ''.join(
+        '\uFFFD' if 0xD800 <= ord(ch) <= 0xDFFF else ch
+        for ch in value
+    )
+
+
+def sanitize_toc_entries(entries: List[TOCEntry]) -> None:
+    """Sanitize TOC entry titles in-place to avoid invalid Unicode."""
+    for entry in entries:
+        entry.title = sanitize_text(entry.title) or entry.title
+        entry.href = sanitize_text(entry.href) or entry.href
+        entry.file_href = sanitize_text(entry.file_href) or entry.file_href
+        entry.anchor = sanitize_text(entry.anchor) or entry.anchor
+        if entry.children:
+            sanitize_toc_entries(entry.children)
+
+
+def sanitize_book_text_fields(book: 'Book') -> None:
+    """Sanitize text fields in a Book to avoid invalid Unicode at render time."""
+    if getattr(book, 'metadata', None):
+        book.metadata.title = sanitize_text(book.metadata.title) or book.metadata.title
+        book.metadata.language = sanitize_text(book.metadata.language) or book.metadata.language
+        book.metadata.description = sanitize_text(book.metadata.description)
+        book.metadata.publisher = sanitize_text(book.metadata.publisher)
+        book.metadata.date = sanitize_text(book.metadata.date)
+        book.metadata.authors = [sanitize_text(a) or a for a in book.metadata.authors]
+        book.metadata.identifiers = [sanitize_text(i) or i for i in book.metadata.identifiers]
+        book.metadata.subjects = [sanitize_text(s) or s for s in book.metadata.subjects]
+
+    book.source_file = sanitize_text(getattr(book, 'source_file', None)) or getattr(book, 'source_file', None)
+    book.cover_image = sanitize_text(getattr(book, 'cover_image', None)) or getattr(book, 'cover_image', None)
+
+    if getattr(book, 'toc', None):
+        sanitize_toc_entries(book.toc)
+
+    if getattr(book, 'spine', None):
+        for ch in book.spine:
+            ch.id = sanitize_text(ch.id) or ch.id
+            ch.href = sanitize_text(ch.href) or ch.href
+            ch.title = sanitize_text(ch.title) or ch.title
+            ch.content = sanitize_text(ch.content) or ch.content
+            ch.text = sanitize_text(ch.text) or ch.text
+
+    if getattr(book, 'images', None):
+        sanitized_images = {}
+        for k, v in book.images.items():
+            sk = sanitize_text(k) or k
+            sv = sanitize_text(v) or v
+            sanitized_images[sk] = sv
+        book.images = sanitized_images
+
+
 def parse_toc_recursive(toc_list, depth=0) -> List[TOCEntry]:
     """
     Recursively parses the TOC structure from ebooklib.
@@ -433,143 +497,373 @@ def generate_pdf_page_image(page, page_num: int, images_dir: str,
     return f"images/{img_filename}"
 
 
+def validate_pdf(pdf_path: str) -> dict:
+    """
+    Validate that a file is a readable PDF before starting heavy processing.
+    Returns dict with 'valid' bool, 'error' str (if invalid), and 'info' dict.
+    """
+    import fitz  # PyMuPDF
+
+    result = {"valid": False, "error": None, "info": {}}
+
+    # Check magic bytes (%PDF-)
+    try:
+        with open(pdf_path, "rb") as f:
+            header = f.read(8)
+        if not header.startswith(b"%PDF"):
+            result["error"] = "File is not a valid PDF (bad header magic bytes)."
+            return result
+    except OSError as e:
+        result["error"] = f"Cannot read file: {e}"
+        return result
+
+    # Try opening with PyMuPDF
+    try:
+        doc = fitz.open(pdf_path)
+    except Exception as e:
+        result["error"] = f"Cannot open PDF: {e}"
+        return result
+
+    try:
+        if doc.needs_pass:
+            doc.close()
+            result["error"] = "PDF is password-protected. Please remove the password and re-upload."
+            return result
+
+        if doc.is_encrypted:
+            doc.close()
+            result["error"] = "PDF is encrypted. Please decrypt the file and re-upload."
+            return result
+
+        total_pages = len(doc)
+        if total_pages == 0:
+            doc.close()
+            result["error"] = "PDF has no pages."
+            return result
+
+        # Quick sanity check: try to access the first page
+        try:
+            _ = doc[0].rect
+        except Exception as e:
+            doc.close()
+            result["error"] = f"PDF appears corrupted (cannot read first page): {e}"
+            return result
+
+        result["valid"] = True
+        result["info"] = {
+            "pages": total_pages,
+            "title": doc.metadata.get("title", ""),
+            "author": doc.metadata.get("author", ""),
+        }
+        doc.close()
+    except Exception as e:
+        try:
+            doc.close()
+        except Exception:
+            pass
+        result["error"] = f"Error inspecting PDF: {e}"
+
+    return result
+
+
 def process_pdf(pdf_path: str, output_dir: str,
-                generate_thumbnails: bool = True) -> Book:
+                generate_thumbnails: bool = True,
+                progress_callback=None,
+                source_filename: Optional[str] = None) -> Book:
     """
     Process a PDF file into a structured Book object.
     Renders each page as an image (like a traditional PDF reader)
     while extracting text separately for search and copy functionality.
+
+    Args:
+        pdf_path: Path to source PDF.
+        output_dir: Final destination directory for the processed book.
+        generate_thumbnails: Whether to render page thumbnails.
+        progress_callback: Optional ``fn(percent, message)`` called during processing.
     """
     import fitz  # PyMuPDF
 
+    def _progress(pct: int, msg: str):
+        if progress_callback:
+            try:
+                progress_callback(pct, msg)
+            except Exception:
+                pass
+
+    # --- 1. Validate -----------------------------------------------------------
+    _progress(5, "Validating PDF…")
+    validation = validate_pdf(pdf_path)
+    if not validation["valid"]:
+        raise ValueError(validation["error"])
+
+    # --- 2. Open ---------------------------------------------------------------
+    _progress(8, "Opening PDF…")
     print(f"Loading {pdf_path}...")
-    doc = fitz.open(pdf_path)
+    try:
+        doc = fitz.open(pdf_path)
+    except Exception as e:
+        raise ValueError(f"Failed to open PDF: {e}")
+
     total_pages = len(doc)
 
-    # Extract Metadata
+    # Extract Metadata (defensively)
+    raw_meta = doc.metadata or {}
+    display_name = source_filename or os.path.basename(pdf_path)
+    display_title = os.path.splitext(display_name)[0] or display_name
     metadata = BookMetadata(
-        title=doc.metadata.get('title') or os.path.basename(pdf_path),
-        language=doc.metadata.get('language') or "en",
+        title=raw_meta.get('title') or display_title,
+        language=raw_meta.get('language') or "en",
         authors=(
-            [doc.metadata.get('author')]
-            if doc.metadata.get('author') else []
+            [raw_meta.get('author')]
+            if raw_meta.get('author') else []
         ),
-        publisher=doc.metadata.get('producer'),
-        date=doc.metadata.get('creationDate'),
+        publisher=raw_meta.get('producer'),
+        date=raw_meta.get('creationDate'),
         subjects=(
-            [doc.metadata.get('subject')]
-            if doc.metadata.get('subject') else []
+            [raw_meta.get('subject')]
+            if raw_meta.get('subject') else []
         )
     )
 
-    # Prepare Output Directories
-    if os.path.exists(output_dir):
-        shutil.rmtree(output_dir)
-    images_dir = os.path.join(output_dir, 'images')
-    thumbs_dir = os.path.join(output_dir, 'thumbnails')
-    os.makedirs(images_dir, exist_ok=True)
-    if generate_thumbnails:
-        os.makedirs(thumbs_dir, exist_ok=True)
-    
-    # Copy original PDF to _data folder for on-demand text extraction
-    pdf_copy_name = 'source.pdf'
-    pdf_copy_path = os.path.join(output_dir, pdf_copy_name)
-    shutil.copy2(pdf_path, pdf_copy_path)
+    # --- 3. Build into a *temp* directory, then swap atomically ----------------
+    # This prevents destroying an existing good copy if processing fails.
+    import tempfile
+    parent_dir = os.path.dirname(os.path.abspath(output_dir))
+    os.makedirs(parent_dir, exist_ok=True)
+    tmp_dir = tempfile.mkdtemp(prefix=".reader3_pdf_", dir=parent_dir)
 
-    spine_chapters = []
-    image_map = {}
-    pdf_page_data = {}
-
-    # Extract native outline/TOC
-    print("Extracting PDF outline...")
-    toc_structure = extract_pdf_outline(doc)
-    has_native_toc = len(toc_structure) > 0
-
-    if not toc_structure:
-        print("No native TOC found, will create page-based navigation.")
-
-    print(f"Processing {total_pages} PDF pages...")
-
-    for i, page in enumerate(doc):
-        rect = page.rect
-        height = rect.height
-        width = rect.width
-
-        # Extract plain text for search/copy (full page, no clipping)
-        page_text = page.get_text("text")
-
-        # Render page as image for display
-        page_image_path = generate_pdf_page_image(page, i, images_dir)
-        image_map[f"page_{i+1}"] = page_image_path
-
-        # Note: text_blocks no longer stored - extracted on-demand from source.pdf
-
-        # Extract annotations
-        annotations = extract_pdf_annotations(page)
-
-        # Generate thumbnail if requested
+    try:
+        images_dir = os.path.join(tmp_dir, 'images')
+        thumbs_dir = os.path.join(tmp_dir, 'thumbnails')
+        os.makedirs(images_dir, exist_ok=True)
         if generate_thumbnails:
-            generate_pdf_thumbnail(page, i, thumbs_dir)
+            os.makedirs(thumbs_dir, exist_ok=True)
 
-        # Store page-specific data (without text_blocks to reduce pickle size)
-        pdf_page_data[i] = PDFPageData(
-            page_num=i,
-            width=width,
-            height=height,
-            rotation=page.rotation,
-            annotations=annotations,
-            has_images=True,  # We render the whole page as image
-            word_count=len(page_text.split())
-        )
+        # Copy original PDF to _data folder for on-demand text extraction
+        pdf_copy_name = 'source.pdf'
+        pdf_copy_path = os.path.join(tmp_dir, pdf_copy_name)
+        shutil.copy2(pdf_path, pdf_copy_path)
 
-        # Create chapter content - use image tag instead of messy HTML
-        chapter_id = f"page_{i+1}"
-        chapter_title = f"Page {i+1}"
+        spine_chapters = []
+        image_map = {}
+        pdf_page_data = {}
+        failed_pages = []
 
-        # HTML content shows the rendered page image
-        # Text is stored separately for copy functionality
-        content_html = f'''<div class="pdf-page-image-container">
+        # Extract native outline/TOC
+        _progress(12, "Extracting PDF outline…")
+        print("Extracting PDF outline...")
+        try:
+            toc_structure = extract_pdf_outline(doc)
+        except Exception as e:
+            print(f"Warning: Failed to extract TOC: {e}")
+            toc_structure = []
+        has_native_toc = len(toc_structure) > 0
+
+        if not toc_structure:
+            print("No native TOC found, will create page-based navigation.")
+
+        _progress(15, f"Processing {total_pages} pages…")
+        print(f"Processing {total_pages} PDF pages...")
+
+        for i in range(total_pages):
+            # Real progress: 15 ‥ 90 proportional to page count
+            page_pct = 15 + int(75 * (i / max(total_pages, 1)))
+            _progress(page_pct, f"Processing page {i+1}/{total_pages}…")
+
+            try:
+                page = doc[i]
+            except Exception as e:
+                print(f"Warning: Could not load page {i+1}: {e}")
+                failed_pages.append(i)
+                # Insert placeholder so page numbering stays consistent
+                _insert_placeholder_page(
+                    i, spine_chapters, image_map, pdf_page_data,
+                    toc_structure, has_native_toc, error_msg=str(e)
+                )
+                continue
+
+            try:
+                rect = page.rect
+                height = rect.height
+                width = rect.width
+
+                # Extract plain text for search/copy (full page, no clipping)
+                try:
+                    page_text = page.get_text("text")
+                except Exception as e:
+                    print(f"Warning: Text extraction failed for page {i+1}: {e}")
+                    page_text = ""
+
+                # Render page as image for display
+                try:
+                    page_image_path = generate_pdf_page_image(page, i, images_dir)
+                except Exception as e:
+                    print(f"Warning: Image render failed for page {i+1}: {e}")
+                    failed_pages.append(i)
+                    _insert_placeholder_page(
+                        i, spine_chapters, image_map, pdf_page_data,
+                        toc_structure, has_native_toc,
+                        error_msg=f"Render failed: {e}"
+                    )
+                    continue
+
+                image_map[f"page_{i+1}"] = page_image_path
+
+                # Extract annotations (non-critical; skip on error)
+                try:
+                    annotations = extract_pdf_annotations(page)
+                except Exception as e:
+                    print(f"Warning: Annotation extraction failed for page {i+1}: {e}")
+                    annotations = []
+
+                # Generate thumbnail if requested (non-critical)
+                if generate_thumbnails:
+                    try:
+                        generate_pdf_thumbnail(page, i, thumbs_dir)
+                    except Exception as e:
+                        print(f"Warning: Thumbnail generation failed for page {i+1}: {e}")
+
+                # Store page-specific data
+                pdf_page_data[i] = PDFPageData(
+                    page_num=i,
+                    width=width,
+                    height=height,
+                    rotation=page.rotation,
+                    annotations=annotations,
+                    has_images=True,
+                    word_count=len(page_text.split()) if page_text else 0
+                )
+
+                # Create chapter content
+                chapter_id = f"page_{i+1}"
+                chapter_title = f"Page {i+1}"
+
+                content_html = f'''<div class="pdf-page-image-container">
 <img src="{page_image_path}" alt="Page {i+1}" class="pdf-page-image" />
 </div>'''
 
-        # If no native TOC, add each page to the TOC
-        if not has_native_toc:
-            toc_structure.append(TOCEntry(
-                title=chapter_title,
-                href=chapter_id,
-                file_href=chapter_id,
-                anchor=""
-            ))
+                if not has_native_toc:
+                    toc_structure.append(TOCEntry(
+                        title=chapter_title,
+                        href=chapter_id,
+                        file_href=chapter_id,
+                        anchor=""
+                    ))
 
-        chapter = ChapterContent(
-            id=chapter_id,
-            href=chapter_id,
-            title=chapter_title,
-            content=content_html,
-            text=page_text,  # Full text for search/copy
-            order=i
+                chapter = ChapterContent(
+                    id=chapter_id,
+                    href=chapter_id,
+                    title=chapter_title,
+                    content=content_html,
+                    text=page_text,
+                    order=i
+                )
+                spine_chapters.append(chapter)
+
+            except Exception as e:
+                print(f"Warning: Unexpected error processing page {i+1}: {e}")
+                failed_pages.append(i)
+                _insert_placeholder_page(
+                    i, spine_chapters, image_map, pdf_page_data,
+                    toc_structure, has_native_toc, error_msg=str(e)
+                )
+
+        doc.close()
+
+        # If *every* page failed, that's still an error
+        if len(failed_pages) == total_pages:
+            raise ValueError(
+                f"All {total_pages} pages failed to process. "
+                "The PDF may be severely corrupted."
+            )
+
+        if failed_pages:
+            print(f"Warning: {len(failed_pages)} of {total_pages} page(s) had errors "
+                  f"and were replaced with placeholders: {failed_pages}")
+
+        _progress(92, "Saving book data…")
+
+        final_book = Book(
+            metadata=metadata,
+            spine=spine_chapters,
+            toc=toc_structure,
+            images=image_map,
+            source_file=display_name,
+            processed_at=datetime.now().isoformat(),
+            added_at=datetime.now().isoformat(),
+            is_pdf=True,
+            pdf_page_data=pdf_page_data,
+            pdf_total_pages=total_pages,
+            pdf_has_toc=has_native_toc,
+            pdf_thumbnails_generated=generate_thumbnails,
+            pdf_source_path=pdf_copy_name
         )
-        spine_chapters.append(chapter)
 
-    doc.close()
+        sanitize_book_text_fields(final_book)
 
-    final_book = Book(
-        metadata=metadata,
-        spine=spine_chapters,
-        toc=toc_structure,
-        images=image_map,
-        source_file=os.path.basename(pdf_path),
-        processed_at=datetime.now().isoformat(),
-        added_at=datetime.now().isoformat(),
-        is_pdf=True,
-        pdf_page_data=pdf_page_data,
-        pdf_total_pages=total_pages,
-        pdf_has_toc=has_native_toc,
-        pdf_thumbnails_generated=generate_thumbnails,
-        pdf_source_path=pdf_copy_name  # Relative path to source.pdf
+        # --- 4. Atomic swap: tmp_dir -> output_dir ----------------------------
+        _progress(95, "Finalising…")
+        if os.path.exists(output_dir):
+            backup_dir = output_dir + ".__old"
+            # Remove stale backup if present
+            if os.path.exists(backup_dir):
+                shutil.rmtree(backup_dir, ignore_errors=True)
+            os.rename(output_dir, backup_dir)
+            try:
+                os.rename(tmp_dir, output_dir)
+            except Exception:
+                # Restore the old directory on rename failure
+                os.rename(backup_dir, output_dir)
+                raise
+            shutil.rmtree(backup_dir, ignore_errors=True)
+        else:
+            os.rename(tmp_dir, output_dir)
+
+        tmp_dir = None  # Prevent cleanup in finally
+        _progress(100, "Done!")
+        return final_book
+
+    finally:
+        # Clean up temp dir on any failure
+        if tmp_dir and os.path.exists(tmp_dir):
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+        try:
+            doc.close()
+        except Exception:
+            pass
+
+
+def _insert_placeholder_page(
+    page_idx: int,
+    spine_chapters: list,
+    image_map: dict,
+    pdf_page_data: dict,
+    toc_structure: list,
+    has_native_toc: bool,
+    error_msg: str = "Page could not be rendered",
+):
+    """Insert a placeholder entry for a page that failed to process."""
+    chapter_id = f"page_{page_idx + 1}"
+    chapter_title = f"Page {page_idx + 1}"
+    content_html = (
+        f'<div class="pdf-page-image-container" style="padding:40px; text-align:center; '
+        f'color:#999; background:#f9f9f9; border:1px dashed #ccc; border-radius:8px;">'
+        f'<p style="font-size:1.2em;">⚠ Page {page_idx + 1} could not be rendered</p>'
+        f'<p style="font-size:0.85em;">{error_msg}</p></div>'
     )
-
-    return final_book
+    if not has_native_toc:
+        toc_structure.append(TOCEntry(
+            title=chapter_title, href=chapter_id,
+            file_href=chapter_id, anchor=""
+        ))
+    pdf_page_data[page_idx] = PDFPageData(
+        page_num=page_idx, width=0, height=0, rotation=0,
+        has_images=False, word_count=0
+    )
+    spine_chapters.append(ChapterContent(
+        id=chapter_id, href=chapter_id, title=chapter_title,
+        content=content_html, text="", order=page_idx
+    ))
 
 
 def export_pdf_pages(book: Book, output_path: str, start_page: int,

@@ -1176,8 +1176,8 @@
     <div id="upload-progress-modal">
         <div class="upload-progress-content">
             <div class="upload-progress-header">
-                <div class="upload-spinner"></div>
-                <div class="upload-progress-title">Uploading Book</div>
+                <div class="upload-spinner" id="upload-spinner"></div>
+                <div class="upload-progress-title" id="upload-progress-title">Uploading Book</div>
             </div>
             <div class="upload-file-name" id="upload-file-name">—</div>
             <div class="upload-progress-bar">
@@ -1185,6 +1185,11 @@
             </div>
             <div class="upload-progress-text" id="upload-progress-text">0%</div>
             <div id="upload-status-message"></div>
+            <div style="display:flex; gap:10px; margin-top:18px; justify-content:flex-end;" id="upload-modal-actions">
+                <button class="btn" id="upload-cancel-btn" style="background:#e74c3c; color:#fff; padding:8px 18px; border:none; border-radius:6px; cursor:pointer; display:none;">Cancel</button>
+                <button class="btn" id="upload-retry-btn" style="background:#3498db; color:#fff; padding:8px 18px; border:none; border-radius:6px; cursor:pointer; display:none;">Retry</button>
+                <button class="btn" id="upload-close-btn" style="background:#888; color:#fff; padding:8px 18px; border:none; border-radius:6px; cursor:pointer; display:none;">Close</button>
+            </div>
         </div>
     </div>
 
@@ -1511,6 +1516,19 @@
                 return;
             }
 
+            // Client-side file size check (200 MB default, matches server)
+            const maxSizeMB = 200;
+            if (file.size > maxSizeMB * 1024 * 1024) {
+                alert(`File is too large (${(file.size / (1024*1024)).toFixed(1)} MB). Maximum size is ${maxSizeMB} MB.`);
+                return;
+            }
+
+            // Reject empty files
+            if (file.size === 0) {
+                alert('The selected file is empty.');
+                return;
+            }
+
             // Upload the file
             uploadFile(file);
         }
@@ -1523,6 +1541,14 @@
         const progressText = document.getElementById('upload-progress-text');
         const fileNameDisplay = document.getElementById('upload-file-name');
         const statusMessage = document.getElementById('upload-status-message');
+        const cancelBtn = document.getElementById('upload-cancel-btn');
+        const retryBtn = document.getElementById('upload-retry-btn');
+        const closeBtn = document.getElementById('upload-close-btn');
+        const uploadSpinner = document.getElementById('upload-spinner');
+        const uploadTitle = document.getElementById('upload-progress-title');
+
+        let currentXhr = null;       // reference so we can abort
+        let lastUploadedFile = null; // for retry
 
         uploadForm.addEventListener('submit', function(e) {
             e.preventDefault();
@@ -1538,9 +1564,58 @@
             uploadFile(file);
         });
 
+        cancelBtn.addEventListener('click', function() {
+            if (currentXhr) {
+                currentXhr.abort();
+                currentXhr = null;
+            }
+            resetUploadModal();
+        });
+
+        retryBtn.addEventListener('click', function() {
+            if (lastUploadedFile) {
+                uploadFile(lastUploadedFile);
+            } else {
+                resetUploadModal();
+            }
+        });
+
+        closeBtn.addEventListener('click', function() {
+            resetUploadModal();
+        });
+
+        function resetUploadModal() {
+            uploadModal.classList.remove('active');
+            uploadBtn.disabled = false;
+            uploadBtn.textContent = 'Upload';
+            cancelBtn.style.display = 'none';
+            retryBtn.style.display = 'none';
+            closeBtn.style.display = 'none';
+            uploadSpinner.style.display = '';
+            uploadTitle.textContent = 'Uploading Book';
+            statusMessage.textContent = '';
+            statusMessage.className = 'upload-status-message';
+            currentXhr = null;
+        }
+
+        function showUploadError(msg) {
+            uploadSpinner.style.display = 'none';
+            uploadTitle.textContent = 'Upload Failed';
+            statusMessage.innerHTML = `<i class="fa-solid fa-xmark"></i> ${msg}`;
+            statusMessage.className = 'upload-status-message error';
+            cancelBtn.style.display = 'none';
+            retryBtn.style.display = '';
+            closeBtn.style.display = '';
+        }
+
         function uploadFile(file) {
+            lastUploadedFile = file;
             const formData = new FormData();
             formData.append('file', file);
+
+            // Disable the upload button to prevent double-submission
+            uploadBtn.disabled = true;
+            uploadBtn.textContent = 'Uploading…';
 
             // Show upload modal
             uploadModal.classList.add('active');
@@ -1549,9 +1624,15 @@
             progressText.textContent = '0%';
             statusMessage.textContent = '';
             statusMessage.className = 'upload-status-message';
+            uploadSpinner.style.display = '';
+            uploadTitle.textContent = 'Uploading Book';
+            cancelBtn.style.display = '';
+            retryBtn.style.display = 'none';
+            closeBtn.style.display = 'none';
 
             // Create XMLHttpRequest for progress tracking
             const xhr = new XMLHttpRequest();
+            currentXhr = xhr;
 
             // Track upload progress
             xhr.upload.addEventListener('progress', function(e) {
@@ -1564,6 +1645,9 @@
 
             // Handle completion
             xhr.addEventListener('load', function() {
+                currentXhr = null;
+                cancelBtn.style.display = 'none';
+
                 if (xhr.status === 303 || xhr.status === 200) {
                     // Upload successful (EPUB - synchronous processing)
                     progressFill.style.width = '100%';
@@ -1572,6 +1656,7 @@
                     statusMessage.className = 'upload-status-message success';
                     
                     setTimeout(function() {
+                        resetUploadModal();
                         window.location.href = '/';
                     }, 1000);
                 } else if (xhr.status === 202) {
@@ -1581,39 +1666,62 @@
                         const uploadId = response.upload_id;
                         
                         if (uploadId) {
-                            // Start polling for status
                             pollUploadStatus(uploadId);
                         } else {
-                            // Fallback: wait and redirect
                             setTimeout(function() {
+                                resetUploadModal();
                                 window.location.href = '/';
                             }, 3000);
                         }
                     } catch (e) {
-                        // Fallback for non-JSON response
                         setTimeout(function() {
+                            resetUploadModal();
                             window.location.href = '/';
                         }, 3000);
                     }
+                } else if (xhr.status === 409) {
+                    // Duplicate / already being processed
+                    let detail = 'This book is already being processed.';
+                    try {
+                        const resp = JSON.parse(xhr.responseText);
+                        if (resp.detail) detail = resp.detail;
+                        if (resp.upload_id) {
+                            // Attach to existing background task
+                            statusMessage.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${detail} Watching progress…`;
+                            statusMessage.className = 'upload-status-message processing';
+                            pollUploadStatus(resp.upload_id);
+                            return;
+                        }
+                    } catch (e) {}
+                    showUploadError(detail);
                 } else {
-                    // Error occurred
-                    statusMessage.innerHTML = '<i class="fa-solid fa-xmark"></i> Upload failed. Please try again.';
-                    statusMessage.className = 'upload-status-message error';
-                    
-                    setTimeout(function() {
-                        uploadModal.classList.remove('active');
-                    }, 3000);
+                    // Error - try to show the server's message
+                    let detail = 'Upload failed. Please try again.';
+                    try {
+                        const resp = JSON.parse(xhr.responseText);
+                        if (resp.detail) detail = resp.detail;
+                    } catch(e) {}
+                    showUploadError(detail);
                 }
             });
 
-            // Handle errors
+            // Handle network errors
             xhr.addEventListener('error', function() {
-                statusMessage.innerHTML = '<i class="fa-solid fa-xmark"></i> Upload failed. Please check your connection.';
-                statusMessage.className = 'upload-status-message error';
-                
-                setTimeout(function() {
-                    uploadModal.classList.remove('active');
-                }, 3000);
+                currentXhr = null;
+                showUploadError('Network error. Please check your connection and try again.');
+            });
+
+            // Handle aborts
+            xhr.addEventListener('abort', function() {
+                currentXhr = null;
+                resetUploadModal();
+            });
+
+            // Handle timeout
+            xhr.timeout = 10 * 60 * 1000; // 10 minutes
+            xhr.addEventListener('timeout', function() {
+                currentXhr = null;
+                showUploadError('Upload timed out. The file may be too large or the connection too slow.');
             });
 
             // Send request
@@ -1623,22 +1731,26 @@
 
         // Poll upload status for background processing (PDFs)
         function pollUploadStatus(uploadId) {
-            const maxAttempts = 120; // 2 minutes max (poll every second)
+            const maxAttempts = 600; // 10 minutes max (poll every second)
             let attempts = 0;
+            let consecutiveErrors = 0;
             
+            cancelBtn.style.display = 'none'; // can't cancel server-side processing
+
             const checkStatus = async function() {
                 attempts++;
                 
                 try {
                     const response = await fetch(`/api/upload/status/${uploadId}`);
                     if (!response.ok) {
-                        throw new Error('Status check failed');
+                        throw new Error(`Status ${response.status}`);
                     }
                     
+                    consecutiveErrors = 0; // reset on success
                     const status = await response.json();
                     
                     // Update progress based on server progress
-                    if (status.progress) {
+                    if (status.progress != null) {
                         progressFill.style.width = status.progress + '%';
                         progressText.textContent = Math.round(status.progress) + '%';
                     }
@@ -1657,6 +1769,7 @@
                         statusMessage.className = 'upload-status-message success';
                         
                         setTimeout(function() {
+                            resetUploadModal();
                             window.location.href = '/';
                         }, 1000);
                         return;
@@ -1664,12 +1777,8 @@
                     
                     // Check if failed
                     if (status.status === 'failed') {
-                        statusMessage.innerHTML = '<i class="fa-solid fa-xmark"></i> Processing failed. Please try again.';
-                        statusMessage.className = 'upload-status-message error';
-                        
-                        setTimeout(function() {
-                            uploadModal.classList.remove('active');
-                        }, 3000);
+                        const failMsg = status.message || 'Processing failed. Please try again.';
+                        showUploadError(failMsg);
                         return;
                     }
                     
@@ -1677,18 +1786,23 @@
                     if (attempts < maxAttempts) {
                         setTimeout(checkStatus, 1000);
                     } else {
-                        // Timeout - redirect anyway
-                        statusMessage.innerHTML = '<i class="fa-solid fa-check"></i> Processing may take longer. Redirecting...';
-                        statusMessage.className = 'upload-status-message success';
-                        setTimeout(function() {
-                            window.location.href = '/';
-                        }, 1000);
+                        statusMessage.innerHTML = '<i class="fa-solid fa-clock"></i> Processing is taking longer than expected. Check back later.';
+                        statusMessage.className = 'upload-status-message processing';
+                        closeBtn.style.display = '';
                     }
                 } catch (error) {
                     console.error('Error polling status:', error);
+                    consecutiveErrors++;
+                    if (consecutiveErrors >= 5) {
+                        showUploadError('Lost connection to server. The book may still be processing—check back shortly.');
+                        return;
+                    }
                     if (attempts < maxAttempts) {
-                        setTimeout(checkStatus, 1000);
+                        // Exponential backoff on errors: 1s, 2s, 4s, capped at 5s
+                        const delay = Math.min(1000 * Math.pow(2, consecutiveErrors - 1), 5000);
+                        setTimeout(checkStatus, delay);
                     } else {
+                        resetUploadModal();
                         window.location.href = '/';
                     }
                 }
