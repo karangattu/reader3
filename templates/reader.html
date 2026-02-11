@@ -162,6 +162,7 @@
         #copy-toast.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
         #copy-toast.success { background: #27ae60; }
         #copy-toast.error { background: #e74c3c; }
+        #copy-toast.info { background: #3498db; }
 
         /* Highlights */
         .highlight-yellow { background-color: rgba(255, 235, 59, 0.4); }
@@ -341,6 +342,10 @@
         .highlight-menu-color.pink { background: #e91e63; }
         .highlight-menu-color.purple { background: #9c27b0; }
 
+        /* Inline copy buttons next to headings */
+        .heading-copy-btn { margin-left: 8px; display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border: 1px solid #ddd; border-radius: 6px; background: #f8f9fa; color: #444; font-size: 0.8em; cursor: pointer; transition: all 0.15s; }
+        .heading-copy-btn:hover { background: #eef2ff; border-color: #d0d7ff; color: #2c3e50; }
+
     </style>
 </head>
 <body class="{{ 'is-pdf' if is_pdf else '' }}">
@@ -396,6 +401,7 @@
         <div class="shortcut-row"><span class="shortcut-key"><span class="kbd">←</span> <span class="kbd">→</span></span><span>Prev/Next chapter</span></div>
         <div class="shortcut-row"><span class="shortcut-key"><span class="kbd">⌘/Ctrl</span>+<span class="kbd">F</span></span><span>Search</span></div>
         <div class="shortcut-row"><span class="shortcut-key"><span class="kbd">⌘/Ctrl</span>+<span class="kbd">B</span></span><span>Bookmarks</span></div>
+        <div class="shortcut-row"><span class="shortcut-key"><span class="kbd">⌘/Ctrl</span>+<span class="kbd">Shift</span>+<span class="kbd">B</span></span><span>Add selection to batch</span></div>
         <div class="shortcut-row"><span class="shortcut-key"><span class="kbd">Esc</span></span><span>Close modals</span></div>
         <div class="shortcut-row"><span class="shortcut-key"><span class="kbd">?</span></span><span>Show/hide this help</span></div>
     </div>
@@ -688,7 +694,10 @@
                         <span class="pdf-page-number">Page {{ chapter_index + 1 }}</span>
                         <div class="pdf-page-actions">
                             <button class="pdf-copy-image-btn" onclick="copyPageImage(this, {{ chapter_index }})" title="Copy page as image to clipboard">
-                                <i class="fa-regular fa-image"></i> Copy Page
+                                <i class="fa-regular fa-image"></i> Copy Image
+                            </button>
+                            <button class="pdf-copy-image-btn" onclick="copyPageText(this, {{ chapter_index }})" title="Copy page text to clipboard">
+                                <i class="fa-regular fa-copy"></i> Copy Text
                             </button>
                         </div>
                     </div>
@@ -1230,7 +1239,7 @@
             
             const highlight = userHighlights.find(h => h.id === currentHighlightId);
             if (highlight && highlight.text) {
-                navigator.clipboard.writeText(highlight.text).then(() => {
+                clipboardWriteText(highlight.text).then(() => {
                     showToast('Text copied to clipboard');
                 }).catch(() => {
                     showToast('Failed to copy text', 'error');
@@ -1810,33 +1819,45 @@
         
         // Copy text from a specific PDF page
         async function copyPageText(button, pageIndex) {
+            // First try the hidden text element already in the DOM
+            let textToCopy = '';
             const textElement = document.getElementById(`pdf-text-${pageIndex}`);
-            if (!textElement) {
-                showCopyToast('Text not available', 'error');
-                return;
+            if (textElement) {
+                textToCopy = textElement.textContent.trim();
             }
-            
-            const textToCopy = textElement.textContent.trim();
+
+            // If no text found in DOM, fetch from text-layer API
             if (!textToCopy) {
-                showCopyToast('No text on this page', 'error');
+                try {
+                    const resp = await fetch(`/api/pdf/${encodeURIComponent(bookId)}/text-layer/${pageIndex}`);
+                    if (resp.ok) {
+                        const data = await resp.json();
+                        if (data.blocks && data.blocks.length > 0) {
+                            textToCopy = data.blocks.map(b => b.text).join('\n').trim();
+                        }
+                    }
+                } catch (e) {
+                    console.error('Text layer fetch failed:', e);
+                }
+            }
+
+            if (!textToCopy) {
+                showCopyToast('No text found on this page', 'info');
                 return;
             }
-            
+
             try {
-                await navigator.clipboard.writeText(textToCopy);
-                // Show success state on button
+                await clipboardWriteText(textToCopy);
                 button.classList.add('copied');
                 const originalText = button.innerHTML;
                 button.innerHTML = '<i class="fa-solid fa-check"></i> Copied!';
                 showCopyToast('Page text copied!', 'success');
-                
-                // Reset button after delay
                 setTimeout(() => {
                     button.classList.remove('copied');
                     button.innerHTML = originalText;
                 }, 2000);
             } catch (err) {
-                showCopyToast('Failed to copy', 'error');
+                showCopyToast('Failed to copy text', 'error');
             }
         }
 
@@ -2146,6 +2167,24 @@
             }
         }
         
+        // Clipboard helper with textarea fallback for older browsers / insecure contexts
+        async function clipboardWriteText(text) {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                return navigator.clipboard.writeText(text);
+            }
+            // Fallback: hidden textarea + execCommand
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.cssText = 'position:fixed;left:-9999px;top:-9999px;opacity:0';
+            document.body.appendChild(ta);
+            ta.select();
+            try {
+                document.execCommand('copy');
+            } finally {
+                document.body.removeChild(ta);
+            }
+        }
+
         // Show toast notification for copy actions
         function showCopyToast(message, type) {
             let toast = document.getElementById('copy-toast');
@@ -2156,7 +2195,7 @@
             }
             
             toast.textContent = message;
-            toast.className = `visible ${type}`;
+            toast.className = `visible ${type || 'success'}`;
             
             setTimeout(() => {
                 toast.classList.remove('visible');
@@ -2166,8 +2205,7 @@
         // Copy all loaded content (EPUB only - PDFs use image copy)
         async function copyAllLoaded() {
             if (isPDF) {
-                // PDFs use image-based copy - this function is for EPUBs only
-                showCopyToast('Use "Copy Page" button for PDF pages', 'info');
+                showCopyToast('Use "Copy Text" or "Copy Image" buttons on each page', 'info');
                 return;
             }
             
@@ -2176,17 +2214,16 @@
             
             const textToCopy = contentEl.innerText.trim();
             if (!textToCopy) {
-                showStatus('Nothing to copy.', '#dc3545');
+                showCopyToast('Nothing to copy.', 'error');
                 return;
             }
             
             try {
-                await navigator.clipboard.writeText(textToCopy);
-                showStatus('All loaded content copied!', '#198754');
-                // Mark chapter as read (100% progress)
+                await clipboardWriteText(textToCopy);
+                showCopyToast('All loaded content copied!', 'success');
                 await markChapterAsRead();
             } catch (err) {
-                showStatus('Clipboard unavailable.', '#dc3545');
+                showCopyToast('Clipboard unavailable.', 'error');
             }
         }
         
@@ -2248,16 +2285,16 @@
             const selectedText = selection.toString().trim();
             
             if (!selectedText) {
-                showStatus('No text selected.', '#dc3545');
+                showCopyToast('No text selected.', 'error');
                 return;
             }
             
             try {
-                await navigator.clipboard.writeText(selectedText);
-                showStatus('Selection copied!', '#198754');
+                await clipboardWriteText(selectedText);
+                showCopyToast('Selection copied!', 'success');
                 hideSelectionToolbar();
             } catch (err) {
-                showStatus('Clipboard unavailable.', '#dc3545');
+                showCopyToast('Clipboard unavailable.', 'error');
             }
         }
         
@@ -2267,13 +2304,13 @@
             const selectedText = selection.toString().trim();
             
             if (!selectedText) {
-                showStatus('No text selected.', '#dc3545');
+                showCopyToast('No text selected.', 'error');
                 return;
             }
             
             batchClipboard.push(selectedText);
             updateBatchButton();
-            showStatus(`Added to batch (${batchClipboard.length} items)`, '#3498db');
+            showCopyToast(`Added to batch (${batchClipboard.length} items)`, 'info');
             hideSelectionToolbar();
             
             // Clear the selection
@@ -2299,7 +2336,7 @@
         // Show batch clipboard modal
         async function showBatchClipboard() {
             if (batchClipboard.length === 0) {
-                showStatus('Batch clipboard is empty.', '#dc3545');
+                showCopyToast('Batch clipboard is empty.', 'error');
                 return;
             }
             
@@ -2314,21 +2351,16 @@
             
             if (action) {
                 try {
-                    await navigator.clipboard.writeText(fullText);
-                    showStatus(`Copied ${batchClipboard.length} items!`, '#198754');
+                    await clipboardWriteText(fullText);
+                    showCopyToast(`Copied ${batchClipboard.length} items!`, 'success');
                 } catch (err) {
-                    showStatus('Clipboard unavailable.', '#dc3545');
+                    showCopyToast('Clipboard unavailable.', 'error');
                 }
             } else {
                 batchClipboard = [];
                 updateBatchButton();
-                showStatus('Batch cleared.', '#3498db');
+                showCopyToast('Batch cleared.', 'info');
             }
-        }
-        
-        function showStatus(message, color) {
-            // Use toast for better UX
-            showToast(message, color === '#198754' ? 'success' : 'error');
         }
         
         // Mouse up handler for selection toolbar
@@ -2356,9 +2388,9 @@
             }
         });
         
-        // Keyboard shortcut: Ctrl/Cmd + B to add to batch
+        // Keyboard shortcut: Ctrl/Cmd + Shift + B to add to batch (avoids conflict with Ctrl/Cmd+B for bookmarks)
         document.addEventListener('keydown', function(e) {
-            if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'B') {
                 e.preventDefault();
                 const selection = window.getSelection();
                 const selectedText = selection.toString().trim();
@@ -2394,7 +2426,10 @@
                                     <span class="pdf-page-number">${page.title}</span>
                                     <div class="pdf-page-actions">
                                         <button class="pdf-copy-image-btn" onclick="copyPageImage(this, ${page.index})" title="Copy page as image to clipboard">
-                                            <i class="fa-regular fa-image"></i> Copy Page
+                                            <i class="fa-regular fa-image"></i> Copy Image
+                                        </button>
+                                        <button class="pdf-copy-image-btn" onclick="copyPageText(this, ${page.index})" title="Copy page text to clipboard">
+                                            <i class="fa-regular fa-copy"></i> Copy Text
                                         </button>
                                     </div>
                                 </div>
@@ -2567,31 +2602,21 @@
 
         async function copyChapterContent() {
             const contentEl = document.querySelector('.book-content');
-            const statusEl = document.getElementById('copy-status');
-            if (!contentEl || !statusEl) {
-                return;
-            }
+            if (!contentEl) return;
 
             const textToCopy = contentEl.innerText.trim();
             if (!textToCopy) {
-                statusEl.textContent = 'Nothing to copy.';
-                statusEl.style.opacity = 1;
-                setTimeout(() => statusEl.style.opacity = 0, 1500);
+                showCopyToast('Nothing to copy.', 'error');
                 return;
             }
 
             try {
-                await navigator.clipboard.writeText(textToCopy);
-                statusEl.textContent = 'Chapter copied to clipboard!';
-                statusEl.style.color = '#198754';
+                await clipboardWriteText(textToCopy);
+                showCopyToast('Chapter copied to clipboard!', 'success');
             } catch (err) {
                 console.error('Copy failed', err);
-                statusEl.textContent = 'Clipboard unavailable.';
-                statusEl.style.color = '#dc3545';
+                showCopyToast('Clipboard unavailable.', 'error');
             }
-
-            statusEl.style.opacity = 1;
-            setTimeout(() => statusEl.style.opacity = 0, 2000);
         }
 
         function toggleSidebar() {
@@ -2737,8 +2762,66 @@
                     performSearchHighlight(decodeURIComponent(searchQuery));
                 }, 500);
             }
+
+            // Inject copy buttons next to headings in EPUB content
+            if (!isPDF) {
+                injectHeadingCopyButtons();
+            }
         });
         
+        // ===== HEADING COPY BUTTONS =====
+
+        function injectHeadingCopyButtons() {
+            const content = document.getElementById('book-content');
+            if (!content) return;
+
+            content.querySelectorAll('h1, h2, h3').forEach(heading => {
+                // Skip if already has a copy button
+                if (heading.querySelector('.heading-copy-btn')) return;
+
+                const btn = document.createElement('button');
+                btn.className = 'heading-copy-btn';
+                btn.title = 'Copy this section';
+                btn.innerHTML = '<i class="fa-regular fa-copy"></i>';
+                btn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    const sectionText = getSectionText(heading);
+                    if (!sectionText) {
+                        showCopyToast('No content in this section', 'info');
+                        return;
+                    }
+                    try {
+                        await clipboardWriteText(sectionText);
+                        btn.innerHTML = '<i class="fa-solid fa-check"></i>';
+                        showCopyToast('Section copied!', 'success');
+                        setTimeout(() => { btn.innerHTML = '<i class="fa-regular fa-copy"></i>'; }, 2000);
+                    } catch (err) {
+                        showCopyToast('Clipboard unavailable', 'error');
+                    }
+                });
+                heading.style.position = 'relative';
+                heading.appendChild(btn);
+            });
+        }
+
+        // Get text from a heading until the next heading of equal or higher level
+        function getSectionText(heading) {
+            const level = parseInt(heading.tagName[1]); // 1, 2, or 3
+            const parts = [heading.textContent.trim()];
+            let el = heading.nextElementSibling;
+            while (el) {
+                const tag = el.tagName;
+                // Stop at same-level or higher heading
+                if (/^H[1-6]$/.test(tag) && parseInt(tag[1]) <= level) break;
+                // Skip copy buttons
+                if (!el.classList.contains('heading-copy-btn')) {
+                    parts.push(el.innerText?.trim() || '');
+                }
+                el = el.nextElementSibling;
+            }
+            return parts.filter(Boolean).join('\n\n');
+        }
+
         // ===== KEYBOARD NAVIGATION HELPERS =====
         
         function navigateChapter(direction) {
@@ -3498,7 +3581,7 @@
                 }).join('\n\n---\n\n');
 
                 // Copy to clipboard
-                await navigator.clipboard.writeText(combinedText);
+                await clipboardWriteText(combinedText);
 
                 // Mark selected chapters as read
                 copyBtn.textContent = `Marking chapters as read... (0/${chapters.length})`;
