@@ -10,26 +10,6 @@ All notable changes to Reader3 will be documented in this file.
 ### Technical
 - Tests: `python -m pytest` (407 passed, starlette `TemplateResponse` deprecation warnings still active).
 
-## [1.6.4] - 2026-02-18
-
-### Fixed
-
-- Guarded `search_pdf_text_positions` against loading `pymupdf` when there is no actual PDF source or when the import fails, and cleaned up document handling with a context manager plus the existing plain-text fallback so running the search suite no longer risks a segmentation fault during CI.
-
-### Technical
-
-- Tests: `python -m pytest` (407 passed, starlette `TemplateResponse` deprecation warnings still active).
-### Changed
-- Server startup now prefers `uvloop`/`httptools`, runs uvicorn via a kwargs dict, and defaults to `ORJSONResponse` for faster serialization, making JSON APIs snappier.
-- Background I/O handling grew stronger with structured logging, sani-tized book fields, upload streaming guards, gzip/security/cache middleware, and helper utilities for offloading blocking work, plus the new health endpoint and executor lifecycle hooks.
-- PDF imports received thorough validation/sanitization, an atomic temp-dir build-and-swap, placeholder pages for recoverable issues, per-page error handling, richer status messaging, and expanded upload modal controls (cancel/retry/backoff and better error guidance).
-- Copy/clipboard flows gained a helper that works in constrained environments, a new info toast style, rename of page copy UI, text-layer fallbacks, inline heading copy buttons, and consistent shortcut/help messaging.
-
-### Technical
-- Tests now use a `conftest.py` fixture that isolates book data and clears caches so automation never touches real user files, while `user_data.py` introduces debounced/atomic writes and exposed flush helpers for the new lifecycle hooks.
-- The server now tracks active uploads, sanitizes filenames, and adds progress callbacks plus improved cleanup to keep partial uploads from leaking state.
-- launcher.py, server.py, and user_data.py gained new helpers for running blocking tasks on a ThreadPoolExecutor, triggering durable saves, and using environment-configurable host/port/workers.
-
 ## [1.6.2] - 2026-02-06
 
 ### Fixed
