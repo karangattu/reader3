@@ -1,10 +1,13 @@
+import argparse
 import os
-import subprocess
 import platform
 import plistlib
+import shutil
+import subprocess
+import sys
 
 
-def build():
+def build(onefile: bool = False, console: bool = False):
     system = platform.system()
     sep = ';' if system == 'Windows' else ':'
 
@@ -14,6 +17,7 @@ def build():
         'fastapi.responses',
         'fastapi.staticfiles',
         'fastapi.templating',
+        'python_multipart',
         'starlette',
         'starlette.routing',
         'starlette.responses',
@@ -34,6 +38,10 @@ def build():
         'uvicorn.protocols.websockets.auto',
         'uvicorn.lifespan',
         'uvicorn.lifespan.on',
+        'uvicorn.lifespan.off',
+        'orjson',
+        'fitz',
+        'pymupdf',
         'ebooklib',
         'bs4',
     ]
@@ -43,17 +51,30 @@ def build():
         'fastapi',
         'starlette',
         'uvicorn',
+        'pymupdf',
     ]
+
+    mode_flag = '--onefile' if onefile else '--onedir'
+    templates_src = os.path.join(os.getcwd(), "templates")
 
     # Define the command
     cmd = [
-        "pyinstaller",
+        sys.executable,
+        "-m",
+        "PyInstaller",
         "--noconfirm",
-        "--onedir",
-        "--windowed",
-        f"--add-data=templates{sep}templates",
+        "--clean",
+        "--specpath",
+        "build",
+        mode_flag,
+        "--console" if console else "--windowed",
+        f"--add-data={templates_src}{sep}templates",
         "--name=Reader3",
     ]
+
+    # Avoid UPX-compression-related startup issues on Windows.
+    if system == 'Windows':
+        cmd.append("--noupx")
 
     # Add hidden imports
     for imp in hidden_imports:
@@ -106,6 +127,23 @@ def build():
     dist_dir = os.path.join(os.getcwd(), "dist")
     print(f"Executable should be in: {dist_dir}")
 
+    if system == 'Windows':
+        exe_path = (
+            os.path.join(dist_dir, "Reader3.exe")
+            if onefile
+            else os.path.join(dist_dir, "Reader3", "Reader3.exe")
+        )
+        print(f"Windows executable: {exe_path}")
+
+        # Create a portable zip for easy distribution (folder mode only).
+        if not onefile and os.path.exists(os.path.join(dist_dir, "Reader3")):
+            archive_base = os.path.join(dist_dir, "Reader3-windows-portable")
+            if os.path.exists(f"{archive_base}.zip"):
+                os.remove(f"{archive_base}.zip")
+            shutil.make_archive(archive_base, "zip", dist_dir, "Reader3")
+            print(f"Portable bundle: {archive_base}.zip")
+            print("Share this zip and keep all files together when unzipped.")
+
     if system == 'Darwin':
         print("\nTo use: Place your EPUB/PDF files in the same directory "
               "as Reader3.app")
@@ -114,4 +152,16 @@ def build():
 
 
 if __name__ == "__main__":
-    build()
+    parser = argparse.ArgumentParser(description="Build Reader3 executable via PyInstaller")
+    parser.add_argument(
+        "--onefile",
+        action="store_true",
+        help="Build a single-file executable instead of a directory bundle",
+    )
+    parser.add_argument(
+        "--console",
+        action="store_true",
+        help="Show console window (useful for debugging startup issues)",
+    )
+    args = parser.parse_args()
+    build(onefile=args.onefile, console=args.console)
