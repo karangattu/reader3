@@ -2,12 +2,23 @@
 
 All notable changes to Reader3 will be documented in this file.
 
-## [1.6.3] - 2026-02-11
+## [1.6.4] - 2026-02-18
 
-### Added
-- Containerization and production readiness: Dockerfile/.dockerignore plus updated render.yaml make releases easier to build, health-checked, and run with sensible defaults.
-- ai_service now reuses an `httpx.AsyncClient` with timeouts so Gemini/Ollama calls keep connections pooled.
+### Fixed
+- Guarded `search_pdf_text_positions` against loading `pymupdf` when there is no actual PDF source or when the import fails, and cleaned up document handling with a context manager plus the existing plain-text fallback so running the search suite no longer risks a segmentation fault during CI.
 
+### Technical
+- Tests: `python -m pytest` (407 passed, starlette `TemplateResponse` deprecation warnings still active).
+
+## [1.6.4] - 2026-02-18
+
+### Fixed
+
+- Guarded `search_pdf_text_positions` against loading `pymupdf` when there is no actual PDF source or when the import fails, and cleaned up document handling with a context manager plus the existing plain-text fallback so running the search suite no longer risks a segmentation fault during CI.
+
+### Technical
+
+- Tests: `python -m pytest` (407 passed, starlette `TemplateResponse` deprecation warnings still active).
 ### Changed
 - Server startup now prefers `uvloop`/`httptools`, runs uvicorn via a kwargs dict, and defaults to `ORJSONResponse` for faster serialization, making JSON APIs snappier.
 - Background I/O handling grew stronger with structured logging, sani-tized book fields, upload streaming guards, gzip/security/cache middleware, and helper utilities for offloading blocking work, plus the new health endpoint and executor lifecycle hooks.
