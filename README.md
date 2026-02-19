@@ -42,6 +42,20 @@ Windows notes:
 uv run python build_executable.py --console
 ```
 
+## CI Releases (on tags)
+
+Pushing a version tag triggers GitHub Actions to build and publish platform artifacts automatically.
+
+```bash
+git tag v1.6.5 && git push origin v1.6.5
+```
+
+Release assets include:
+- `Reader3-windows-portable.zip`
+- `Reader3.exe`
+- `Reader3-macOS.zip`
+- SHA256 checksum files for both
+
 ## License
 
 MIT

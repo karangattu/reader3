@@ -1,4 +1,4 @@
-name: Build and Release
+name: Windows Release
 
 on:
   push:
@@ -7,104 +7,84 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-macos:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install pyinstaller fastapi uvicorn python-multipart jinja2 ebooklib beautifulsoup4 lxml pdfplumber
-      
-      - name: Build macOS executable
-        run: python build_executable.py
-      
-      - name: Zip macOS app
-        run: |
-          cd dist
-          zip -r Reader3-macOS.zip Reader3.app
-      
-      - name: Upload macOS artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: Reader3-macOS
-          path: dist/Reader3-macOS.zip
-
-  build-windows:
+  tests:
     runs-on: windows-latest
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      
+
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run tests (required)
+        run: |
+          pytest tests/ -v --tb=short
+
+  release-windows:
+    needs: tests
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pyinstaller fastapi uvicorn python-multipart jinja2 ebooklib beautifulsoup4 lxml pdfplumber
-      
-      - name: Build Windows executable
+          pip install -e .
+
+      - name: Build Windows release artifacts (one command)
         run: python build_executable.py
-      
-      - name: Zip Windows executable
+
+      - name: Verify expected artifacts
+        shell: pwsh
         run: |
-          cd dist
-          Compress-Archive -Path Reader3 -DestinationPath Reader3-Windows.zip
-      
+          if (-not (Test-Path "dist/Reader3/Reader3.exe")) {
+            throw "Missing dist/Reader3/Reader3.exe"
+          }
+          if (-not (Test-Path "dist/Reader3-windows-portable.zip")) {
+            throw "Missing dist/Reader3-windows-portable.zip"
+          }
+
+      - name: Generate checksums
+        shell: pwsh
+        run: |
+          $zipHash = (Get-FileHash "dist/Reader3-windows-portable.zip" -Algorithm SHA256).Hash.ToLower()
+          Set-Content -Path "dist/Reader3-windows-portable.zip.sha256" -Value "$zipHash  Reader3-windows-portable.zip"
+
+          $exeHash = (Get-FileHash "dist/Reader3/Reader3.exe" -Algorithm SHA256).Hash.ToLower()
+          Set-Content -Path "dist/Reader3.exe.sha256" -Value "$exeHash  Reader3.exe"
+
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Reader3-Windows
-          path: dist/Reader3-Windows.zip
+          name: Reader3-Windows-${{ github.ref_name }}
+          path: |
+            dist/Reader3-windows-portable.zip
+            dist/Reader3-windows-portable.zip.sha256
+            dist/Reader3/Reader3.exe
+            dist/Reader3.exe.sha256
 
-  release:
-    needs: [build-macos, build-windows]
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
-    permissions:
-      contents: write
-    steps:
-      - name: Download macOS artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: Reader3-macOS
-      
-      - name: Download Windows artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: Reader3-Windows
-      
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
+      - name: Publish GitHub Release assets
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
         with:
           files: |
-            Reader3-macOS.zip
-            Reader3-Windows.zip
-          body: |
-            ## Features
-            - Read ePub and PDF files
-            - Chapter navigation
-            - Text selection and batch copy for PDFs
-            - Light/dark mode support
-            - Bookmark support
-
-            ## Installation
-            
-            ### macOS
-            1. Download Reader3-macOS.zip
-            2. Unzip the file
-            3. Move Reader3.app to your Applications folder
-            4. Double-click to launch
-
-            ### Windows
-            1. Download Reader3-Windows.zip
-            2. Unzip the file
-            3. Run Reader3.exe
+            dist/Reader3-windows-portable.zip
+            dist/Reader3-windows-portable.zip.sha256
+            dist/Reader3/Reader3.exe
+            dist/Reader3.exe.sha256
+          generate_release_notes: true
