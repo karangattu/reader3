@@ -1993,6 +1993,74 @@ class TestBackgroundUploadAPI:
         assert response.status_code == 400
 
 
+class TestBackgroundPdfProcessingConfig:
+    """Tests for PDF background-processing infrastructure."""
+
+    def test_pdf_thumbnails_flag_parsing(self, monkeypatch):
+        """Server should parse thumbnail env flag consistently."""
+        import server
+
+        monkeypatch.setenv("PDF_GENERATE_THUMBNAILS", "false")
+        assert server._pdf_thumbnails_enabled() is False
+
+        monkeypatch.setenv("PDF_GENERATE_THUMBNAILS", "0")
+        assert server._pdf_thumbnails_enabled() is False
+
+        monkeypatch.setenv("PDF_GENERATE_THUMBNAILS", "true")
+        assert server._pdf_thumbnails_enabled() is True
+
+    def test_background_pdf_processing_uses_progress_callback_and_thumbnail_flag(
+        self, tmp_path, monkeypatch
+    ):
+        """Background PDF path should pass a progress callback and env thumbnail flag."""
+        import server
+        import reader3
+
+        upload_id = "test-upload-id"
+        server.upload_status[upload_id] = {
+            "status": "queued",
+            "progress": 0,
+            "message": "queued",
+            "filename": "test.pdf",
+            "book_id": None,
+            "started_at": 0,
+            "completed_at": None,
+        }
+
+        temp_pdf = tmp_path / "upload.pdf"
+        temp_pdf.write_bytes(b"%PDF-1.4 test")
+
+        captured = {}
+        observed_progress = []
+
+        def fake_process_pdf(pdf_path, output_dir, generate_thumbnails=True, progress_callback=None, source_filename=None):
+            captured["generate_thumbnails"] = generate_thumbnails
+            captured["has_progress_callback"] = callable(progress_callback)
+            if progress_callback:
+                progress_callback(37, "Working...")
+                observed_progress.append(server.upload_status[upload_id]["progress"])
+            return object()
+
+        monkeypatch.setattr(reader3, "process_pdf", fake_process_pdf)
+        monkeypatch.setattr(server, "save_to_pickle", lambda *_: None)
+        monkeypatch.setattr(server, "validate_pdf", lambda _: {"valid": True, "error": None})
+        monkeypatch.setenv("PDF_GENERATE_THUMBNAILS", "false")
+
+        server.process_book_background(
+            upload_id,
+            str(temp_pdf),
+            ".pdf",
+            str(tmp_path / "book_data"),
+            "book_data",
+        )
+
+        assert captured["has_progress_callback"] is True
+        assert captured["generate_thumbnails"] is False
+        assert observed_progress == [37]
+        assert server.upload_status[upload_id]["status"] == "completed"
+        assert not temp_pdf.exists()
+
+
 class TestConsolidatedProgressSaving:
     """Tests for consolidated progress saving (chapter progress via main progress endpoint)."""
 

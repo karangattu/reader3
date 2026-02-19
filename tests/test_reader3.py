@@ -16,9 +16,11 @@ from reader3 import (
     get_pdf_page_stats,
     search_pdf_text_positions,
     is_content_document,
+    process_epub,
 )
 from bs4 import BeautifulSoup
 import ebooklib
+import pytest
 
 
 class TestBookMetadata:
@@ -765,3 +767,50 @@ class TestPDFTOCExtraction:
         assert book.pdf_has_toc is False
         assert len(book.toc) == 5
         assert book.toc[0].title == "Page 1"
+
+
+class TestProcessEpubAtomicWrites:
+    """Tests for atomic EPUB processing behavior."""
+
+    def test_existing_output_dir_preserved_on_processing_failure(
+        self, tmp_path, monkeypatch
+    ):
+        """If processing fails, existing output directory should stay intact."""
+
+        class BrokenDocumentItem:
+            media_type = "application/xhtml+xml"
+
+            def get_type(self):
+                return ebooklib.ITEM_DOCUMENT
+
+            def get_name(self):
+                return "chapter1.xhtml"
+
+            def get_content(self):
+                raise RuntimeError("simulated content decode failure")
+
+        class FakeEpubBook:
+            toc = []
+            spine = [("item_1", "yes")]
+
+            def get_metadata(self, namespace, key):
+                return []
+
+            def get_items(self):
+                return []
+
+            def get_item_with_id(self, item_id):
+                return BrokenDocumentItem()
+
+        monkeypatch.setattr("reader3.epub.read_epub", lambda _: FakeEpubBook())
+
+        output_dir = tmp_path / "book_data"
+        output_dir.mkdir()
+        sentinel = output_dir / "keep.txt"
+        sentinel.write_text("preserve me", encoding="utf-8")
+
+        with pytest.raises(RuntimeError):
+            process_epub("dummy.epub", str(output_dir))
+
+        assert sentinel.exists()
+        assert sentinel.read_text(encoding="utf-8") == "preserve me"

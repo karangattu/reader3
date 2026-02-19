@@ -947,8 +947,6 @@ def search_pdf_text_positions(book: Book, query: str,
     
     Note: This now extracts text blocks on-demand from the source PDF.
     """
-    import fitz
-    
     if not book.is_pdf:
         return []
 
@@ -971,33 +969,36 @@ def search_pdf_text_positions(book: Book, query: str,
         return _search_pdf_text_fallback(book, query, pages_to_search)
     
     try:
-        doc = fitz.open(pdf_path)
-        
-        for page_idx in pages_to_search:
-            if page_idx < 0 or page_idx >= len(doc):
-                continue
+        import fitz
+    except Exception as e:
+        print(f"Error importing fitz for PDF search: {e}")
+        return _search_pdf_text_fallback(book, query, pages_to_search)
 
-            page = doc[page_idx]
-            text_blocks = extract_pdf_text_blocks(page)
+    try:
+        with fitz.open(pdf_path) as doc:
+            for page_idx in pages_to_search:
+                if page_idx < 0 or page_idx >= len(doc):
+                    continue
 
-            # Simple word-by-word matching
-            for block in text_blocks:
-                if query_lower in block.text.lower():
-                    results.append({
-                        "page": page_idx,
-                        "text": block.text,
-                        "rect": [block.x0, block.y0, block.x1, block.y1],
-                        "match_type": "exact"
-                    })
-                elif any(w in block.text.lower() for w in query_words):
-                    results.append({
-                        "page": page_idx,
-                        "text": block.text,
-                        "rect": [block.x0, block.y0, block.x1, block.y1],
-                        "match_type": "partial"
-                    })
-        
-        doc.close()
+                page = doc[page_idx]
+                text_blocks = extract_pdf_text_blocks(page)
+
+                # Simple word-by-word matching
+                for block in text_blocks:
+                    if query_lower in block.text.lower():
+                        results.append({
+                            "page": page_idx,
+                            "text": block.text,
+                            "rect": [block.x0, block.y0, block.x1, block.y1],
+                            "match_type": "exact"
+                        })
+                    elif any(w in block.text.lower() for w in query_words):
+                        results.append({
+                            "page": page_idx,
+                            "text": block.text,
+                            "rect": [block.x0, block.y0, block.x1, block.y1],
+                            "match_type": "partial"
+                        })
     except Exception as e:
         print(f"Error searching PDF: {e}")
 
@@ -1161,116 +1162,143 @@ def process_epub(epub_path: str, output_dir: str) -> Book:
     # 2. Extract Metadata
     metadata = extract_metadata_robust(book)
 
-    # 3. Prepare Output Directories
-    if os.path.exists(output_dir):
-        shutil.rmtree(output_dir)
-    images_dir = os.path.join(output_dir, 'images')
-    os.makedirs(images_dir, exist_ok=True)
+    # 3. Build into a temp dir, then swap atomically
+    import tempfile
 
-    # 4. Extract Images & Build Map
-    print("Extracting images...")
-    image_map = {}  # Key: internal_path, Value: local_relative_path
+    parent_dir = os.path.dirname(os.path.abspath(output_dir))
+    os.makedirs(parent_dir, exist_ok=True)
+    tmp_dir = tempfile.mkdtemp(prefix=".reader3_epub_", dir=parent_dir)
 
-    for item in book.get_items():
-        if item.get_type() == ebooklib.ITEM_IMAGE:
-            # Normalize filename
-            original_fname = os.path.basename(item.get_name())
-            # Sanitize filename for OS
-            safe_fname = "".join(
-                [c for c in original_fname
-                 if c.isalpha() or c.isdigit() or c in '._-']
-            ).strip()
+    try:
+        images_dir = os.path.join(tmp_dir, 'images')
+        os.makedirs(images_dir, exist_ok=True)
 
-            # Save to disk
-            local_path = os.path.join(images_dir, safe_fname)
-            with open(local_path, 'wb') as f:
-                f.write(item.get_content())
+        # 4. Extract Images & Build Map
+        print("Extracting images...")
+        image_map = {}  # Key: internal_path, Value: local_relative_path
 
-            # Map keys: We try both the full internal path
-            # and just the basename to be robust against
-            # messy HTML src attributes
-            rel_path = f"images/{safe_fname}"
-            image_map[item.get_name()] = rel_path
-            image_map[original_fname] = rel_path
+        for item in book.get_items():
+            if item.get_type() == ebooklib.ITEM_IMAGE:
+                # Normalize filename
+                original_fname = os.path.basename(item.get_name())
+                # Sanitize filename for OS
+                safe_fname = "".join(
+                    [c for c in original_fname
+                     if c.isalpha() or c.isdigit() or c in '._-']
+                ).strip()
 
-    # 4.5 Extract Cover Image
-    print("Extracting cover image...")
-    cover_image = extract_cover_image(book, images_dir, image_map)
+                # Save to disk
+                local_path = os.path.join(images_dir, safe_fname)
+                with open(local_path, 'wb') as f:
+                    f.write(item.get_content())
 
-    # 5. Process TOC
-    print("Parsing Table of Contents...")
-    toc_structure = parse_toc_recursive(book.toc)
-    if not toc_structure:
-        print("Warning: Empty TOC, building fallback from Spine...")
-        toc_structure = get_fallback_toc(book)
+                # Map keys: We try both the full internal path
+                # and just the basename to be robust against
+                # messy HTML src attributes
+                rel_path = f"images/{safe_fname}"
+                image_map[item.get_name()] = rel_path
+                image_map[original_fname] = rel_path
 
-    # 6. Process Content (Spine-based to preserve HTML validity)
-    print("Processing chapters...")
-    spine_chapters = []
+        # 4.5 Extract Cover Image
+        print("Extracting cover image...")
+        cover_image = extract_cover_image(book, images_dir, image_map)
 
-    # We iterate over the spine (linear reading order)
-    for i, spine_item in enumerate(book.spine):
-        item_id, linear = spine_item
-        item = book.get_item_with_id(item_id)
+        # 5. Process TOC
+        print("Parsing Table of Contents...")
+        toc_structure = parse_toc_recursive(book.toc)
+        if not toc_structure:
+            print("Warning: Empty TOC, building fallback from Spine...")
+            toc_structure = get_fallback_toc(book)
 
-        if not item:
-            continue
+        # 6. Process Content (Spine-based to preserve HTML validity)
+        print("Processing chapters...")
+        spine_chapters = []
 
-        if is_content_document(item):
-            # Raw content
-            raw_content = item.get_content().decode('utf-8', errors='ignore')
-            soup = BeautifulSoup(raw_content, 'html.parser')
+        # We iterate over the spine (linear reading order)
+        for i, spine_item in enumerate(book.spine):
+            item_id, linear = spine_item
+            item = book.get_item_with_id(item_id)
 
-            # A. Fix Images
-            for img in soup.find_all('img'):
-                src = img.get('src', '')
-                if not src: continue
+            if not item:
+                continue
 
-                # Decode URL (part01/image%201.jpg -> part01/image 1.jpg)
-                src_decoded = unquote(src)
-                filename = os.path.basename(src_decoded)
+            if is_content_document(item):
+                # Raw content
+                raw_content = item.get_content().decode('utf-8', errors='ignore')
+                soup = BeautifulSoup(raw_content, 'html.parser')
 
-                # Try to find in map
-                if src_decoded in image_map:
-                    img['src'] = image_map[src_decoded]
-                elif filename in image_map:
-                    img['src'] = image_map[filename]
+                # A. Fix Images
+                for img in soup.find_all('img'):
+                    src = img.get('src', '')
+                    if not src:
+                        continue
 
-            # B. Clean HTML
-            soup = clean_html_content(soup)
+                    # Decode URL (part01/image%201.jpg -> part01/image 1.jpg)
+                    src_decoded = unquote(src)
+                    filename = os.path.basename(src_decoded)
 
-            # C. Extract Body Content only
-            body = soup.find('body')
-            if body:
-                # Extract inner HTML of body
-                final_html = "".join([str(x) for x in body.contents])
-            else:
-                final_html = str(soup)
+                    # Try to find in map
+                    if src_decoded in image_map:
+                        img['src'] = image_map[src_decoded]
+                    elif filename in image_map:
+                        img['src'] = image_map[filename]
 
-            # D. Create Object
-            chapter = ChapterContent(
-                id=item_id,
-                href=item.get_name(), # Important: This links TOC to Content
-                title=f"Section {i+1}", # Fallback, real titles come from TOC
-                content=final_html,
-                text=extract_plain_text(soup),
-                order=i
-            )
-            spine_chapters.append(chapter)
+                # B. Clean HTML
+                soup = clean_html_content(soup)
 
-    # 7. Final Assembly
-    final_book = Book(
-        metadata=metadata,
-        spine=spine_chapters,
-        toc=toc_structure,
-        images=image_map,
-        source_file=os.path.basename(epub_path),
-        processed_at=datetime.now().isoformat(),
-        added_at=datetime.now().isoformat(),
-        cover_image=cover_image
-    )
+                # C. Extract Body Content only
+                body = soup.find('body')
+                if body:
+                    # Extract inner HTML of body
+                    final_html = "".join([str(x) for x in body.contents])
+                else:
+                    final_html = str(soup)
 
-    return final_book
+                # D. Create Object
+                chapter = ChapterContent(
+                    id=item_id,
+                    href=item.get_name(), # Important: This links TOC to Content
+                    title=f"Section {i+1}", # Fallback, real titles come from TOC
+                    content=final_html,
+                    text=extract_plain_text(soup),
+                    order=i
+                )
+                spine_chapters.append(chapter)
+
+        # 7. Final Assembly
+        final_book = Book(
+            metadata=metadata,
+            spine=spine_chapters,
+            toc=toc_structure,
+            images=image_map,
+            source_file=os.path.basename(epub_path),
+            processed_at=datetime.now().isoformat(),
+            added_at=datetime.now().isoformat(),
+            cover_image=cover_image
+        )
+
+        sanitize_book_text_fields(final_book)
+
+        # 8. Atomic swap: tmp_dir -> output_dir
+        if os.path.exists(output_dir):
+            backup_dir = output_dir + ".__old"
+            if os.path.exists(backup_dir):
+                shutil.rmtree(backup_dir, ignore_errors=True)
+            os.rename(output_dir, backup_dir)
+            try:
+                os.rename(tmp_dir, output_dir)
+            except Exception:
+                os.rename(backup_dir, output_dir)
+                raise
+            shutil.rmtree(backup_dir, ignore_errors=True)
+        else:
+            os.rename(tmp_dir, output_dir)
+
+        tmp_dir = None
+        return final_book
+    finally:
+        if tmp_dir and os.path.exists(tmp_dir):
+            shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
 def save_to_pickle(book: Book, output_dir: str):

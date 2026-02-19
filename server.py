@@ -77,6 +77,12 @@ def _run_sync(fn, *args):
     return asyncio.get_event_loop().run_in_executor(_io_executor, fn, *args)
 
 
+def _pdf_thumbnails_enabled() -> bool:
+    """Whether to generate PDF thumbnails during import."""
+    raw = os.environ.get("PDF_GENERATE_THUMBNAILS", "true").strip().lower()
+    return raw not in {"0", "false", "no", "off"}
+
+
 # ---------------------------------------------------------------------------
 # Security headers middleware
 # ---------------------------------------------------------------------------
@@ -152,6 +158,23 @@ def update_upload_status(upload_id: str, **kwargs):
             upload_status[upload_id].update(kwargs)
 
 
+def _build_upload_progress_callback(upload_id: str):
+    """Create a PDF processing callback that streams progress into upload status."""
+    def _progress(percent: int, message: str):
+        try:
+            pct = max(0, min(100, int(percent)))
+        except Exception:
+            pct = 0
+        update_upload_status(
+            upload_id,
+            status="processing",
+            progress=pct,
+            message=message or "Processing...",
+        )
+
+    return _progress
+
+
 def cleanup_old_statuses():
     """Remove completed statuses older than 1 hour."""
     cutoff = datetime.now().timestamp() - 3600
@@ -168,15 +191,11 @@ def _sanitize_filename(name: str) -> str:
     """Aggressively sanitize a filename for safe filesystem use."""
     import re
     import unicodedata
-    # Normalize unicode, strip dangerous characters
+
     name = unicodedata.normalize("NFKD", name)
-    # Replace path separators and null bytes
     name = name.replace("/", "_").replace("\\", "_").replace("\0", "")
-    # Keep only safe characters
     name = re.sub(r'[^\w\s.\-()]', '_', name)
-    # Collapse multiple underscores / spaces
     name = re.sub(r'[_\s]+', ' ', name).strip()
-    # Fallback if nothing left
     if not name or name in (".", ".."):
         name = "unnamed_book"
     return name
@@ -426,32 +445,36 @@ async def rebuild_metadata(force: bool = False):
     return {"status": "ok", "updated": updated, "errors": errors}
 
 
-def process_book_background(upload_id: str, temp_path: str, suffix: str, full_out_dir: str, out_dir: str, source_filename: str):
+def process_book_background(
+    upload_id: str,
+    temp_path: str,
+    suffix: str,
+    full_out_dir: str,
+    out_dir: str,
+    source_filename: Optional[str] = None,
+):
     """Background task to process a book (PDF or EPUB)."""
-    def _progress(pct: int, msg: str):
-        update_upload_status(upload_id, progress=pct, message=msg)
-
     try:
-        update_upload_status(upload_id, status="processing", progress=5, message="Starting processing…")
+        update_upload_status(upload_id, status="processing", progress=5, message="Starting processing...")
 
         if suffix == ".pdf":
             from reader3 import process_pdf
-            # Validate first (fast) so we can give a clear early error
-            _progress(7, "Validating PDF…")
+            update_upload_status(upload_id, progress=7, message="Validating PDF…")
             validation = validate_pdf(temp_path)
             if not validation["valid"]:
                 raise ValueError(validation["error"])
-
             book_obj = process_pdf(
-                temp_path, full_out_dir,
-                progress_callback=_progress,
+                temp_path,
+                full_out_dir,
+                generate_thumbnails=_pdf_thumbnails_enabled(),
+                progress_callback=_build_upload_progress_callback(upload_id),
                 source_filename=source_filename,
             )
         else:
-            _progress(20, "Parsing EPUB structure…")
+            update_upload_status(upload_id, progress=20, message="Parsing EPUB structure…")
             book_obj = process_epub(temp_path, full_out_dir)
 
-        _progress(92, "Saving book data…")
+        update_upload_status(upload_id, progress=92, message="Saving book data…")
         save_to_pickle(book_obj, full_out_dir)
 
         # Clear caches
@@ -471,9 +494,7 @@ def process_book_background(upload_id: str, temp_path: str, suffix: str, full_ou
 
     except Exception as e:
         logger.error("Error processing book in background: %s", e, exc_info=True)
-        # Note: process_pdf now uses atomic temp dir swap so full_out_dir is
-        # only present when processing actually succeeded. For EPUB which
-        # doesn't have that yet, clean up partial data.
+        # process_pdf uses atomic swap so old data should be intact.
         if suffix != ".pdf" and os.path.exists(full_out_dir):
             shutil.rmtree(full_out_dir, ignore_errors=True)
         update_upload_status(
@@ -484,13 +505,11 @@ def process_book_background(upload_id: str, temp_path: str, suffix: str, full_ou
             completed_at=datetime.now().timestamp()
         )
     finally:
-        # Clean up temp file
         try:
             if os.path.exists(temp_path):
                 os.remove(temp_path)
         except OSError:
             pass
-        # Release the active-upload lock for this output directory
         with _active_uploads_lock:
             _active_uploads.pop(out_dir, None)
 
@@ -499,7 +518,6 @@ def process_book_background(upload_id: str, temp_path: str, suffix: str, full_ou
 async def upload_book(file: UploadFile = File(...), background: bool = False, background_tasks: BackgroundTasks = None):
     """Handle EPUB/PDF file uploads. Use ?background=true for async processing."""
 
-    # --- Basic validation ---------------------------------------------------
     original_name = file.filename or "unnamed"
     suffix = os.path.splitext(original_name)[1].lower()
     if suffix not in (".epub", ".pdf"):
@@ -507,13 +525,12 @@ async def upload_book(file: UploadFile = File(...), background: bool = False, ba
             status_code=400, detail="Only .epub and .pdf files are supported."
         )
 
-    # --- Stream to a temp file with size guard ------------------------------
     temp_path = None
     try:
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
             bytes_written = 0
             try:
-                while chunk := await file.read(1024 * 256):  # 256 KB chunks
+                while chunk := await file.read(1024 * 256):
                     bytes_written += len(chunk)
                     if bytes_written > MAX_UPLOAD_BYTES:
                         raise HTTPException(
@@ -522,7 +539,7 @@ async def upload_book(file: UploadFile = File(...), background: bool = False, ba
                         )
                     tmp.write(chunk)
             except HTTPException:
-                raise  # re-raise size error
+                raise
             except Exception as e:
                 raise HTTPException(
                     status_code=400,
@@ -530,7 +547,6 @@ async def upload_book(file: UploadFile = File(...), background: bool = False, ba
                 )
             temp_path = tmp.name
     except HTTPException:
-        # Clean up on size / read errors
         if temp_path and os.path.exists(temp_path):
             os.remove(temp_path)
         raise
@@ -539,19 +555,16 @@ async def upload_book(file: UploadFile = File(...), background: bool = False, ba
         os.remove(temp_path)
         raise HTTPException(status_code=400, detail="Uploaded file is empty.")
 
-    # --- Quick validation for PDFs before committing to heavy work ----------
     if suffix == ".pdf":
         validation = validate_pdf(temp_path)
         if not validation["valid"]:
             os.remove(temp_path)
             raise HTTPException(status_code=422, detail=validation["error"])
 
-    # --- Build safe output directory name -----------------------------------
     safe_filename = _sanitize_filename(os.path.basename(original_name))
     out_dir = os.path.splitext(safe_filename)[0] + "_data"
     full_out_dir = os.path.join(BOOKS_DIR, out_dir)
 
-    # --- Prevent concurrent processing of the same target -------------------
     with _active_uploads_lock:
         existing_uid = _active_uploads.get(out_dir)
     if existing_uid:
@@ -603,7 +616,12 @@ async def upload_book(file: UploadFile = File(...), background: bool = False, ba
 
         if suffix == ".pdf":
             from reader3 import process_pdf
-            book_obj = process_pdf(temp_path, full_out_dir, source_filename=safe_filename)
+            book_obj = process_pdf(
+                temp_path,
+                full_out_dir,
+                generate_thumbnails=_pdf_thumbnails_enabled(),
+                source_filename=safe_filename,
+            )
         else:
             book_obj = process_epub(temp_path, full_out_dir)
 
@@ -614,13 +632,10 @@ async def upload_book(file: UploadFile = File(...), background: bool = False, ba
         load_book_metadata.cache_clear()
 
     except ValueError as e:
-        # Validation-type errors (e.g. bad PDF) → 422
         logger.warning("Validation error processing book: %s", e)
         raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
         logger.error("Error processing book: %s", e, exc_info=True)
-        # process_pdf uses atomic swap so old data should be intact;
-        # for EPUB, clean up partial output
         if suffix != ".pdf" and os.path.exists(full_out_dir):
             shutil.rmtree(full_out_dir, ignore_errors=True)
         raise HTTPException(status_code=500, detail=f"Failed to process book: {str(e)}")
@@ -853,8 +868,12 @@ async def reprocess_pdf(book_id: str):
         book_path = os.path.join(BOOKS_DIR, safe_book_id)
 
         # Reprocess the PDF
-        source_filename = book.source_file or os.path.basename(pdf_path)
-        book_obj = process_pdf(pdf_path, book_path, source_filename=source_filename)
+        book_obj = process_pdf(
+            pdf_path,
+            book_path,
+            generate_thumbnails=_pdf_thumbnails_enabled(),
+            source_filename=book.source_file,
+        )
         save_to_pickle(book_obj, book_path)
 
         # Clear cache
