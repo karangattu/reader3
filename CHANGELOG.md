@@ -2,6 +2,20 @@
 
 All notable changes to Reader3 will be documented in this file.
 
+## [1.6.5] - 2026-02-20
+
+### Fixed
+
+- **PDF Select Range from mid-chapter** — Checking a page checkbox then clicking Select Range now correctly anchors the range at that page instead of silently discarding the selection.
+- **Viewport page detection** — The heuristic that picks "the page you're looking at" now finds the page whose center is truly closest to the viewport midpoint, instead of the last page within a loose threshold (which overshot by 2-3 pages on tall PDF pages).
+
+### Changed
+
+- **CI release workflows** — Split build matrix for macOS/Windows, added SHA-256 checksum files for release assets.
+- **Windows packaging** — PyInstaller build now produces a portable folder zip alongside the single-file exe; added `--console` flag for debugging startup issues.
+
+---
+
 ## [1.6.4] - 2026-02-18
 
 ### Fixed
