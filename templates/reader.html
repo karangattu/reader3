@@ -1954,7 +1954,7 @@
             }
         }
 
-        // Select a range of pages starting from current page
+        // Select a range of pages starting from current page or user-checked page
         async function selectPageRange() {
             const input = document.getElementById('page-range-input');
             const numPages = parseInt(input.value);
@@ -1964,27 +1964,33 @@
                 return;
             }
 
-            // Clear existing selection first
+            // If the user already checked one or more pages, start from the
+            // lowest selected page instead of the viewport heuristic.
+            let startPageIndex = null;
+            if (selectedPdfPages.size > 0) {
+                startPageIndex = Math.min(...selectedPdfPages);
+            }
+
+            // Clear existing selection *after* we've captured the anchor
             clearPdfSelection();
 
-            // Get the visible page (the one currently in view)
-            const pages = document.querySelectorAll('.pdf-page');
-            let startPageIndex = currentPageIndex;
-            
-            // Find which page is most visible in the viewport
-            const mainContent = document.getElementById('main');
-            const viewportCenter = mainContent.scrollTop + mainContent.clientHeight / 2;
-            
-            pages.forEach(page => {
-                const pageIndex = parseInt(page.dataset.pageIndex);
-                const rect = page.getBoundingClientRect();
-                const pageCenter = rect.top + rect.height / 2;
-                
-                // If this page is closer to center, use it as start
-                if (Math.abs(pageCenter - mainContent.clientHeight / 2) < mainContent.clientHeight / 3) {
-                    startPageIndex = pageIndex;
-                }
-            });
+            // Fall back to viewport heuristic only when no page was pre-selected
+            if (startPageIndex === null) {
+                const pages = document.querySelectorAll('.pdf-page');
+                startPageIndex = currentPageIndex;
+
+                const mainContent = document.getElementById('main');
+
+                pages.forEach(page => {
+                    const pageIndex = parseInt(page.dataset.pageIndex);
+                    const rect = page.getBoundingClientRect();
+                    const pageCenter = rect.top + rect.height / 2;
+
+                    if (Math.abs(pageCenter - mainContent.clientHeight / 2) < mainContent.clientHeight / 3) {
+                        startPageIndex = pageIndex;
+                    }
+                });
+            }
 
             // Calculate range
             const endPageIndex = Math.min(startPageIndex + numPages - 1, totalPages - 1);
