@@ -1976,17 +1976,20 @@
 
             // Fall back to viewport heuristic only when no page was pre-selected
             if (startPageIndex === null) {
-                const pages = document.querySelectorAll('.pdf-page');
-                startPageIndex = currentPageIndex;
-
                 const mainContent = document.getElementById('main');
+                const viewportMid = mainContent.getBoundingClientRect().top + mainContent.clientHeight / 2;
+                const pages = document.querySelectorAll('.pdf-page');
+                let bestDist = Infinity;
+                startPageIndex = currentPageIndex;
 
                 pages.forEach(page => {
                     const pageIndex = parseInt(page.dataset.pageIndex);
                     const rect = page.getBoundingClientRect();
                     const pageCenter = rect.top + rect.height / 2;
+                    const dist = Math.abs(pageCenter - viewportMid);
 
-                    if (Math.abs(pageCenter - mainContent.clientHeight / 2) < mainContent.clientHeight / 3) {
+                    if (dist < bestDist) {
+                        bestDist = dist;
                         startPageIndex = pageIndex;
                     }
                 });
