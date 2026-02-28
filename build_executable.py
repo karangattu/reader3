@@ -5,6 +5,7 @@ import plistlib
 import shutil
 import subprocess
 import sys
+import tempfile
 
 
 def build(onefile: bool = False, console: bool = False):
@@ -149,6 +150,44 @@ def build(onefile: bool = False, console: bool = False):
               "as Reader3.app")
         print("Then double-click Reader3.app to start the server and open "
               "your browser.")
+        create_macos_dmg(dist_dir)
+
+
+def create_macos_dmg(dist_dir: str):
+    """Create a drag-and-drop DMG containing Reader3.app and Applications link."""
+    app_path = os.path.join(dist_dir, "Reader3.app")
+    dmg_path = os.path.join(dist_dir, "Reader3-macOS.dmg")
+
+    if not os.path.exists(app_path):
+        print("Skipping DMG creation: Reader3.app not found")
+        return
+
+    print("\nCreating macOS DMG installer...")
+
+    with tempfile.TemporaryDirectory() as staging_dir:
+        staged_app = os.path.join(staging_dir, "Reader3.app")
+        shutil.copytree(app_path, staged_app)
+
+        applications_link = os.path.join(staging_dir, "Applications")
+        os.symlink("/Applications", applications_link)
+
+        if os.path.exists(dmg_path):
+            os.remove(dmg_path)
+
+        subprocess.check_call([
+            "hdiutil",
+            "create",
+            "-volname",
+            "Reader3",
+            "-srcfolder",
+            staging_dir,
+            "-ov",
+            "-format",
+            "UDZO",
+            dmg_path,
+        ])
+
+    print(f"DMG installer: {dmg_path}")
 
 
 if __name__ == "__main__":

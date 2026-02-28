@@ -32,6 +32,7 @@ uv run python build_executable.py
 
 Creates:
 - macOS: `dist/Reader3.app`
+- macOS installer: `dist/Reader3-macOS.dmg` (drag `Reader3.app` into `Applications`)
 - Windows (default): `dist/Reader3/Reader3.exe` and `dist/Reader3-windows-portable.zip`
 
 Windows notes:
@@ -54,7 +55,8 @@ Release assets include:
 - `Reader3-windows-portable.zip`
 - `Reader3.exe`
 - `Reader3-macOS.zip`
-- SHA256 checksum files for both
+- `Reader3-macOS.dmg`
+- SHA256 checksum files for each artifact
 
 ## License
 
