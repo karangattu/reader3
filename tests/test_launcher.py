@@ -180,7 +180,7 @@ class TestGetBooksDirectory:
         """Test getting books directory for frozen Windows app."""
         with patch("sys.frozen", True, create=True):
             with patch("sys.platform", "win32"):
-                with patch("sys.executable", "C:\\Program Files\\Reader3\\reader3.exe"):
+                with patch("sys.executable", "C:/Program Files/Reader3/reader3.exe"):
                     result = get_books_directory()
                     # Should return parent directory of executable
                     assert "Program Files" in result or "Reader3" in result
