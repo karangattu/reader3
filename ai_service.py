@@ -274,20 +274,20 @@ Summary:"""
             },
             timeout=60.0,
         )
-            
-            if response.status_code != 200:
-                error_msg = response.json().get("error", {}).get("message", response.text)
-                raise Exception(f"Gemini error: {error_msg}")
-            
-            # Extract text from Gemini response
-            data = response.json()
-            candidates = data.get("candidates", [])
-            if candidates:
-                parts = candidates[0].get("content", {}).get("parts", [])
-                if parts:
-                    return parts[0].get("text", "").strip()
-            
-            return ""
+
+        if response.status_code != 200:
+            error_msg = response.json().get("error", {}).get("message", response.text)
+            raise Exception(f"Gemini error: {error_msg}")
+
+        # Extract text from Gemini response
+        data = response.json()
+        candidates = data.get("candidates", [])
+        if candidates:
+            parts = candidates[0].get("content", {}).get("parts", [])
+            if parts:
+                return parts[0].get("text", "").strip()
+
+        return ""
 
 
 # Singleton instance
