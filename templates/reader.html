@@ -1852,6 +1852,7 @@
                 const originalText = button.innerHTML;
                 button.innerHTML = '<i class="fa-solid fa-check"></i> Copied!';
                 showCopyToast('Page text copied!', 'success');
+                if (isPDF) markPdfPageRead(pageIndex);
                 setTimeout(() => {
                     button.classList.remove('copied');
                     button.innerHTML = originalText;
@@ -1891,6 +1892,7 @@
                 const originalText = button.innerHTML;
                 button.innerHTML = '<i class="fa-solid fa-check"></i> Copied!';
                 showCopyToast('Page image copied!', 'success');
+                markPdfPageRead(pageIndex);
                 setTimeout(() => {
                     button.classList.remove('copied');
                     button.innerHTML = originalText;
@@ -2161,7 +2163,10 @@
                     btn.innerHTML = '<i class="fa-solid fa-check"></i> Copied!';
                 }
                 showCopyToast(`${images.length} page${images.length > 1 ? 's' : ''} copied as image!`, 'success');
-                
+
+                // Mark all copied pages as read
+                sortedPages.forEach(pageIndex => markPdfPageRead(pageIndex));
+
                 setTimeout(() => {
                     if (btn) {
                         btn.classList.remove('copied');
@@ -2473,25 +2478,63 @@
             }
         }
         
+        // Track which PDF pages have already been marked as read (avoid duplicate API calls)
+        const pdfPagesMarkedRead = new Set();
+
+        // Mark a single PDF page as read (100% progress) and update sidebar
+        function markPdfPageRead(pageIndex) {
+            if (pdfPagesMarkedRead.has(pageIndex)) return;
+            pdfPagesMarkedRead.add(pageIndex);
+
+            fetch(`/api/chapter-progress/${encodeURIComponent(bookId)}/${pageIndex}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ progress: 100.0 })
+            }).catch(err => console.error('Failed to mark page as read:', err));
+
+            // Update sidebar progress bar and read status
+            for (const [href, idx] of Object.entries(spineMap)) {
+                if (idx === pageIndex) {
+                    const progressElem = document.querySelector(`.chapter-progress[data-href="${href}"] .chapter-progress-fill`);
+                    if (progressElem) progressElem.style.width = '100%';
+                    const percentEl = document.querySelector(`.toc-chapter-percent[data-href="${href}"]`);
+                    if (percentEl) percentEl.textContent = '100%';
+                    const link = document.querySelector(`.toc-link[data-href="${href}"]`);
+                    if (link) {
+                        link.classList.add('read');
+                        link.classList.remove('unread');
+                    }
+                    break;
+                }
+            }
+        }
+
         // Track scroll position to show current page
         function trackVisiblePage() {
             const pages = document.querySelectorAll('.pdf-page');
             const mainContent = document.getElementById('main');
             const scrollTop = mainContent.scrollTop;
             const viewportHeight = mainContent.clientHeight;
-            
+
             let currentVisible = currentPageIndex + 1;
-            
+
             pages.forEach(page => {
                 const rect = page.getBoundingClientRect();
-                const pageIndex = parseInt(page.dataset.pageIndex) + 1;
-                
+                const pageIndex = parseInt(page.dataset.pageIndex);
+
                 // If the page is mostly in view
                 if (rect.top < viewportHeight / 2 && rect.bottom > viewportHeight / 2) {
-                    currentVisible = pageIndex;
+                    currentVisible = pageIndex + 1;
+                }
+
+                // Mark pages as read when they've been scrolled past (bottom above viewport top)
+                // or are currently visible in the viewport
+                if (rect.bottom < viewportHeight && rect.bottom > 0 ||
+                    rect.top < viewportHeight / 2 && rect.bottom > viewportHeight / 2) {
+                    markPdfPageRead(pageIndex);
                 }
             });
-            
+
             showPageIndicator(currentVisible);
         }
 
@@ -2879,7 +2922,12 @@
             Object.keys(spineMap).forEach(href => {
                 const chapterIndex = spineMap[href];
                 const progress = progressData[chapterIndex] || 0;
-                
+
+                // Pre-populate the read set for PDF pages already at 100%
+                if (isPDF && progress >= 100) {
+                    pdfPagesMarkedRead.add(chapterIndex);
+                }
+
                 // Find the progress bar for this chapter
                 const progressElem = document.querySelector(`.chapter-progress[data-href="${href}"] .chapter-progress-fill`);
                 if (progressElem) {
