@@ -52,6 +52,17 @@ class ReadingProgress:
 
 
 @dataclass
+class ReaderPreferences:
+    """Persisted reader display and accessibility preferences."""
+    theme: str = "light"
+    font_size_px: int = 19
+    line_height: float = 1.8
+    page_width_px: int = 700
+    reduced_motion: bool = False
+    high_contrast: bool = False
+
+
+@dataclass
 class SearchQuery:
     """A search query entry for history."""
     query: str
@@ -133,7 +144,8 @@ class UserData:
     vocabulary: Dict[str, List[VocabularyWord]] = field(default_factory=dict)
     annotations: Dict[str, List[Annotation]] = field(default_factory=dict)
     collections: List[Collection] = field(default_factory=list)
-    version: str = "1.2"
+    reader_preferences: ReaderPreferences = field(default_factory=ReaderPreferences)
+    version: str = "1.3"
 
 
 def generate_id() -> str:
@@ -211,7 +223,8 @@ class UserDataManager:
                 collections=[
                     Collection(**c) for c in raw.get('collections', [])
                 ],
-                version=raw.get('version', '1.2')
+                reader_preferences=ReaderPreferences(**raw.get('reader_preferences', {})),
+                version=raw.get('version', '1.3')
             )
         except Exception as e:
             print(f"Error loading user data: {e}")
@@ -283,6 +296,7 @@ class UserDataManager:
                 for book_id, annots in self._data.annotations.items()
             },
             'collections': [asdict(c) for c in self._data.collections],
+            'reader_preferences': asdict(self._data.reader_preferences),
             'version': self._data.version
         }
         
@@ -422,6 +436,31 @@ class UserDataManager:
         if book_id in data.progress:
             data.progress[book_id].reading_time_seconds += seconds
             self.save_deferred()
+
+    # Reader Preferences
+    def get_reader_preferences(self) -> ReaderPreferences:
+        """Get global reader preferences."""
+        data = self.load()
+        return data.reader_preferences
+
+    def update_reader_preferences(self, **kwargs) -> ReaderPreferences:
+        """Merge and persist global reader preferences."""
+        data = self.load()
+        prefs = data.reader_preferences
+
+        for field_name in (
+            'theme',
+            'font_size_px',
+            'line_height',
+            'page_width_px',
+            'reduced_motion',
+            'high_contrast',
+        ):
+            if field_name in kwargs and kwargs[field_name] is not None:
+                setattr(prefs, field_name, kwargs[field_name])
+
+        self.save()
+        return prefs
     
     # Chapter Progress (per-chapter tracking)
     def get_chapter_progress(self, book_id: str) -> Dict[int, float]:

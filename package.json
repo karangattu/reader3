@@ -1,0 +1,27 @@
+{
+  "name": "reader3",
+  "version": "1.0.0",
+  "description": "A lightweight, self-hosted EPUB & PDF reader for reading books alongside LLMs.",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/karangattu/reader3.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/karangattu/reader3/issues"
+  },
+  "homepage": "https://github.com/karangattu/reader3#readme",
+  "dependencies": {
+    "@capacitor/core": "^8.2.0"
+  }
+}

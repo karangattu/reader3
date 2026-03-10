@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import logging
 import os
 import pickle
@@ -32,7 +33,6 @@ from reader3 import (
     get_pdf_page_stats,
     search_pdf_text_positions,
     validate_pdf,
-    sanitize_book_text_fields,
 )
 from semantic_search import semantic_search_books
 from user_data import (
@@ -45,6 +45,7 @@ from user_data import (
     VocabularyWord,
     Annotation,
     Collection,
+    ReaderPreferences,
     generate_id,
 )
 
@@ -71,6 +72,8 @@ _io_executor = ThreadPoolExecutor(
 # Maximum upload size: 200 MB (configurable via env)
 MAX_UPLOAD_BYTES = int(os.environ.get("MAX_UPLOAD_MB", 200)) * 1024 * 1024
 
+VALID_READER_THEMES = {"light", "sepia", "dark"}
+
 
 def _run_sync(fn, *args):
     """Schedule a blocking function on the I/O thread pool."""
@@ -78,9 +81,122 @@ def _run_sync(fn, *args):
 
 
 def _pdf_thumbnails_enabled() -> bool:
-    """Whether to generate PDF thumbnails during import."""
-    raw = os.environ.get("PDF_GENERATE_THUMBNAILS", "true").strip().lower()
-    return raw not in {"0", "false", "no", "off"}
+    """Return whether PDF thumbnail generation is enabled."""
+    raw = os.environ.get("PDF_GENERATE_THUMBNAILS", "true")
+    return raw.strip().lower() not in {"0", "false", "no", "off"}
+
+
+def _format_pdf_validation_error(error: Optional[str]) -> str:
+    """Turn low-level PDF validation failures into user-facing guidance."""
+    if not error:
+        return "This PDF could not be processed."
+
+    lowered = error.lower()
+    if "password-protected" in lowered:
+        return (
+            "This PDF is password-protected. Remove the password in Preview or "
+            "another PDF app, then upload it again."
+        )
+    if "encrypted" in lowered:
+        return (
+            "This PDF is encrypted. Export or decrypt it first, then upload the "
+            "unlocked copy."
+        )
+    if "bad header" in lowered or "not a valid pdf" in lowered:
+        return "This file does not look like a valid PDF."
+    return error
+
+
+def _compute_progress_percent(book_id: str, chapter_count: int) -> float:
+    """Compute overall progress percent for a book from per-chapter progress."""
+    chapter_progress = user_data_manager.get_chapter_progress(book_id)
+    if not chapter_progress or chapter_count <= 0:
+        return 0.0
+    return round(min(100.0, sum(chapter_progress.values()) / chapter_count), 1)
+
+
+def _progress_status_label(progress_percent: float) -> str:
+    """Map numeric progress to a library-friendly reading status."""
+    if progress_percent >= 100.0:
+        return "completed"
+    if progress_percent > 0:
+        return "in_progress"
+    return "unread"
+
+
+def _persist_upload_metadata(book_dir: str, source_hash: str, source_filename: str):
+    """Augment saved metadata with upload-specific fields used by the library."""
+    meta_path = os.path.join(book_dir, "book_meta.json")
+    if not os.path.exists(meta_path):
+        return
+
+    try:
+        with open(meta_path, "r", encoding="utf-8") as handle:
+            metadata = json.load(handle)
+        metadata["source_hash"] = source_hash
+        metadata["source_file"] = source_filename
+        with open(meta_path, "w", encoding="utf-8") as handle:
+            json.dump(metadata, handle, ensure_ascii=False)
+    except Exception as exc:
+        logger.error("Error updating upload metadata for %s: %s", book_dir, exc)
+
+
+def _find_duplicate_book_by_hash(source_hash: str) -> Optional[dict]:
+    """Find an existing library entry with the same source file hash."""
+    if not os.path.exists(BOOKS_DIR):
+        return None
+
+    for item in os.listdir(BOOKS_DIR):
+        item_path = os.path.join(BOOKS_DIR, item)
+        if not item.endswith("_data") or not os.path.isdir(item_path):
+            continue
+
+        metadata = load_book_metadata(item)
+        if metadata and metadata.get("source_hash") == source_hash:
+            return {
+                "book_id": item,
+                "title": metadata.get("title") or item.replace("_data", ""),
+            }
+    return None
+
+
+def _find_active_upload(filename: str) -> Optional[str]:
+    """Return an active upload id for a matching filename, if any."""
+    with upload_status_lock:
+        for upload_id, status in upload_status.items():
+            if (
+                status.get("filename") == filename
+                and status.get("status") in {"queued", "processing"}
+            ):
+                return upload_id
+    return None
+
+
+def _build_library_entry(folder_name: str, metadata: dict) -> dict:
+    """Create the lightweight book record used by the library page."""
+    progress_percent = _compute_progress_percent(folder_name, metadata.get("chapters", 0))
+    return {
+        "id": folder_name,
+        "title": metadata.get("title", "Untitled"),
+        "author": ", ".join(metadata.get("authors", [])),
+        "chapters": metadata.get("chapters", 0),
+        "added_at": metadata.get("added_at"),
+        "cover_image": metadata.get("cover_image"),
+        "progress_percent": progress_percent,
+        "reading_status": _progress_status_label(progress_percent),
+    }
+
+
+def _serialize_reader_preferences(preferences: ReaderPreferences) -> dict:
+    """Convert reader preferences to a response/template payload."""
+    return {
+        "theme": preferences.theme,
+        "font_size_px": preferences.font_size_px,
+        "line_height": preferences.line_height,
+        "page_width_px": preferences.page_width_px,
+        "reduced_motion": preferences.reduced_motion,
+        "high_contrast": preferences.high_contrast,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -146,33 +262,12 @@ app.add_middleware(GZipMiddleware, minimum_size=500, compresslevel=6)
 upload_status: Dict[str, dict] = {}
 upload_status_lock = threading.Lock()
 
-# Track files currently being processed to prevent concurrent duplicate uploads
-_active_uploads: Dict[str, str] = {}  # out_dir -> upload_id
-_active_uploads_lock = threading.Lock()
-
 
 def update_upload_status(upload_id: str, **kwargs):
     """Thread-safe update of upload status."""
     with upload_status_lock:
         if upload_id in upload_status:
             upload_status[upload_id].update(kwargs)
-
-
-def _build_upload_progress_callback(upload_id: str):
-    """Create a PDF processing callback that streams progress into upload status."""
-    def _progress(percent: int, message: str):
-        try:
-            pct = max(0, min(100, int(percent)))
-        except Exception:
-            pct = 0
-        update_upload_status(
-            upload_id,
-            status="processing",
-            progress=pct,
-            message=message or "Processing...",
-        )
-
-    return _progress
 
 
 def cleanup_old_statuses():
@@ -185,20 +280,6 @@ def cleanup_old_statuses():
         ]
         for uid in to_remove:
             del upload_status[uid]
-
-
-def _sanitize_filename(name: str) -> str:
-    """Aggressively sanitize a filename for safe filesystem use."""
-    import re
-    import unicodedata
-
-    name = unicodedata.normalize("NFKD", name)
-    name = name.replace("/", "_").replace("\\", "_").replace("\0", "")
-    name = re.sub(r'[^\w\s.\-()]', '_', name)
-    name = re.sub(r'[_\s]+', ' ', name).strip()
-    if not name or name in (".", ".."):
-        name = "unnamed_book"
-    return name
 
 
 # Determine base path for resources (templates)
@@ -263,7 +344,6 @@ def load_book_cached(folder_name: str) -> Optional[Book]:
     try:
         with open(file_path, "rb") as f:
             book = pickle.load(f)
-        sanitize_book_text_fields(book)
         return book
     except Exception as e:
         logger.error("Error loading book %s: %s", folder_name, e)
@@ -349,7 +429,12 @@ def get_cached_reading_times(book_id: str) -> Optional[dict]:
 
 
 @app.get("/", response_class=HTMLResponse)
-async def library_view(request: Request, sort: str = "recent"):
+async def library_view(
+    request: Request,
+    sort: str = "recent",
+    q: str = "",
+    status: str = "all",
+):
     """Lists all available processed books."""
     books = []
 
@@ -362,30 +447,46 @@ async def library_view(request: Request, sort: str = "recent"):
                 if item.endswith("_data") and os.path.isdir(item_path):
                     meta = load_book_metadata(item)
                     if meta:
-                        result.append(
-                            {
-                                "id": item,
-                                "title": meta.get("title", "Untitled"),
-                                "author": ", ".join(meta.get("authors", [])),
-                                "chapters": meta.get("chapters", 0),
-                                "added_at": meta.get("added_at"),
-                                "cover_image": meta.get("cover_image"),
-                            }
-                        )
+                        result.append(_build_library_entry(item, meta))
         return result
 
     books = await _run_sync(_scan_books)
 
+    normalized_query = q.strip().lower()
+    if normalized_query:
+        books = [
+            book for book in books
+            if normalized_query in book["title"].lower()
+            or normalized_query in book["author"].lower()
+        ]
+
+    if status in {"unread", "in_progress", "completed"}:
+        books = [book for book in books if book["reading_status"] == status]
+
     # Sort books based on the sort parameter
     if sort == "recent":
-        books.sort(key=lambda x: x["added_at"], reverse=True)
+        books.sort(key=lambda x: x["added_at"] or "", reverse=True)
     elif sort == "alpha":
         books.sort(key=lambda x: x["title"].lower())
     elif sort == "author":
         books.sort(key=lambda x: x["author"].lower())
+    elif sort == "progress":
+        books.sort(
+            key=lambda x: (x["progress_percent"], x["added_at"] or ""),
+            reverse=True,
+        )
+    else:
+        sort = "recent"
 
     return templates.TemplateResponse(
-        "library.html", {"request": request, "books": books, "sort": sort}
+        "library.html",
+        {
+            "request": request,
+            "books": books,
+            "sort": sort,
+            "library_query": q,
+            "status": status,
+        },
     )
 
 
@@ -451,31 +552,42 @@ def process_book_background(
     suffix: str,
     full_out_dir: str,
     out_dir: str,
-    source_filename: Optional[str] = None,
+    source_filename: str = "",
+    source_hash: str = "",
 ):
     """Background task to process a book (PDF or EPUB)."""
     try:
-        update_upload_status(upload_id, status="processing", progress=5, message="Starting processing...")
+        update_upload_status(upload_id, status="processing", progress=10, message="Starting processing...")
+
+        def progress_callback(progress: int, message: str):
+            update_upload_status(
+                upload_id,
+                status="processing",
+                progress=max(10, min(95, int(progress))),
+                message=message,
+            )
 
         if suffix == ".pdf":
             from reader3 import process_pdf
-            update_upload_status(upload_id, progress=7, message="Validating PDF…")
             validation = validate_pdf(temp_path)
             if not validation["valid"]:
-                raise ValueError(validation["error"])
+                raise ValueError(_format_pdf_validation_error(validation["error"]))
+            update_upload_status(upload_id, progress=20, message="Preparing PDF import...")
             book_obj = process_pdf(
                 temp_path,
                 full_out_dir,
                 generate_thumbnails=_pdf_thumbnails_enabled(),
-                progress_callback=_build_upload_progress_callback(upload_id),
-                source_filename=source_filename,
+                progress_callback=progress_callback,
+                source_filename=source_filename or None,
             )
         else:
-            update_upload_status(upload_id, progress=20, message="Parsing EPUB structure…")
+            update_upload_status(upload_id, progress=20, message="Parsing EPUB structure...")
             book_obj = process_epub(temp_path, full_out_dir)
 
-        update_upload_status(upload_id, progress=92, message="Saving book data…")
+        update_upload_status(upload_id, progress=80, message="Saving book data...")
         save_to_pickle(book_obj, full_out_dir)
+        if source_hash:
+            _persist_upload_metadata(full_out_dir, source_hash, source_filename or book_obj.source_file)
 
         # Clear caches
         load_book_cached.cache_clear()
@@ -493,10 +605,10 @@ def process_book_background(
         logger.info("Background processing completed for %s", out_dir)
 
     except Exception as e:
-        logger.error("Error processing book in background: %s", e, exc_info=True)
-        # process_pdf uses atomic swap so old data should be intact.
-        if suffix != ".pdf" and os.path.exists(full_out_dir):
-            shutil.rmtree(full_out_dir, ignore_errors=True)
+        logger.error("Error processing book in background: %s", e)
+        # Clean up partial data if failed
+        if os.path.exists(full_out_dir):
+            shutil.rmtree(full_out_dir)
         update_upload_status(
             upload_id,
             status="failed",
@@ -505,91 +617,84 @@ def process_book_background(
             completed_at=datetime.now().timestamp()
         )
     finally:
-        try:
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
-        except OSError:
-            pass
-        with _active_uploads_lock:
-            _active_uploads.pop(out_dir, None)
+        # Clean up temp file
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
 
 
 @app.post("/upload")
 async def upload_book(file: UploadFile = File(...), background: bool = False, background_tasks: BackgroundTasks = None):
     """Handle EPUB/PDF file uploads. Use ?background=true for async processing."""
 
-    original_name = file.filename or "unnamed"
-    suffix = os.path.splitext(original_name)[1].lower()
-    if suffix not in (".epub", ".pdf"):
+    suffix = os.path.splitext(file.filename)[1].lower()
+    if suffix not in [".epub", ".pdf"]:
         raise HTTPException(
-            status_code=400, detail="Only .epub and .pdf files are supported."
+            status_code=400, detail="Only .epub and .pdf files are supported"
         )
 
-    temp_path = None
-    try:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-            bytes_written = 0
-            try:
-                while chunk := await file.read(1024 * 256):
-                    bytes_written += len(chunk)
-                    if bytes_written > MAX_UPLOAD_BYTES:
-                        raise HTTPException(
-                            status_code=413,
-                            detail=f"File too large. Maximum size is {MAX_UPLOAD_BYTES // (1024*1024)} MB.",
-                        )
-                    tmp.write(chunk)
-            except HTTPException:
-                raise
-            except Exception as e:
+    # Stream the upload to a temp file with size enforcement
+    hasher = hashlib.sha256()
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        bytes_written = 0
+        while chunk := await file.read(1024 * 256):  # 256 KB chunks
+            bytes_written += len(chunk)
+            if bytes_written > MAX_UPLOAD_BYTES:
+                tmp.close()
+                os.remove(tmp.name)
                 raise HTTPException(
-                    status_code=400,
-                    detail=f"Error reading uploaded file: {e}",
+                    status_code=413,
+                    detail=f"File too large. Maximum size is {MAX_UPLOAD_BYTES // (1024*1024)} MB.",
                 )
-            temp_path = tmp.name
-    except HTTPException:
-        if temp_path and os.path.exists(temp_path):
-            os.remove(temp_path)
-        raise
+            hasher.update(chunk)
+            tmp.write(chunk)
+        temp_path = tmp.name
 
-    if bytes_written == 0:
-        os.remove(temp_path)
-        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
-
-    if suffix == ".pdf":
-        validation = validate_pdf(temp_path)
-        if not validation["valid"]:
-            os.remove(temp_path)
-            raise HTTPException(status_code=422, detail=validation["error"])
-
-    safe_filename = _sanitize_filename(os.path.basename(original_name))
+    safe_filename = os.path.basename(file.filename)
+    source_hash = hasher.hexdigest()
     out_dir = os.path.splitext(safe_filename)[0] + "_data"
     full_out_dir = os.path.join(BOOKS_DIR, out_dir)
 
-    with _active_uploads_lock:
-        existing_uid = _active_uploads.get(out_dir)
-    if existing_uid:
-        os.remove(temp_path)
+    active_upload_id = _find_active_upload(safe_filename)
+    if active_upload_id:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
         return JSONResponse(
             status_code=409,
             content={
                 "detail": "This book is already being processed.",
-                "upload_id": existing_uid,
+                "upload_id": active_upload_id,
             },
         )
+
+    duplicate_book = _find_duplicate_book_by_hash(source_hash)
+    if duplicate_book:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+        raise HTTPException(
+            status_code=409,
+            detail=f'{duplicate_book["title"]} is already in your library.',
+        )
+
+    if suffix == ".pdf":
+        validation = validate_pdf(temp_path)
+        if not validation["valid"]:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            raise HTTPException(
+                status_code=400,
+                detail=_format_pdf_validation_error(validation["error"]),
+            )
 
     # Background processing for PDFs (they're slower) or when explicitly requested
     if background or (suffix == ".pdf" and background_tasks is not None):
         upload_id = str(uuid.uuid4())
         cleanup_old_statuses()
 
-        with _active_uploads_lock:
-            _active_uploads[out_dir] = upload_id
-
         with upload_status_lock:
             upload_status[upload_id] = {
                 "status": "queued",
                 "progress": 0,
-                "message": "Upload received, queued for processing…",
+                "message": "Upload received, queued for processing...",
                 "filename": safe_filename,
                 "book_id": None,
                 "started_at": datetime.now().timestamp(),
@@ -599,9 +704,16 @@ async def upload_book(file: UploadFile = File(...), background: bool = False, ba
         # Run in background thread for true async processing
         thread = threading.Thread(
             target=process_book_background,
-            args=(upload_id, temp_path, suffix, full_out_dir, out_dir, safe_filename),
-            daemon=True,
-            name=f"upload-{upload_id[:8]}",
+            args=(
+                upload_id,
+                temp_path,
+                suffix,
+                full_out_dir,
+                out_dir,
+                safe_filename,
+                source_hash,
+            ),
+            daemon=True
         )
         thread.start()
 
@@ -626,25 +738,20 @@ async def upload_book(file: UploadFile = File(...), background: bool = False, ba
             book_obj = process_epub(temp_path, full_out_dir)
 
         save_to_pickle(book_obj, full_out_dir)
+        _persist_upload_metadata(full_out_dir, source_hash, safe_filename)
 
         load_book_cached.cache_clear()
         get_cached_reading_times.cache_clear()
         load_book_metadata.cache_clear()
 
-    except ValueError as e:
-        logger.warning("Validation error processing book: %s", e)
-        raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
-        logger.error("Error processing book: %s", e, exc_info=True)
-        if suffix != ".pdf" and os.path.exists(full_out_dir):
-            shutil.rmtree(full_out_dir, ignore_errors=True)
+        logger.error("Error processing book: %s", e)
+        if os.path.exists(full_out_dir):
+            shutil.rmtree(full_out_dir)
         raise HTTPException(status_code=500, detail=f"Failed to process book: {str(e)}")
     finally:
-        try:
-            if temp_path and os.path.exists(temp_path):
-                os.remove(temp_path)
-        except OSError:
-            pass
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
 
     return RedirectResponse(url="/", status_code=303)
 
@@ -712,8 +819,55 @@ async def read_chapter(request: Request, book_id: str, chapter_index: int):
             "next_idx": next_idx,
             "is_pdf": book.is_pdf,
             "needs_reprocess": needs_reprocess,
+            "reader_preferences": _serialize_reader_preferences(
+                user_data_manager.get_reader_preferences()
+            ),
         },
     )
+
+
+@app.get("/api/reader/preferences")
+async def get_reader_preferences():
+    """Get persisted reader appearance preferences."""
+    return _serialize_reader_preferences(user_data_manager.get_reader_preferences())
+
+
+@app.put("/api/reader/preferences")
+async def update_reader_preferences(request: Request):
+    """Update persisted reader appearance preferences."""
+    payload = await request.json()
+
+    updates = {}
+    if "theme" in payload:
+        theme = str(payload["theme"])
+        if theme not in VALID_READER_THEMES:
+            raise HTTPException(status_code=400, detail="Invalid reader theme")
+        updates["theme"] = theme
+
+    if "font_size_px" in payload:
+        value = int(payload["font_size_px"])
+        if value < 14 or value > 32:
+            raise HTTPException(status_code=400, detail="Font size must be between 14 and 32")
+        updates["font_size_px"] = value
+
+    if "line_height" in payload:
+        value = float(payload["line_height"])
+        if value < 1.3 or value > 2.4:
+            raise HTTPException(status_code=400, detail="Line height must be between 1.3 and 2.4")
+        updates["line_height"] = value
+
+    if "page_width_px" in payload:
+        value = int(payload["page_width_px"])
+        if value < 560 or value > 960:
+            raise HTTPException(status_code=400, detail="Page width must be between 560 and 960")
+        updates["page_width_px"] = value
+
+    for flag_name in ("reduced_motion", "high_contrast"):
+        if flag_name in payload:
+            updates[flag_name] = bool(payload[flag_name])
+
+    preferences = user_data_manager.update_reader_preferences(**updates)
+    return _serialize_reader_preferences(preferences)
 
 
 @app.get("/read/{book_id}/pages/{start}/{count}")
@@ -868,12 +1022,7 @@ async def reprocess_pdf(book_id: str):
         book_path = os.path.join(BOOKS_DIR, safe_book_id)
 
         # Reprocess the PDF
-        book_obj = process_pdf(
-            pdf_path,
-            book_path,
-            generate_thumbnails=_pdf_thumbnails_enabled(),
-            source_filename=book.source_file,
-        )
+        book_obj = process_pdf(pdf_path, book_path)
         save_to_pickle(book_obj, book_path)
 
         # Clear cache

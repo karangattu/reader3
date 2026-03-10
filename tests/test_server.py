@@ -6,11 +6,73 @@ import pytest
 from fastapi.testclient import TestClient
 import sys
 import os
+import hashlib
+import json
+from datetime import datetime, timedelta
+from pathlib import Path
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import server
+from reader3 import Book, BookMetadata, ChapterContent, TOCEntry, save_to_pickle
 from server import app
+
+
+def create_test_book(
+    book_id,
+    title,
+    author="Test Author",
+    *,
+    added_at=None,
+    chapters=3,
+    is_pdf=False,
+):
+    """Create a minimal processed book in the test library."""
+    added_at = added_at or datetime.now().isoformat()
+    book_dir = Path(server.BOOKS_DIR) / book_id
+    book_dir.mkdir(parents=True, exist_ok=True)
+
+    spine = []
+    toc = []
+    for index in range(chapters):
+        href = f"chapter-{index}.html"
+        spine.append(
+            ChapterContent(
+                id=f"chapter-{index}",
+                href=href,
+                title=f"Chapter {index + 1}",
+                content=f"<p>{title} chapter {index + 1}</p>",
+                text=f"{title} chapter {index + 1}",
+                order=index,
+            )
+        )
+        toc.append(
+            TOCEntry(
+                title=f"Chapter {index + 1}",
+                href=href,
+                file_href=href,
+                anchor="",
+            )
+        )
+
+    source_ext = ".pdf" if is_pdf else ".epub"
+    book = Book(
+        metadata=BookMetadata(title=title, language="en", authors=[author]),
+        spine=spine,
+        toc=toc,
+        images={},
+        source_file=f"{title}{source_ext}",
+        processed_at=added_at,
+        added_at=added_at,
+        is_pdf=is_pdf,
+    )
+    save_to_pickle(book, str(book_dir))
+
+    server.load_book_cached.cache_clear()
+    server.load_book_metadata.cache_clear()
+    server.get_cached_reading_times.cache_clear()
+    return book_dir
 
 
 @pytest.fixture
@@ -36,6 +98,52 @@ class TestLibraryEndpoint:
         content = response.text.lower()
         assert "library" in content or "reader" in content
 
+    def test_library_contains_organization_controls(self, client):
+        """Library page should expose the new organization controls."""
+        response = client.get("/")
+
+        assert response.status_code == 200
+        assert "Sort by" in response.text
+        assert "Progress" in response.text
+        assert "Reading status" in response.text
+
+    def test_library_can_sort_by_progress(self, client):
+        """Library view should sort matching books by reading progress."""
+        create_test_book(
+            "org_progress_low_data",
+            "Organize Progress Low",
+            added_at=(datetime.now() - timedelta(days=1)).isoformat(),
+            chapters=2,
+        )
+        create_test_book(
+            "org_progress_high_data",
+            "Organize Progress High",
+            added_at=datetime.now().isoformat(),
+            chapters=2,
+        )
+        server.user_data_manager.save_chapter_progress("org_progress_low_data", 0, 20.0)
+        server.user_data_manager.save_chapter_progress("org_progress_high_data", 0, 100.0)
+        server.user_data_manager.save_chapter_progress("org_progress_high_data", 1, 40.0)
+
+        response = client.get("/?sort=progress&q=Organize%20Progress")
+
+        assert response.status_code == 200
+        high_index = response.text.index("Organize Progress High")
+        low_index = response.text.index("Organize Progress Low")
+        assert high_index < low_index
+
+    def test_library_filters_by_reading_status(self, client):
+        """Library view should filter books by reading state."""
+        create_test_book("status_done_data", "Filter Status Completed", chapters=1)
+        create_test_book("status_unread_data", "Filter Status Unread", chapters=1)
+        server.user_data_manager.save_chapter_progress("status_done_data", 0, 100.0)
+
+        response = client.get("/?status=completed&q=Filter%20Status")
+
+        assert response.status_code == 200
+        assert "Filter Status Completed" in response.text
+        assert "Filter Status Unread" not in response.text
+
 
 class TestUploadEndpoint:
     """Tests for the upload endpoint."""
@@ -45,6 +153,50 @@ class TestUploadEndpoint:
         response = client.post("/upload")
         # Should fail with 422 (Unprocessable Entity) due to missing file
         assert response.status_code == 422
+
+    def test_upload_rejects_duplicate_file_content(self, client):
+        """Uploading the same file content twice should return a conflict."""
+        duplicate_bytes = b"duplicate-book-content"
+        duplicate_hash = hashlib.sha256(duplicate_bytes).hexdigest()
+        create_test_book("duplicate_upload_data", "Duplicate Upload Book")
+
+        meta_path = Path(server.BOOKS_DIR) / "duplicate_upload_data" / "book_meta.json"
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        meta["source_hash"] = duplicate_hash
+        meta_path.write_text(json.dumps(meta), encoding="utf-8")
+        server.load_book_metadata.cache_clear()
+
+        from io import BytesIO
+
+        response = client.post(
+            "/upload",
+            files={"file": ("duplicate.epub", BytesIO(duplicate_bytes), "application/epub+zip")},
+        )
+
+        assert response.status_code == 409
+        assert "already in your library" in response.json()["detail"].lower()
+
+    def test_upload_returns_friendly_pdf_validation_message(self, client, monkeypatch):
+        """Invalid PDFs should fail early with a helpful validation message."""
+        monkeypatch.setattr(
+            server,
+            "validate_pdf",
+            lambda _path: {
+                "valid": False,
+                "error": "PDF is password-protected. Please remove the password and re-upload.",
+            },
+        )
+
+        from io import BytesIO
+
+        response = client.post(
+            "/upload",
+            files={"file": ("locked.pdf", BytesIO(b"%PDF-1.7 locked"), "application/pdf")},
+        )
+
+        assert response.status_code == 400
+        assert "password-protected" in response.json()["detail"].lower()
+        assert "remove the password" in response.json()["detail"].lower()
 
 
 class TestStaticAssets:
@@ -2153,3 +2305,54 @@ class TestLibraryMetadataOptimization:
         assert response.status_code == 200
         data = response.json()
         assert len(data["books"]) <= 3
+
+
+class TestReaderPreferencesAPI:
+    """Tests for persisted reader settings endpoints."""
+
+    def test_get_reader_preferences_defaults(self, client):
+        """The reader settings endpoint should return defaults."""
+        response = client.get("/api/reader/preferences")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["theme"] == "light"
+        assert data["font_size_px"] == 19
+        assert data["line_height"] == 1.8
+        assert data["page_width_px"] == 700
+
+    def test_update_reader_preferences_round_trip(self, client):
+        """Reader settings updates should persist and be returned on read."""
+        response = client.put(
+            "/api/reader/preferences",
+            json={
+                "theme": "sepia",
+                "font_size_px": 23,
+                "line_height": 1.95,
+                "page_width_px": 840,
+                "reduced_motion": True,
+                "high_contrast": True,
+            },
+        )
+
+        assert response.status_code == 200
+        assert response.json()["theme"] == "sepia"
+
+        follow_up = client.get("/api/reader/preferences")
+        data = follow_up.json()
+        assert data["theme"] == "sepia"
+        assert data["font_size_px"] == 23
+        assert data["line_height"] == 1.95
+        assert data["page_width_px"] == 840
+        assert data["reduced_motion"] is True
+        assert data["high_contrast"] is True
+
+    def test_reader_page_contains_settings_ui(self, client):
+        """Reader page should expose the settings panel affordance."""
+        create_test_book("reader_settings_data", "Reader Settings Demo")
+
+        response = client.get("/read/reader_settings_data/0")
+
+        assert response.status_code == 200
+        assert "Reader Settings" in response.text
+        assert "reader-settings-panel" in response.text

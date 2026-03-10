@@ -6,19 +6,59 @@
     <title>{{ book.metadata.title }}</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <style>
+        :root {
+            --reader-bg: #f4f1ea;
+            --reader-surface: #fff;
+            --reader-sidebar-bg: #f8f9fa;
+            --reader-text: #212529;
+            --reader-muted: #5c6670;
+            --reader-border: #dde2e7;
+            --reader-toolbar-bg: rgba(255, 255, 255, 0.95);
+            --reader-font-size: 19px;
+            --reader-line-height: 1.8;
+            --reader-page-width: 700px;
+            --reader-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+        }
+
+        body.theme-sepia {
+            --reader-bg: #efe4cf;
+            --reader-surface: #fbf3e4;
+            --reader-sidebar-bg: #f2e7d4;
+            --reader-text: #43362c;
+            --reader-muted: #65584b;
+            --reader-border: #d8c7ac;
+            --reader-toolbar-bg: rgba(251, 243, 228, 0.96);
+        }
+
+        body.theme-dark {
+            --reader-bg: #11161c;
+            --reader-surface: #18212b;
+            --reader-sidebar-bg: #141c24;
+            --reader-text: #edf2f7;
+            --reader-muted: #b4c0cf;
+            --reader-border: #283444;
+            --reader-toolbar-bg: rgba(24, 33, 43, 0.96);
+            --reader-shadow: 0 18px 45px rgba(0, 0, 0, 0.35);
+        }
+
+        body.high-contrast {
+            --reader-border: #000;
+        }
+
         /* Layout */
-        body { margin: 0; padding: 0; display: flex; height: 100vh; overflow: hidden; font-family: "Georgia", serif; background: #fff; }
+        body { margin: 0; padding: 0; display: flex; height: 100vh; overflow: hidden; font-family: "Georgia", serif; background: var(--reader-bg); color: var(--reader-text); }
         body.sidebar-collapsed #sidebar { width: 0; padding: 0; border-right: none; transform: translateX(-100%); opacity: 0; pointer-events: none; }
         body.sidebar-collapsed #main { width: 100%; }
         body.selection-mode .book-content { cursor: text; user-select: text; }
         body.selection-mode .book-content ::selection { background: #ffeb3b; color: #000; }
+        body.reduced-motion *, body.reduced-motion *::before, body.reduced-motion *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
         
         /* PDF-specific styles */
         body.is-pdf .book-content { user-select: text; cursor: text; }
         body.is-pdf .book-content ::selection { background: #b3d9ff; color: #000; }
 
         /* Sidebar */
-        #sidebar { width: 300px; background: #f8f9fa; border-right: 1px solid #e9ecef; overflow-y: auto; padding: 20px; flex-shrink: 0; transition: width 0.2s ease, transform 0.2s ease, opacity 0.2s ease; }
+        #sidebar { width: 300px; background: var(--reader-sidebar-bg); border-right: 1px solid var(--reader-border); overflow-y: auto; padding: 20px; flex-shrink: 0; transition: width 0.2s ease, transform 0.2s ease, opacity 0.2s ease; }
         .nav-header { font-family: -apple-system, sans-serif; font-weight: bold; color: #495057; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #dee2e6; }
         .nav-home { display: block; margin-bottom: 20px; margin-top: 45px; color: #3498db; text-decoration: none; font-family: -apple-system, sans-serif; font-size: 0.9em; }
 
@@ -82,12 +122,12 @@
         .shortcut-key { opacity: 0.7; }
 
         /* Main Content */
-        #main { flex-grow: 1; overflow-y: auto; position: relative; scroll-behavior: smooth; }
-        .content-container { max-width: 700px; margin: 0 auto; padding: 60px 40px 60px 40px; line-height: 1.8; font-size: 1.15em; color: #212529; background: #fff; position: relative; z-index: 1; }
+        #main { flex-grow: 1; overflow-y: auto; position: relative; scroll-behavior: smooth; background: var(--reader-bg); }
+        .content-container { max-width: var(--reader-page-width); margin: 0 auto; padding: 60px 40px 60px 40px; line-height: var(--reader-line-height); font-size: var(--reader-font-size); color: var(--reader-text); background: var(--reader-surface); position: relative; z-index: 1; box-shadow: var(--reader-shadow); }
         .content-toolbar { display: flex; justify-content: flex-end; gap: 10px; margin-bottom: 25px; font-family: -apple-system, sans-serif; flex-wrap: wrap; }
-        .content-toolbar.pdf-toolbar { position: sticky; top: 0; background: #fff; padding: 15px 10px 15px 10px; margin: -15px -10px 25px -10px; z-index: 50; border-radius: 0 0 8px 8px; transition: box-shadow 0.3s ease; }
+        .content-toolbar.pdf-toolbar { position: sticky; top: 0; background: var(--reader-toolbar-bg); padding: 15px 10px 15px 10px; margin: -15px -10px 25px -10px; z-index: 50; border-radius: 0 0 8px 8px; transition: box-shadow 0.3s ease; backdrop-filter: blur(8px); }
         .content-toolbar.pdf-toolbar.stuck { box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-        .toolbar-btn { border: 1px solid #ddd; background: #fff; color: #495057; padding: 9px 16px; border-radius: 5px; cursor: pointer; font-size: 0.9em; font-weight: 500; transition: all 0.2s ease; }
+        .toolbar-btn { border: 1px solid var(--reader-border); background: var(--reader-surface); color: var(--reader-muted); padding: 9px 16px; border-radius: 5px; cursor: pointer; font-size: 0.9em; font-weight: 500; transition: all 0.2s ease; }
         .toolbar-btn:hover { background: #495057; color: #fff; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); }
         .toolbar-btn:active { transform: scale(0.97); }
         .toolbar-btn.active { background: #3498db; color: #fff; border-color: #3498db; }
@@ -107,8 +147,107 @@
         /* Content Styling (Basic normalization for the book HTML) */
         .book-content { position: relative; z-index: 1; }
         .book-content img { max-width: 100%; height: auto; display: block; margin: 20px auto; }
-        .book-content h1, .book-content h2, .book-content h3 { font-family: -apple-system, sans-serif; margin-top: 1.5em; color: #333; }
+        .book-content h1, .book-content h2, .book-content h3 { font-family: -apple-system, sans-serif; margin-top: 1.5em; color: var(--reader-text); }
         .book-content p { margin-bottom: 1.5em; text-align: justify; }
+
+        .reader-settings-panel {
+            position: fixed;
+            inset: 0;
+            background: rgba(9, 12, 16, 0.45);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1300;
+            padding: 24px;
+        }
+
+        .reader-settings-panel.visible {
+            display: flex;
+        }
+
+        .reader-settings-card {
+            width: min(540px, 100%);
+            background: var(--reader-surface);
+            color: var(--reader-text);
+            border: 1px solid var(--reader-border);
+            border-radius: 18px;
+            box-shadow: var(--reader-shadow);
+            overflow: hidden;
+            font-family: -apple-system, sans-serif;
+        }
+
+        .reader-settings-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 18px 22px;
+            border-bottom: 1px solid var(--reader-border);
+        }
+
+        .reader-settings-title {
+            font-size: 1.05em;
+            font-weight: 700;
+        }
+
+        .reader-settings-body {
+            padding: 20px 22px 24px;
+            display: grid;
+            gap: 18px;
+        }
+
+        .reader-setting-group {
+            display: grid;
+            gap: 8px;
+        }
+
+        .reader-setting-label {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            align-items: center;
+            font-size: 0.92em;
+            font-weight: 600;
+        }
+
+        .reader-setting-help {
+            color: var(--reader-muted);
+            font-size: 0.82em;
+            line-height: 1.4;
+        }
+
+        .reader-settings-card input[type="range"],
+        .reader-settings-card select {
+            width: 100%;
+        }
+
+        .reader-settings-card input[type="range"] {
+            accent-color: #3498db;
+        }
+
+        .reader-toggle-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 12px 14px;
+            border: 1px solid var(--reader-border);
+            border-radius: 12px;
+        }
+
+        .reader-settings-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            margin-top: 6px;
+        }
+
+        .reader-settings-status {
+            min-height: 1.2em;
+            color: var(--reader-muted);
+            font-size: 0.85em;
+            text-align: right;
+        }
 
         /* Navigation Footer */
         .chapter-nav { position: relative; z-index: 10; display: flex; justify-content: space-between; margin-top: 60px; padding-top: 20px; padding-bottom: 20px; border-top: 1px solid #eee; background: #fff; font-family: -apple-system, sans-serif; }
@@ -348,7 +487,7 @@
 
     </style>
 </head>
-<body class="{{ 'is-pdf' if is_pdf else '' }}">
+<body class="{{ 'is-pdf ' if is_pdf else '' }}theme-{{ reader_preferences.theme }}{% if reader_preferences.high_contrast %} high-contrast{% endif %}{% if reader_preferences.reduced_motion %} reduced-motion{% endif %}" style="--reader-font-size: {{ reader_preferences.font_size_px }}px; --reader-line-height: {{ reader_preferences.line_height }}; --reader-page-width: {{ reader_preferences.page_width_px }}px;">
 
     <!-- Reading progress bar at top -->
     <div id="reading-progress">
@@ -560,6 +699,74 @@
             </div>
         </div>
     </div>
+
+    <div id="reader-settings-panel" class="reader-settings-panel" aria-hidden="true">
+        <div class="reader-settings-card">
+            <div class="reader-settings-header">
+                <div class="reader-settings-title"><i class="fa-solid fa-sliders"></i> Reader Settings</div>
+                <button class="panel-close" type="button" onclick="toggleReaderSettingsPanel(false)"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="reader-settings-body">
+                <div class="reader-setting-group">
+                    <label class="reader-setting-label" for="reader-theme">
+                        <span>Theme</span>
+                        <span id="reader-theme-value"></span>
+                    </label>
+                    <select id="reader-theme">
+                        <option value="light">Paper</option>
+                        <option value="sepia">Sepia</option>
+                        <option value="dark">Night</option>
+                    </select>
+                    <div class="reader-setting-help">Choose a reading surface that matches the room and your eyes.</div>
+                </div>
+
+                <div class="reader-setting-group">
+                    <label class="reader-setting-label" for="reader-font-size">
+                        <span>Font size</span>
+                        <span id="reader-font-size-value"></span>
+                    </label>
+                    <input id="reader-font-size" type="range" min="14" max="32" step="1">
+                </div>
+
+                <div class="reader-setting-group">
+                    <label class="reader-setting-label" for="reader-line-height">
+                        <span>Line spacing</span>
+                        <span id="reader-line-height-value"></span>
+                    </label>
+                    <input id="reader-line-height" type="range" min="1.3" max="2.4" step="0.05">
+                </div>
+
+                <div class="reader-setting-group">
+                    <label class="reader-setting-label" for="reader-page-width">
+                        <span>Page width</span>
+                        <span id="reader-page-width-value"></span>
+                    </label>
+                    <input id="reader-page-width" type="range" min="560" max="960" step="20">
+                </div>
+
+                <label class="reader-toggle-row" for="reader-reduced-motion">
+                    <div>
+                        <div class="reader-setting-label"><span>Reduced motion</span></div>
+                        <div class="reader-setting-help">Turn off most fades and transitions.</div>
+                    </div>
+                    <input id="reader-reduced-motion" type="checkbox">
+                </label>
+
+                <label class="reader-toggle-row" for="reader-high-contrast">
+                    <div>
+                        <div class="reader-setting-label"><span>High contrast</span></div>
+                        <div class="reader-setting-help">Increase edge definition for text and panels.</div>
+                    </div>
+                    <input id="reader-high-contrast" type="checkbox">
+                </label>
+
+                <div class="reader-settings-actions">
+                    <button class="toolbar-btn" type="button" onclick="resetReaderPreferences()"><i class="fa-solid fa-rotate-left"></i> Reset</button>
+                    <div id="reader-settings-status" class="reader-settings-status" aria-live="polite"></div>
+                </div>
+            </div>
+        </div>
+    </div>
     
     <!-- PDF floating page indicator -->
     {% if is_pdf %}
@@ -667,6 +874,7 @@
     <div id="main">
         <div class="content-container">
             <div class="content-toolbar {% if is_pdf %}pdf-toolbar{% endif %}">
+                <button class="toolbar-btn" type="button" onclick="toggleReaderSettingsPanel(true)" title="Adjust theme, font size, spacing, and accessibility settings"><i class="fa-solid fa-sliders"></i> Reader Settings</button>
                 {% if is_pdf %}
                 <button class="toolbar-btn" type="button" onclick="togglePageJump()" title="Jump to a specific page"><i class="fa-solid fa-hashtag"></i> Go to Page</button>
                 <div style="display: flex; align-items: center; gap: 5px; border-left: 1px solid #ddd; padding-left: 10px; margin-left: 5px;">
@@ -744,6 +952,8 @@
         const isPDF = {{ 'true' if is_pdf else 'false' }};
         const bookId = {{ book_id | tojson }};
         const totalPages = {{ book.spine|length }};
+        const defaultReaderPreferences = {"theme": "light", "font_size_px": 19, "line_height": 1.8, "page_width_px": 700, "reduced_motion": false, "high_contrast": false};
+        let readerPreferences = {{ reader_preferences | tojson }};
         let currentPageIndex = {{ chapter_index }};
         let loadingPages = false;
         let visiblePageRange = { start: 0, end: 0 };
@@ -765,6 +975,151 @@
         let currentSessionId = null;
         let sessionStartTime = null;
         let currentNoteContext = null; // For add note modal
+        let readerSettingsSaveTimeout = null;
+
+        function updateReaderSettingsStatus(message, isError = false) {
+            const statusEl = document.getElementById('reader-settings-status');
+            if (!statusEl) return;
+            statusEl.textContent = message || '';
+            statusEl.style.color = isError ? '#c0392b' : '';
+        }
+
+        function syncReaderSettingsForm() {
+            const theme = document.getElementById('reader-theme');
+            const fontSize = document.getElementById('reader-font-size');
+            const lineHeight = document.getElementById('reader-line-height');
+            const pageWidth = document.getElementById('reader-page-width');
+            const reducedMotion = document.getElementById('reader-reduced-motion');
+            const highContrast = document.getElementById('reader-high-contrast');
+
+            if (!theme) return;
+
+            theme.value = readerPreferences.theme;
+            fontSize.value = readerPreferences.font_size_px;
+            lineHeight.value = readerPreferences.line_height;
+            pageWidth.value = readerPreferences.page_width_px;
+            reducedMotion.checked = !!readerPreferences.reduced_motion;
+            highContrast.checked = !!readerPreferences.high_contrast;
+
+            document.getElementById('reader-theme-value').textContent = theme.options[theme.selectedIndex].text;
+            document.getElementById('reader-font-size-value').textContent = `${readerPreferences.font_size_px}px`;
+            document.getElementById('reader-line-height-value').textContent = Number(readerPreferences.line_height).toFixed(2);
+            document.getElementById('reader-page-width-value').textContent = `${readerPreferences.page_width_px}px`;
+        }
+
+        function applyReaderPreferences() {
+            document.body.classList.remove('theme-light', 'theme-sepia', 'theme-dark', 'high-contrast', 'reduced-motion');
+            document.body.classList.add(`theme-${readerPreferences.theme}`);
+            if (readerPreferences.high_contrast) {
+                document.body.classList.add('high-contrast');
+            }
+            if (readerPreferences.reduced_motion) {
+                document.body.classList.add('reduced-motion');
+            }
+
+            document.body.style.setProperty('--reader-font-size', `${readerPreferences.font_size_px}px`);
+            document.body.style.setProperty('--reader-line-height', readerPreferences.line_height);
+            document.body.style.setProperty('--reader-page-width', `${readerPreferences.page_width_px}px`);
+            syncReaderSettingsForm();
+        }
+
+        async function persistReaderPreferences() {
+            try {
+                updateReaderSettingsStatus('Saving…');
+                const response = await fetch('/api/reader/preferences', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(readerPreferences),
+                });
+
+                if (!response.ok) {
+                    const data = await response.json().catch(() => ({}));
+                    throw new Error(data.detail || 'Could not save reader settings.');
+                }
+
+                readerPreferences = await response.json();
+                applyReaderPreferences();
+                updateReaderSettingsStatus('Saved');
+                setTimeout(() => updateReaderSettingsStatus(''), 1400);
+            } catch (error) {
+                console.error('Failed to save reader preferences:', error);
+                updateReaderSettingsStatus(error.message || 'Could not save settings.', true);
+            }
+        }
+
+        function queueReaderPreferencesSave() {
+            applyReaderPreferences();
+            updateReaderSettingsStatus('Saving…');
+            if (readerSettingsSaveTimeout) {
+                clearTimeout(readerSettingsSaveTimeout);
+            }
+            readerSettingsSaveTimeout = setTimeout(() => {
+                persistReaderPreferences();
+            }, 250);
+        }
+
+        function toggleReaderSettingsPanel(forceOpen = null) {
+            const panel = document.getElementById('reader-settings-panel');
+            if (!panel) return;
+
+            const shouldOpen = forceOpen === null ? !panel.classList.contains('visible') : forceOpen;
+            panel.classList.toggle('visible', shouldOpen);
+            panel.setAttribute('aria-hidden', shouldOpen ? 'false' : 'true');
+
+            if (shouldOpen) {
+                syncReaderSettingsForm();
+            }
+        }
+
+        function resetReaderPreferences() {
+            readerPreferences = { ...defaultReaderPreferences };
+            queueReaderPreferencesSave();
+        }
+
+        function initializeReaderSettings() {
+            applyReaderPreferences();
+
+            const controls = {
+                theme: document.getElementById('reader-theme'),
+                font_size_px: document.getElementById('reader-font-size'),
+                line_height: document.getElementById('reader-line-height'),
+                page_width_px: document.getElementById('reader-page-width'),
+                reduced_motion: document.getElementById('reader-reduced-motion'),
+                high_contrast: document.getElementById('reader-high-contrast'),
+            };
+
+            controls.theme.addEventListener('change', (event) => {
+                readerPreferences.theme = event.target.value;
+                queueReaderPreferencesSave();
+            });
+            controls.font_size_px.addEventListener('input', (event) => {
+                readerPreferences.font_size_px = Number(event.target.value);
+                queueReaderPreferencesSave();
+            });
+            controls.line_height.addEventListener('input', (event) => {
+                readerPreferences.line_height = Number(event.target.value);
+                queueReaderPreferencesSave();
+            });
+            controls.page_width_px.addEventListener('input', (event) => {
+                readerPreferences.page_width_px = Number(event.target.value);
+                queueReaderPreferencesSave();
+            });
+            controls.reduced_motion.addEventListener('change', (event) => {
+                readerPreferences.reduced_motion = event.target.checked;
+                queueReaderPreferencesSave();
+            });
+            controls.high_contrast.addEventListener('change', (event) => {
+                readerPreferences.high_contrast = event.target.checked;
+                queueReaderPreferencesSave();
+            });
+
+            const panel = document.getElementById('reader-settings-panel');
+            panel.addEventListener('click', (event) => {
+                if (event.target === panel) {
+                    toggleReaderSettingsPanel(false);
+                }
+            });
+        }
         
         // ===== PDF REPROCESS FUNCTIONS =====
         
@@ -1852,7 +2207,6 @@
                 const originalText = button.innerHTML;
                 button.innerHTML = '<i class="fa-solid fa-check"></i> Copied!';
                 showCopyToast('Page text copied!', 'success');
-                if (isPDF) markPdfPageRead(pageIndex);
                 setTimeout(() => {
                     button.classList.remove('copied');
                     button.innerHTML = originalText;
@@ -1892,7 +2246,6 @@
                 const originalText = button.innerHTML;
                 button.innerHTML = '<i class="fa-solid fa-check"></i> Copied!';
                 showCopyToast('Page image copied!', 'success');
-                markPdfPageRead(pageIndex);
                 setTimeout(() => {
                     button.classList.remove('copied');
                     button.innerHTML = originalText;
@@ -1956,7 +2309,7 @@
             }
         }
 
-        // Select a range of pages starting from current page or user-checked page
+        // Select a range of pages starting from current page
         async function selectPageRange() {
             const input = document.getElementById('page-range-input');
             const numPages = parseInt(input.value);
@@ -1966,36 +2319,27 @@
                 return;
             }
 
-            // If the user already checked one or more pages, start from the
-            // lowest selected page instead of the viewport heuristic.
-            let startPageIndex = null;
-            if (selectedPdfPages.size > 0) {
-                startPageIndex = Math.min(...selectedPdfPages);
-            }
-
-            // Clear existing selection *after* we've captured the anchor
+            // Clear existing selection first
             clearPdfSelection();
 
-            // Fall back to viewport heuristic only when no page was pre-selected
-            if (startPageIndex === null) {
-                const mainContent = document.getElementById('main');
-                const viewportMid = mainContent.getBoundingClientRect().top + mainContent.clientHeight / 2;
-                const pages = document.querySelectorAll('.pdf-page');
-                let bestDist = Infinity;
-                startPageIndex = currentPageIndex;
-
-                pages.forEach(page => {
-                    const pageIndex = parseInt(page.dataset.pageIndex);
-                    const rect = page.getBoundingClientRect();
-                    const pageCenter = rect.top + rect.height / 2;
-                    const dist = Math.abs(pageCenter - viewportMid);
-
-                    if (dist < bestDist) {
-                        bestDist = dist;
-                        startPageIndex = pageIndex;
-                    }
-                });
-            }
+            // Get the visible page (the one currently in view)
+            const pages = document.querySelectorAll('.pdf-page');
+            let startPageIndex = currentPageIndex;
+            
+            // Find which page is most visible in the viewport
+            const mainContent = document.getElementById('main');
+            const viewportCenter = mainContent.scrollTop + mainContent.clientHeight / 2;
+            
+            pages.forEach(page => {
+                const pageIndex = parseInt(page.dataset.pageIndex);
+                const rect = page.getBoundingClientRect();
+                const pageCenter = rect.top + rect.height / 2;
+                
+                // If this page is closer to center, use it as start
+                if (Math.abs(pageCenter - mainContent.clientHeight / 2) < mainContent.clientHeight / 3) {
+                    startPageIndex = pageIndex;
+                }
+            });
 
             // Calculate range
             const endPageIndex = Math.min(startPageIndex + numPages - 1, totalPages - 1);
@@ -2163,10 +2507,7 @@
                     btn.innerHTML = '<i class="fa-solid fa-check"></i> Copied!';
                 }
                 showCopyToast(`${images.length} page${images.length > 1 ? 's' : ''} copied as image!`, 'success');
-
-                // Mark all copied pages as read
-                sortedPages.forEach(pageIndex => markPdfPageRead(pageIndex));
-
+                
                 setTimeout(() => {
                     if (btn) {
                         btn.classList.remove('copied');
@@ -2478,63 +2819,25 @@
             }
         }
         
-        // Track which PDF pages have already been marked as read (avoid duplicate API calls)
-        const pdfPagesMarkedRead = new Set();
-
-        // Mark a single PDF page as read (100% progress) and update sidebar
-        function markPdfPageRead(pageIndex) {
-            if (pdfPagesMarkedRead.has(pageIndex)) return;
-            pdfPagesMarkedRead.add(pageIndex);
-
-            fetch(`/api/chapter-progress/${encodeURIComponent(bookId)}/${pageIndex}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ progress: 100.0 })
-            }).catch(err => console.error('Failed to mark page as read:', err));
-
-            // Update sidebar progress bar and read status
-            for (const [href, idx] of Object.entries(spineMap)) {
-                if (idx === pageIndex) {
-                    const progressElem = document.querySelector(`.chapter-progress[data-href="${href}"] .chapter-progress-fill`);
-                    if (progressElem) progressElem.style.width = '100%';
-                    const percentEl = document.querySelector(`.toc-chapter-percent[data-href="${href}"]`);
-                    if (percentEl) percentEl.textContent = '100%';
-                    const link = document.querySelector(`.toc-link[data-href="${href}"]`);
-                    if (link) {
-                        link.classList.add('read');
-                        link.classList.remove('unread');
-                    }
-                    break;
-                }
-            }
-        }
-
         // Track scroll position to show current page
         function trackVisiblePage() {
             const pages = document.querySelectorAll('.pdf-page');
             const mainContent = document.getElementById('main');
             const scrollTop = mainContent.scrollTop;
             const viewportHeight = mainContent.clientHeight;
-
+            
             let currentVisible = currentPageIndex + 1;
-
+            
             pages.forEach(page => {
                 const rect = page.getBoundingClientRect();
-                const pageIndex = parseInt(page.dataset.pageIndex);
-
+                const pageIndex = parseInt(page.dataset.pageIndex) + 1;
+                
                 // If the page is mostly in view
                 if (rect.top < viewportHeight / 2 && rect.bottom > viewportHeight / 2) {
-                    currentVisible = pageIndex + 1;
-                }
-
-                // Mark pages as read when they've been scrolled past (bottom above viewport top)
-                // or are currently visible in the viewport
-                if (rect.bottom < viewportHeight && rect.bottom > 0 ||
-                    rect.top < viewportHeight / 2 && rect.bottom > viewportHeight / 2) {
-                    markPdfPageRead(pageIndex);
+                    currentVisible = pageIndex;
                 }
             });
-
+            
             showPageIndicator(currentVisible);
         }
 
@@ -2713,6 +3016,7 @@
 
         // Save scroll position on navigation buttons (Previous/Next)
         document.addEventListener('DOMContentLoaded', function() {
+            initializeReaderSettings();
             const navButtons = document.querySelectorAll('.nav-btn:not(.disabled)');
             navButtons.forEach(button => {
                 button.addEventListener('click', saveScrollPosition);
@@ -2736,6 +3040,7 @@
                     closeSearch();
                     const panel = document.getElementById('bookmarks-panel');
                     if (panel) panel.classList.remove('visible');
+                    toggleReaderSettingsPanel(false);
                     hideKeyboardHelp();
                 }
                 
@@ -2922,12 +3227,7 @@
             Object.keys(spineMap).forEach(href => {
                 const chapterIndex = spineMap[href];
                 const progress = progressData[chapterIndex] || 0;
-
-                // Pre-populate the read set for PDF pages already at 100%
-                if (isPDF && progress >= 100) {
-                    pdfPagesMarkedRead.add(chapterIndex);
-                }
-
+                
                 // Find the progress bar for this chapter
                 const progressElem = document.querySelector(`.chapter-progress[data-href="${href}"] .chapter-progress-fill`);
                 if (progressElem) {

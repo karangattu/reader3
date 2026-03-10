@@ -5,7 +5,6 @@ import threading
 import time
 import subprocess
 import traceback
-import multiprocessing
 from datetime import datetime
 
 
@@ -80,9 +79,6 @@ def open_browser():
 
 def main():
     try:
-        if getattr(sys, 'frozen', False) and sys.platform == 'win32':
-            multiprocessing.freeze_support()
-
         # Set the BOOKS_DIR environment variable for server.py to use
         books_dir = get_books_directory()
         os.environ['READER3_BOOKS_DIR'] = books_dir
@@ -120,9 +116,6 @@ def main():
         # Prefer uvloop/httptools for faster event loop and HTTP parsing
         if sys.platform != "win32":
             uvicorn_kwargs.update({"loop": "uvloop", "http": "httptools"})
-        else:
-            # Prefer pure-Python HTTP parser for frozen Windows portability
-            uvicorn_kwargs.update({"http": "h11"})
 
         uvicorn.run(app, **uvicorn_kwargs)
     except Exception as e:

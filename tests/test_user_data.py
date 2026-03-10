@@ -11,6 +11,7 @@ from user_data import (
     Bookmark,
     Highlight,
     ReadingProgress,
+    ReaderPreferences,
     SearchQuery,
     Collection,
     generate_id
@@ -585,6 +586,59 @@ class TestChapterProgress:
         
         progress = manager.get_chapter_progress("book1")
         assert progress == {}
+
+
+class TestReaderPreferences:
+    """Tests for persisted reader preferences."""
+
+    def test_get_reader_preferences_defaults(self, manager):
+        """Reader preferences should have sensible defaults."""
+        prefs = manager.get_reader_preferences()
+
+        assert isinstance(prefs, ReaderPreferences)
+        assert prefs.theme == "light"
+        assert prefs.font_size_px == 19
+        assert prefs.line_height == 1.8
+        assert prefs.page_width_px == 700
+        assert prefs.reduced_motion is False
+        assert prefs.high_contrast is False
+
+    def test_update_reader_preferences_persists(self, temp_data_dir):
+        """Updated reader preferences should persist across manager instances."""
+        manager = UserDataManager(temp_data_dir)
+
+        updated = manager.update_reader_preferences(
+            theme="sepia",
+            font_size_px=22,
+            line_height=2.0,
+            page_width_px=820,
+            reduced_motion=True,
+            high_contrast=True,
+        )
+
+        assert updated.theme == "sepia"
+        assert updated.font_size_px == 22
+        assert updated.line_height == 2.0
+        assert updated.page_width_px == 820
+        assert updated.reduced_motion is True
+        assert updated.high_contrast is True
+
+        reloaded = UserDataManager(temp_data_dir).get_reader_preferences()
+        assert reloaded.theme == "sepia"
+        assert reloaded.font_size_px == 22
+        assert reloaded.line_height == 2.0
+        assert reloaded.page_width_px == 820
+        assert reloaded.reduced_motion is True
+        assert reloaded.high_contrast is True
+
+    def test_update_reader_preferences_merges_partial_updates(self, manager):
+        """Partial updates should preserve previously saved preference values."""
+        manager.update_reader_preferences(theme="dark", font_size_px=21)
+        updated = manager.update_reader_preferences(page_width_px=760)
+
+        assert updated.theme == "dark"
+        assert updated.font_size_px == 21
+        assert updated.page_width_px == 760
 
 
 class TestSearchHistory:
