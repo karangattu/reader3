@@ -1,55 +1,54 @@
 import asyncio
 import hashlib
+import json
 import logging
 import os
 import pickle
-import json
+import shutil
+import sys
+import tempfile
 import threading
 import uuid
-from contextlib import asynccontextmanager
 from concurrent.futures import ThreadPoolExecutor
-from functools import lru_cache
-from typing import Optional, Dict
+from contextlib import asynccontextmanager
 from datetime import datetime
-import tempfile
-import shutil
-from fastapi import FastAPI, Request, HTTPException, UploadFile, File, BackgroundTasks
+from functools import lru_cache
+from typing import Dict, Optional
+
+from fastapi import BackgroundTasks, FastAPI, File, HTTPException, Request, UploadFile
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import (
-    HTMLResponse,
     FileResponse,
-    RedirectResponse,
-    PlainTextResponse,
+    HTMLResponse,
     JSONResponse,
     ORJSONResponse,
+    PlainTextResponse,
+    RedirectResponse,
 )
-from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from reader3 import (
     Book,
+    get_pdf_page_stats,
     process_epub,
     save_to_pickle,
-    get_pdf_page_stats,
     search_pdf_text_positions,
     validate_pdf,
 )
 from semantic_search import semantic_search_books
 from user_data import (
-    UserDataManager,
-    Highlight,
-    Bookmark,
-    ReadingProgress,
-    SearchQuery,
-    ReadingSession,
-    VocabularyWord,
     Annotation,
-    Collection,
+    Bookmark,
+    Highlight,
     ReaderPreferences,
+    ReadingProgress,
+    ReadingSession,
+    SearchQuery,
+    UserDataManager,
+    VocabularyWord,
     generate_id,
 )
-
-import sys
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -1800,6 +1799,7 @@ async def export_pdf_pages_endpoint(book_id: str, request: Request):
 
     # Create export in a temp location
     import tempfile
+
     from reader3 import export_pdf_pages
 
     with tempfile.NamedTemporaryFile(

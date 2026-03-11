@@ -2,32 +2,27 @@
 Tests for the semantic search module.
 """
 
-import pytest
-import sys
 import os
-import json
+import sys
 import tempfile
-from unittest.mock import Mock, patch, MagicMock
-from collections import Counter
+from unittest.mock import Mock
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from semantic_search import (
-    _normalize_token,
-    _tokenize,
-    _index_path,
-    _load_index,
-    _write_index,
-    _should_rebuild,
-    ensure_book_index,
-    _build_context,
-    _find_match,
-    semantic_search_books,
-    STOPWORDS,
-    TOKEN_RE,
     INDEX_FILENAME,
     INDEX_VERSION,
+    _build_context,
+    _find_match,
+    _index_path,
+    _load_index,
+    _normalize_token,
+    _should_rebuild,
+    _tokenize,
+    _write_index,
+    ensure_book_index,
+    semantic_search_books,
 )
 
 

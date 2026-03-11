@@ -1,13 +1,15 @@
-from fastapi.testclient import TestClient
-from unittest.mock import patch, MagicMock
-import sys
 import os
+import sys
+from unittest.mock import MagicMock, patch
+
 import pytest
+from fastapi.testclient import TestClient
 
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from server import app
+
 
 @pytest.fixture
 def client():

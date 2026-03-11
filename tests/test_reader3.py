@@ -2,25 +2,26 @@
 Tests for Reader3 core functionality.
 """
 
+import ebooklib
+import pytest
+from bs4 import BeautifulSoup
+
 from reader3 import (
     Book,
     BookMetadata,
     ChapterContent,
+    PDFAnnotation,
+    PDFPageData,
+    PDFTextBlock,
     TOCEntry,
     clean_html_content,
     extract_plain_text,
-    parse_toc_recursive,
-    PDFAnnotation,
-    PDFTextBlock,
-    PDFPageData,
     get_pdf_page_stats,
-    search_pdf_text_positions,
     is_content_document,
+    parse_toc_recursive,
     process_epub,
+    search_pdf_text_positions,
 )
-from bs4 import BeautifulSoup
-import ebooklib
-import pytest
 
 
 class TestBookMetadata:

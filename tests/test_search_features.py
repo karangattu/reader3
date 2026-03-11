@@ -2,8 +2,6 @@
 Tests for the enhanced search and chapter progress features.
 """
 
-import pytest
-from reader3 import Book, BookMetadata, ChapterContent
 
 
 class TestSearchAPIResponse:
@@ -278,7 +276,6 @@ class TestReadingMomentumMetrics:
     def test_reading_time_accumulation(self):
         """Test that reading time accumulates during a session."""
         session_start_seconds = 1000
-        current_seconds = 1000
         
         # Simulate passage of time
         intervals = [

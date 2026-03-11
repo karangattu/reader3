@@ -2,11 +2,10 @@
 Additional tests for Reader3 - covering utility functions and basic structures.
 """
 
-import pytest
-import sys
 import os
-from unittest.mock import Mock
+import sys
 import tempfile
+from unittest.mock import Mock
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -14,14 +13,13 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from reader3 import (
     BookMetadata,
     ChapterContent,
-    TOCEntry,
     PDFAnnotation,
-    PDFTextBlock,
     PDFPageData,
-    Book,
+    PDFTextBlock,
+    TOCEntry,
+    get_pdf_page_stats,
     sanitize_text,
     validate_pdf,
-    get_pdf_page_stats,
 )
 
 

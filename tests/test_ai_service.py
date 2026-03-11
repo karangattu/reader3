@@ -2,18 +2,19 @@
 Tests for the AI Service module.
 """
 
-import pytest
-import sys
-import os
 import json
+import os
+import sys
 import tempfile
-from unittest.mock import AsyncMock, MagicMock, patch, Mock
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import httpx
+import pytest
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from ai_service import AIService, AIConfig, get_ai_service, reset_ai_service
+from ai_service import AIConfig, AIService, get_ai_service, reset_ai_service
 
 
 class TestAIConfig:
@@ -122,8 +123,6 @@ class TestAIServiceConfigPersistence:
         service = AIService(config=config)
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            config_path = os.path.join(tmpdir, "ai_config.json")
-
             with patch("ai_service.os.path.dirname", return_value=tmpdir):
                 with patch("builtins.open", create=True) as mock_file:
                     service.save_config()
@@ -625,7 +624,7 @@ class TestAIServiceClientManagement:
     async def test_client_close(self):
         """Test closing the client."""
         service = AIService()
-        client = await service._get_client()
+        await service._get_client()
         await service.close()
 
         assert service._client is None or service._client.is_closed

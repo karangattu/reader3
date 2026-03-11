@@ -7,8 +7,9 @@ Provides LLM-powered features using free providers:
 
 import json
 import os
-from typing import Optional, Literal
 from dataclasses import dataclass
+from typing import Literal, Optional
+
 import httpx
 
 

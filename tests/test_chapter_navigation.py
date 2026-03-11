@@ -2,13 +2,11 @@
 Tests for EPUB chapter navigation and TOC-to-spine matching.
 """
 
-import pytest
 from reader3 import (
     Book,
     BookMetadata,
     ChapterContent,
     TOCEntry,
-    parse_toc_recursive,
 )
 
 

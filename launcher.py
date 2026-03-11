@@ -1,10 +1,10 @@
 import os
+import subprocess
 import sys
-import webbrowser
 import threading
 import time
-import subprocess
 import traceback
+import webbrowser
 from datetime import datetime
 
 
@@ -92,6 +92,7 @@ def main():
         
         # Import here after setting up the environment
         import uvicorn
+
         from server import app
         
         # When running as a PyInstaller executable (especially on Windows),

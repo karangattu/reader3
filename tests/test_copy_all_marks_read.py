@@ -2,10 +2,11 @@
 Tests for chapter reading progress marking when copying content.
 """
 
+import os
+import sys
+
 import pytest
 from fastapi.testclient import TestClient
-import sys
-import os
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -202,7 +203,7 @@ class TestChapterProgressBoundaries:
         book_id = f"test_progress_cap_{uuid.uuid4().hex[:8]}"
         
         # Try to set over 100% (shouldn't happen in normal flow)
-        response = client.post(
+        client.post(
             f"/api/chapter-progress/{book_id}/0",
             json={"progress": 100.0}
         )

@@ -2,21 +2,19 @@
 Tests for the launcher module.
 """
 
-import pytest
-import sys
 import os
+import sys
 import tempfile
-from unittest.mock import patch, MagicMock, call
-from datetime import datetime
+from unittest.mock import patch
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from launcher import (
+    get_books_directory,
     get_error_log_path,
     log_error,
     log_info,
-    get_books_directory,
     open_browser,
 )
 

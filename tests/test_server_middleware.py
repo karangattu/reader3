@@ -2,21 +2,21 @@
 Tests for server middleware and infrastructure.
 """
 
-import pytest
-import sys
 import os
-from unittest.mock import patch, MagicMock, AsyncMock
+import sys
+from unittest.mock import patch
+
+import pytest
 from fastapi.testclient import TestClient
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from server import (
-    SecurityHeadersMiddleware,
     CacheControlMiddleware,
-    app,
-    _run_sync,
     _pdf_thumbnails_enabled,
+    _run_sync,
+    app,
 )
 
 
@@ -88,26 +88,23 @@ class TestCacheControlMiddleware:
     def test_cache_control_immutable_for_book_assets(self, client):
         """Test that book assets have immutable cache control."""
         # Test the middleware logic for immutable assets
-        response = client.get("/read/book_id/image.png")
+        client.get("/read/book_id/image.png")
 
         # The middleware checks for /read/ prefix and image extensions
         # Even if 404, the header should be attempted
-        cache_control = response.headers.get("Cache-Control", "")
         # Cache control might be set even for 404 responses by the middleware
 
     def test_cache_control_for_cover_images(self, client):
         """Test cache control for cover images."""
-        response = client.get("/cover/book_id.jpg")
+        client.get("/cover/book_id.jpg")
 
-        cache_control = response.headers.get("Cache-Control", "")
         # 404 is expected, but middleware should still apply
         # if the route were to exist
 
     def test_no_cache_for_api_endpoints(self, client):
         """Test that API endpoints don't get aggressive caching."""
-        response = client.get("/api/progress/test_book")
+        client.get("/api/progress/test_book")
 
-        cache_control = response.headers.get("Cache-Control", "")
         # API responses should not have the immutable cache control
         # unless explicitly set elsewhere
 
@@ -219,6 +216,7 @@ class TestMaxUploadSize:
         with patch.dict(os.environ, {}, clear=False):
             # Import fresh to get env value
             import importlib
+
             import server as server_module
             importlib.reload(server_module)
 
@@ -291,7 +289,7 @@ class TestMiddlewareOrder:
     def test_gzip_middleware_active(self, client):
         """Test that GZip middleware is active."""
         # GZip middleware is installed but only compresses large responses
-        response = client.get("/")
+        client.get("/")
         # Check if Content-Encoding header might be gzip for large responses
         # For small responses, gzip may not be applied due to minimum_size=500
 

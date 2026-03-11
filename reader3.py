@@ -2,18 +2,18 @@
 Parses an EPUB file into a structured object that can be used to serve the book via a web interface.
 """
 
+import json
 import os
 import pickle
 import shutil
-import json
 from dataclasses import dataclass, field
-from typing import List, Dict, Optional
 from datetime import datetime
+from typing import Dict, List, Optional
 from urllib.parse import unquote
 
 import ebooklib
-from ebooklib import epub
 from bs4 import BeautifulSoup, Comment
+from ebooklib import epub
 
 # --- Data structures ---
 
@@ -378,7 +378,6 @@ def extract_pdf_annotations(page) -> List[PDFAnnotation]:
                 # Get quads and extract text from them
                 quads = annot.vertices
                 if quads:
-                    quad_rect = page.rect
                     text_content = page.get_text("text", clip=annot.rect).strip()
             except Exception:
                 pass
@@ -427,7 +426,6 @@ def extract_pdf_images(page, page_num: int, images_dir: str) -> Dict[str, str]:
     Extract images from a PDF page and save them.
     Returns a map of image references to file paths.
     """
-    import fitz
     image_map = {}
     image_list = page.get_images(full=True)
 

@@ -2,14 +2,15 @@
 Tests for the FastAPI server.
 """
 
-import pytest
-from fastapi.testclient import TestClient
-import sys
-import os
 import hashlib
 import json
+import os
+import sys
 from datetime import datetime, timedelta
 from pathlib import Path
+
+import pytest
+from fastapi.testclient import TestClient
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -2165,8 +2166,8 @@ class TestBackgroundPdfProcessingConfig:
         self, tmp_path, monkeypatch
     ):
         """Background PDF path should pass a progress callback and env thumbnail flag."""
-        import server
         import reader3
+        import server
 
         upload_id = "test-upload-id"
         server.upload_status[upload_id] = {

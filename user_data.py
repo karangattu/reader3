@@ -5,13 +5,13 @@ Writes are debounced: changes are batched and flushed to disk after a
 configurable delay (default 2 s) or when the process shuts down.
 """
 
+import hashlib
 import json
 import os
 import threading
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
-from typing import List, Dict, Optional
-import hashlib
+from typing import Dict, List, Optional
 
 
 @dataclass
@@ -424,10 +424,10 @@ class UserDataManager:
     
     # Reading Progress
     def save_progress(self, progress: ReadingProgress):
-        """Save reading progress for a book (deferred write)."""
+        """Save reading progress for a book."""
         data = self.load()
         data.progress[progress.book_id] = progress
-        self.save_deferred()
+        self.save()
     
     def get_progress(self, book_id: str) -> Optional[ReadingProgress]:
         """Get reading progress for a book."""
@@ -543,11 +543,11 @@ class UserDataManager:
     def _to_markdown(self, data: dict) -> str:
         """Convert export data to Markdown format."""
         lines = [
-            f"# Notes and Highlights",
-            f"",
+            "# Notes and Highlights",
+            "",
             f"**Book ID:** {data['book_id']}",
             f"**Exported:** {data['exported_at']}",
-            f"",
+            "",
         ]
         
         if data['bookmarks']:
@@ -557,7 +557,7 @@ class UserDataManager:
                 lines.append(f"### {b['title']}")
                 lines.append(f"*Chapter {b['chapter_index'] + 1}, {b['created_at']}*")
                 if b.get('note'):
-                    lines.append(f"")
+                    lines.append("")
                     lines.append(f"> {b['note']}")
                 lines.append("")
         
@@ -574,10 +574,10 @@ class UserDataManager:
                 }.get(h['color'], '⚪')
                 
                 lines.append(f"{color_emoji} **Chapter {h['chapter_index'] + 1}**")
-                lines.append(f"")
+                lines.append("")
                 lines.append(f"> {h['text']}")
                 if h.get('note'):
-                    lines.append(f"")
+                    lines.append("")
                     lines.append(f"*Note: {h['note']}*")
                 lines.append("")
         
@@ -856,11 +856,11 @@ class UserDataManager:
         highlights = data.highlights.get(book_id, [])
         
         lines = [
-            f"# Annotations and Notes",
-            f"",
+            "# Annotations and Notes",
+            "",
             f"**Book ID:** {book_id}",
             f"**Exported:** {datetime.now().isoformat()}",
-            f"",
+            "",
         ]
         
         # Group by chapter
@@ -889,7 +889,7 @@ class UserDataManager:
                 lines.append(f"{color_emoji} **Highlight:**")
                 lines.append(f"> {h.text}")
                 if h.note:
-                    lines.append(f"")
+                    lines.append("")
                     lines.append(f"*Note: {h.note}*")
                 lines.append("")
             
@@ -897,9 +897,9 @@ class UserDataManager:
             for a in chapter_data['annotations']:
                 tags_str = ' '.join(f'`#{t}`' for t in a.tags) if a.tags else ''
                 lines.append(f"📝 **Note** {tags_str}")
-                lines.append(f"")
+                lines.append("")
                 lines.append(f"{a.note_text}")
-                lines.append(f"")
+                lines.append("")
                 lines.append(f"*Created: {a.created_at}*")
                 lines.append("")
         

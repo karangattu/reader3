@@ -3,18 +3,21 @@
 import json
 import os
 import tempfile
+
 import pytest
 
 from user_data import (
-    UserDataManager,
-    UserData,
+    Annotation,
     Bookmark,
     Highlight,
-    ReadingProgress,
     ReaderPreferences,
+    ReadingProgress,
+    ReadingSession,
     SearchQuery,
-    Collection,
-    generate_id
+    UserData,
+    UserDataManager,
+    VocabularyWord,
+    generate_id,
 )
 
 
@@ -969,8 +972,6 @@ class TestEdgeCases:
 # NEW FEATURES TESTS
 # ============================================================================
 
-from user_data import ReadingSession, VocabularyWord, Annotation
-
 
 class TestReadingSessions:
     """Tests for reading session functionality."""
@@ -1179,7 +1180,7 @@ class TestVocabulary:
             word="duplicate",
             definition="different definition"
         )
-        result = manager.add_vocabulary_word(word2)
+        manager.add_vocabulary_word(word2)
         
         vocab = manager.get_vocabulary("book1")
         assert len(vocab) == 1  # Still just one word
@@ -1466,7 +1467,7 @@ class TestDataCleanup:
         assert len(sessions) == 0
 
 
-class TestDataPersistence:
+class TestNewFeatureDataPersistence:
     """Tests for data persistence with new features."""
 
     def test_vocabulary_persistence(self, temp_data_dir):
@@ -1581,9 +1582,9 @@ class TestCollections:
 
     def test_get_collections_sorted_by_order(self, manager):
         """Test that collections are returned sorted by sort_order."""
-        col1 = manager.create_collection(name="A")
-        col2 = manager.create_collection(name="B")
-        col3 = manager.create_collection(name="C")
+        manager.create_collection(name="A")
+        manager.create_collection(name="B")
+        manager.create_collection(name="C")
         
         # Manually change sort order
         data = manager.load()
@@ -1724,7 +1725,7 @@ class TestCollections:
         """Test getting all collections a book belongs to."""
         col1 = manager.create_collection(name="Fiction")
         col2 = manager.create_collection(name="Favorites")
-        col3 = manager.create_collection(name="To Read")
+        manager.create_collection(name="To Read")
         
         manager.add_book_to_collection(col1.id, "book1")
         manager.add_book_to_collection(col2.id, "book1")
