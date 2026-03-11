@@ -69,8 +69,8 @@
         #sidebar-toggle:hover { background: #495057; color: #fff; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15); }
 
         /* Selection floating toolbar */
-        #selection-toolbar { display: none; position: fixed; z-index: 1001; background: #333; color: #fff; padding: 8px 12px; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); font-family: -apple-system, sans-serif; font-size: 0.85em; }
-        #selection-toolbar.visible { display: flex; gap: 8px; align-items: center; }
+        #selection-toolbar { display: none; position: fixed; top: 0; left: 0; right: 0; z-index: 1001; background: #333; color: #fff; padding: 8px 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); font-family: -apple-system, sans-serif; font-size: 0.85em; justify-content: center; }
+        #selection-toolbar.visible { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
         #selection-toolbar button { background: transparent; border: 1px solid rgba(255,255,255,0.3); color: #fff; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.85em; transition: all 0.2s; }
         #selection-toolbar button:hover { background: rgba(255,255,255,0.2); border-color: rgba(255,255,255,0.5); }
         #selection-toolbar .selection-count { opacity: 0.7; font-size: 0.8em; }
@@ -2696,12 +2696,10 @@
             if (selectedText.length > 0) {
                 const charCount = document.getElementById('selection-char-count');
                 if (charCount) {
-                    charCount.textContent = `${selectedText.length} chars`;
+                    const words = selectedText.split(/\s+/).filter(w => w.length > 0);
+                    charCount.textContent = `${words.length} words · ${selectedText.length} chars`;
                 }
                 
-                // Position toolbar above the selection
-                toolbar.style.left = `${Math.max(10, Math.min(x - 100, window.innerWidth - 250))}px`;
-                toolbar.style.top = `${Math.max(10, y - 50)}px`;
                 toolbar.classList.add('visible');
             } else {
                 hideSelectionToolbar();
