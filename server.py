@@ -74,6 +74,12 @@ MAX_UPLOAD_BYTES = int(os.environ.get("MAX_UPLOAD_MB", 200)) * 1024 * 1024
 
 VALID_READER_THEMES = {"light", "sepia", "dark"}
 
+VALID_READER_FONTS = {
+    "Georgia", "Literata", "Merriweather", "Lora", "Source Serif 4",
+    "Crimson Text", "IBM Plex Serif", "Libre Baskerville", "Vollkorn",
+    "Inter",
+}
+
 
 def _run_sync(fn, *args):
     """Schedule a blocking function on the I/O thread pool."""
@@ -196,6 +202,7 @@ def _serialize_reader_preferences(preferences: ReaderPreferences) -> dict:
         "page_width_px": preferences.page_width_px,
         "reduced_motion": preferences.reduced_motion,
         "high_contrast": preferences.high_contrast,
+        "font_family": preferences.font_family,
     }
 
 
@@ -822,6 +829,7 @@ async def read_chapter(request: Request, book_id: str, chapter_index: int):
             "reader_preferences": _serialize_reader_preferences(
                 user_data_manager.get_reader_preferences()
             ),
+            "book_font": user_data_manager.get_book_font(book_id),
         },
     )
 
@@ -866,8 +874,39 @@ async def update_reader_preferences(request: Request):
         if flag_name in payload:
             updates[flag_name] = bool(payload[flag_name])
 
+    if "font_family" in payload:
+        font = str(payload["font_family"])
+        if font not in VALID_READER_FONTS:
+            raise HTTPException(status_code=400, detail="Invalid font family")
+        updates["font_family"] = font
+
     preferences = user_data_manager.update_reader_preferences(**updates)
     return _serialize_reader_preferences(preferences)
+
+
+@app.get("/api/book-font/{book_id}")
+async def get_book_font(book_id: str):
+    """Get per-book font override."""
+    font = user_data_manager.get_book_font(book_id)
+    return {"font_family": font}
+
+
+@app.put("/api/book-font/{book_id}")
+async def set_book_font(book_id: str, request: Request):
+    """Set per-book font override."""
+    payload = await request.json()
+    font = str(payload.get("font_family", ""))
+    if font not in VALID_READER_FONTS:
+        raise HTTPException(status_code=400, detail="Invalid font family")
+    user_data_manager.set_book_font(book_id, font)
+    return {"font_family": font}
+
+
+@app.delete("/api/book-font/{book_id}")
+async def clear_book_font(book_id: str):
+    """Remove per-book font override (fall back to global)."""
+    user_data_manager.clear_book_font(book_id)
+    return {"font_family": None}
 
 
 @app.get("/read/{book_id}/pages/{start}/{count}")

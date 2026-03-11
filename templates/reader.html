@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ book.metadata.title }}</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Serif:ital,wght@0,400;0,600;1,400&family=Inter:wght@400;600&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&family=Lora:ital,wght@0,400;0,600;1,400&family=Merriweather:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=Vollkorn:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
     <style>
         :root {
             --reader-bg: #f4f1ea;
@@ -46,7 +49,7 @@
         }
 
         /* Layout */
-        body { margin: 0; padding: 0; display: flex; height: 100vh; overflow: hidden; font-family: "Georgia", serif; background: var(--reader-bg); color: var(--reader-text); }
+        body { margin: 0; padding: 0; display: flex; height: 100vh; overflow: hidden; font-family: var(--reader-font-family, "Georgia"), serif; background: var(--reader-bg); color: var(--reader-text); }
         body.sidebar-collapsed #sidebar { width: 0; padding: 0; border-right: none; transform: translateX(-100%); opacity: 0; pointer-events: none; }
         body.sidebar-collapsed #main { width: 100%; }
         body.selection-mode .book-content { cursor: text; user-select: text; }
@@ -487,7 +490,7 @@
 
     </style>
 </head>
-<body class="{{ 'is-pdf ' if is_pdf else '' }}theme-{{ reader_preferences.theme }}{% if reader_preferences.high_contrast %} high-contrast{% endif %}{% if reader_preferences.reduced_motion %} reduced-motion{% endif %}" style="--reader-font-size: {{ reader_preferences.font_size_px }}px; --reader-line-height: {{ reader_preferences.line_height }}; --reader-page-width: {{ reader_preferences.page_width_px }}px;">
+<body class="{{ 'is-pdf ' if is_pdf else '' }}theme-{{ reader_preferences.theme }}{% if reader_preferences.high_contrast %} high-contrast{% endif %}{% if reader_preferences.reduced_motion %} reduced-motion{% endif %}" style="--reader-font-size: {{ reader_preferences.font_size_px }}px; --reader-line-height: {{ reader_preferences.line_height }}; --reader-page-width: {{ reader_preferences.page_width_px }}px; --reader-font-family: '{{ book_font or reader_preferences.font_family }}';">
 
     <!-- Reading progress bar at top -->
     <div id="reading-progress">
@@ -718,6 +721,32 @@
                         <option value="dark">Night</option>
                     </select>
                     <div class="reader-setting-help">Choose a reading surface that matches the room and your eyes.</div>
+                </div>
+
+                <div class="reader-setting-group">
+                    <label class="reader-setting-label" for="reader-font-family">
+                        <span>Font</span>
+                        <span id="reader-font-family-value"></span>
+                    </label>
+                    <select id="reader-font-family">
+                        <option value="Georgia" style="font-family: Georgia, serif">Georgia</option>
+                        <option value="Literata" style="font-family: 'Literata', serif">Literata</option>
+                        <option value="Merriweather" style="font-family: 'Merriweather', serif">Merriweather</option>
+                        <option value="Lora" style="font-family: 'Lora', serif">Lora</option>
+                        <option value="Source Serif 4" style="font-family: 'Source Serif 4', serif">Source Serif 4</option>
+                        <option value="Crimson Text" style="font-family: 'Crimson Text', serif">Crimson Text</option>
+                        <option value="IBM Plex Serif" style="font-family: 'IBM Plex Serif', serif">IBM Plex Serif</option>
+                        <option value="Libre Baskerville" style="font-family: 'Libre Baskerville', serif">Libre Baskerville</option>
+                        <option value="Vollkorn" style="font-family: 'Vollkorn', serif">Vollkorn</option>
+                        <option value="Inter" style="font-family: 'Inter', sans-serif">Inter</option>
+                    </select>
+                    <div style="display: flex; align-items: center; gap: 8px; margin-top: 2px;">
+                        <label style="display: flex; align-items: center; gap: 6px; font-size: 0.82em; color: var(--reader-muted); cursor: pointer;">
+                            <input type="checkbox" id="reader-book-font" style="accent-color: #3498db;">
+                            Set as default for this book
+                        </label>
+                    </div>
+                    <div class="reader-setting-help">Pick a typeface for reading. Per-book defaults override your global choice.</div>
                 </div>
 
                 <div class="reader-setting-group">
@@ -952,8 +981,9 @@
         const isPDF = {{ 'true' if is_pdf else 'false' }};
         const bookId = {{ book_id | tojson }};
         const totalPages = {{ book.spine|length }};
-        const defaultReaderPreferences = {"theme": "light", "font_size_px": 19, "line_height": 1.8, "page_width_px": 700, "reduced_motion": false, "high_contrast": false};
+        const defaultReaderPreferences = {"theme": "light", "font_size_px": 19, "line_height": 1.8, "page_width_px": 700, "reduced_motion": false, "high_contrast": false, "font_family": "Georgia"};
         let readerPreferences = {{ reader_preferences | tojson }};
+        let bookFont = {{ (book_font | tojson) if book_font else 'null' }};
         let currentPageIndex = {{ chapter_index }};
         let loadingPages = false;
         let visiblePageRange = { start: 0, end: 0 };
@@ -991,6 +1021,8 @@
             const pageWidth = document.getElementById('reader-page-width');
             const reducedMotion = document.getElementById('reader-reduced-motion');
             const highContrast = document.getElementById('reader-high-contrast');
+            const fontFamily = document.getElementById('reader-font-family');
+            const bookFontCheckbox = document.getElementById('reader-book-font');
 
             if (!theme) return;
 
@@ -1001,10 +1033,15 @@
             reducedMotion.checked = !!readerPreferences.reduced_motion;
             highContrast.checked = !!readerPreferences.high_contrast;
 
+            const activeFont = bookFont || readerPreferences.font_family;
+            fontFamily.value = activeFont;
+            bookFontCheckbox.checked = !!bookFont;
+
             document.getElementById('reader-theme-value').textContent = theme.options[theme.selectedIndex].text;
             document.getElementById('reader-font-size-value').textContent = `${readerPreferences.font_size_px}px`;
             document.getElementById('reader-line-height-value').textContent = Number(readerPreferences.line_height).toFixed(2);
             document.getElementById('reader-page-width-value').textContent = `${readerPreferences.page_width_px}px`;
+            document.getElementById('reader-font-family-value').textContent = activeFont;
         }
 
         function applyReaderPreferences() {
@@ -1017,9 +1054,11 @@
                 document.body.classList.add('reduced-motion');
             }
 
+            const activeFont = bookFont || readerPreferences.font_family;
             document.body.style.setProperty('--reader-font-size', `${readerPreferences.font_size_px}px`);
             document.body.style.setProperty('--reader-line-height', readerPreferences.line_height);
             document.body.style.setProperty('--reader-page-width', `${readerPreferences.page_width_px}px`);
+            document.body.style.setProperty('--reader-font-family', `'${activeFont}'`);
             syncReaderSettingsForm();
         }
 
@@ -1073,6 +1112,8 @@
 
         function resetReaderPreferences() {
             readerPreferences = { ...defaultReaderPreferences };
+            bookFont = null;
+            fetch(`/api/book-font/${encodeURIComponent(bookId)}`, { method: 'DELETE' }).catch(() => {});
             queueReaderPreferencesSave();
         }
 
@@ -1087,6 +1128,9 @@
                 reduced_motion: document.getElementById('reader-reduced-motion'),
                 high_contrast: document.getElementById('reader-high-contrast'),
             };
+
+            const fontFamilySelect = document.getElementById('reader-font-family');
+            const bookFontCheckbox = document.getElementById('reader-book-font');
 
             controls.theme.addEventListener('change', (event) => {
                 readerPreferences.theme = event.target.value;
@@ -1111,6 +1155,43 @@
             controls.high_contrast.addEventListener('change', (event) => {
                 readerPreferences.high_contrast = event.target.checked;
                 queueReaderPreferencesSave();
+            });
+
+            fontFamilySelect.addEventListener('change', (event) => {
+                const font = event.target.value;
+                if (bookFontCheckbox.checked) {
+                    bookFont = font;
+                    fetch(`/api/book-font/${encodeURIComponent(bookId)}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ font_family: font }),
+                    }).catch(console.error);
+                } else {
+                    readerPreferences.font_family = font;
+                    queueReaderPreferencesSave();
+                    return;
+                }
+                applyReaderPreferences();
+                updateReaderSettingsStatus('Saved');
+                setTimeout(() => updateReaderSettingsStatus(''), 1400);
+            });
+
+            bookFontCheckbox.addEventListener('change', (event) => {
+                const font = fontFamilySelect.value;
+                if (event.target.checked) {
+                    bookFont = font;
+                    fetch(`/api/book-font/${encodeURIComponent(bookId)}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ font_family: font }),
+                    }).catch(console.error);
+                } else {
+                    bookFont = null;
+                    fetch(`/api/book-font/${encodeURIComponent(bookId)}`, { method: 'DELETE' }).catch(console.error);
+                }
+                applyReaderPreferences();
+                updateReaderSettingsStatus('Saved');
+                setTimeout(() => updateReaderSettingsStatus(''), 1400);
             });
 
             const panel = document.getElementById('reader-settings-panel');

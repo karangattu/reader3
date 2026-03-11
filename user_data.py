@@ -60,6 +60,7 @@ class ReaderPreferences:
     page_width_px: int = 700
     reduced_motion: bool = False
     high_contrast: bool = False
+    font_family: str = "Georgia"
 
 
 @dataclass
@@ -145,6 +146,7 @@ class UserData:
     annotations: Dict[str, List[Annotation]] = field(default_factory=dict)
     collections: List[Collection] = field(default_factory=list)
     reader_preferences: ReaderPreferences = field(default_factory=ReaderPreferences)
+    book_fonts: Dict[str, str] = field(default_factory=dict)
     version: str = "1.3"
 
 
@@ -224,6 +226,7 @@ class UserDataManager:
                     Collection(**c) for c in raw.get('collections', [])
                 ],
                 reader_preferences=ReaderPreferences(**raw.get('reader_preferences', {})),
+                book_fonts=raw.get('book_fonts', {}),
                 version=raw.get('version', '1.3')
             )
         except Exception as e:
@@ -297,6 +300,7 @@ class UserDataManager:
             },
             'collections': [asdict(c) for c in self._data.collections],
             'reader_preferences': asdict(self._data.reader_preferences),
+            'book_fonts': self._data.book_fonts,
             'version': self._data.version
         }
         
@@ -455,13 +459,32 @@ class UserDataManager:
             'page_width_px',
             'reduced_motion',
             'high_contrast',
+            'font_family',
         ):
             if field_name in kwargs and kwargs[field_name] is not None:
                 setattr(prefs, field_name, kwargs[field_name])
 
         self.save()
         return prefs
-    
+
+    # Per-book font overrides
+    def get_book_font(self, book_id: str) -> Optional[str]:
+        """Get the font override for a specific book, or None."""
+        data = self.load()
+        return data.book_fonts.get(book_id)
+
+    def set_book_font(self, book_id: str, font_family: str):
+        """Set a per-book font override."""
+        data = self.load()
+        data.book_fonts[book_id] = font_family
+        self.save()
+
+    def clear_book_font(self, book_id: str):
+        """Remove a per-book font override."""
+        data = self.load()
+        data.book_fonts.pop(book_id, None)
+        self.save()
+
     # Chapter Progress (per-chapter tracking)
     def get_chapter_progress(self, book_id: str) -> Dict[int, float]:
         """Get reading progress for each chapter in a book."""
