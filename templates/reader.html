@@ -914,7 +914,10 @@
                         <i class="fa-solid fa-layer-group"></i> Select Range
                     </button>
                 </div>
-                <button class="toolbar-btn pdf-multi-copy-btn" type="button" onclick="copySelectedPagesAsImage()" id="pdf-multi-copy-btn" title="Copy selected pages as a combined image"><i class="fa-regular fa-images"></i> Copy Selected (<span id="pdf-selected-count">0</span>)</button>
+                <button class="toolbar-btn pdf-multi-copy-btn" type="button" onclick="copySelectedPagesAsImage()" id="pdf-multi-copy-btn" title="Copy selected pages as a combined image">
+                    <i class="fa-regular fa-images" id="pdf-multi-copy-icon"></i>
+                    <span id="pdf-multi-copy-label">Copy Selected</span> (<span id="pdf-selected-count">0</span>)
+                </button>
                 <button class="toolbar-btn pdf-clear-btn" type="button" onclick="clearPdfSelection()" id="pdf-clear-btn" title="Clear selection"><i class="fa-solid fa-xmark"></i> Clear</button>
                 <button class="toolbar-btn" type="button" onclick="toggleSelectAllPages()" id="pdf-select-all-btn" title="Select/Deselect all loaded pages"><i class="fa-regular fa-square-check"></i> Select All</button>
                 {% else %}
@@ -2155,6 +2158,63 @@
             }
         }
         
+        function createPdfPageElement(page) {
+            const pageWrapper = document.createElement('div');
+            const isSelected = selectedPdfPages.has(page.index);
+            pageWrapper.className = `pdf-page${isSelected ? ' selected' : ''}`;
+            pageWrapper.dataset.pageIndex = page.index;
+            pageWrapper.innerHTML = `
+                <div class="pdf-page-header">
+                    <input type="checkbox" class="pdf-page-select" data-page-index="${page.index}" onchange="updatePdfPageSelection(this)" title="Select page for multi-copy" ${isSelected ? 'checked' : ''}>
+                    <span class="pdf-page-number">${page.title}</span>
+                    <div class="pdf-page-actions">
+                        <button class="pdf-copy-image-btn" onclick="copyPageImage(this, ${page.index})" title="Copy page as image to clipboard">
+                            <i class="fa-regular fa-image"></i> Copy Image
+                        </button>
+                        <button class="pdf-copy-image-btn" onclick="copyPageText(this, ${page.index})" title="Copy page text to clipboard">
+                            <i class="fa-regular fa-copy"></i> Copy Text
+                        </button>
+                    </div>
+                </div>
+                ${page.content}
+            `;
+            return pageWrapper;
+        }
+
+        function appendPdfPages(pages) {
+            const contentDiv = document.getElementById('book-content');
+            pages.forEach(page => {
+                contentDiv.appendChild(createPdfPageElement(page));
+            });
+        }
+
+        function setPdfMultiCopyButtonState(state) {
+            const btn = document.getElementById('pdf-multi-copy-btn');
+            const icon = document.getElementById('pdf-multi-copy-icon');
+            const label = document.getElementById('pdf-multi-copy-label');
+            if (!btn || !icon || !label) {
+                return;
+            }
+
+            btn.disabled = state === 'processing';
+            btn.classList.toggle('copied', state === 'success');
+
+            if (state === 'processing') {
+                icon.className = 'fa-solid fa-spinner fa-spin';
+                label.textContent = 'Processing...';
+                return;
+            }
+
+            if (state === 'success') {
+                icon.className = 'fa-solid fa-check';
+                label.textContent = 'Copied!';
+                return;
+            }
+
+            icon.className = 'fa-regular fa-images';
+            label.textContent = 'Copy Selected';
+        }
+
         // PDF: Load all remaining pages
         async function loadAllPages() {
             if (!isPDF || loadingPages) return;
@@ -2174,20 +2234,7 @@
                     const data = await resp.json();
                     
                     if (data.pages && data.pages.length > 0) {
-                        const contentDiv = document.getElementById('book-content');
-                        data.pages.forEach(page => {
-                            const pageWrapper = document.createElement('div');
-                            pageWrapper.className = 'pdf-page';
-                            pageWrapper.dataset.pageIndex = page.index;
-                            pageWrapper.innerHTML = `
-                                <div class="pdf-page-header">
-                                    <span class="pdf-page-number">${page.title}</span>
-                                </div>
-                                ${page.content}
-                            `;
-                            contentDiv.appendChild(pageWrapper);
-                        });
-                        
+                        appendPdfPages(data.pages);
                         currentPageIndex = Math.max(...data.pages.map(p => p.index));
                         updatePageIndicator();
                         updateProgressBar();
@@ -2361,8 +2408,11 @@
             const clearBtn = document.getElementById('pdf-clear-btn');
             const countSpan = document.getElementById('pdf-selected-count');
             
-            if (btn && countSpan) {
+            if (countSpan) {
                 countSpan.textContent = selectedPdfPages.size;
+            }
+
+            if (btn) {
                 if (selectedPdfPages.size > 0) {
                     btn.classList.add('visible');
                     clearBtn?.classList.add('visible');
@@ -2444,27 +2494,7 @@
                         const data = await resp.json();
                         
                         if (data.pages && data.pages.length > 0) {
-                            const contentDiv = document.getElementById('book-content');
-                            data.pages.forEach(page => {
-                                const pageWrapper = document.createElement('div');
-                                pageWrapper.className = 'pdf-page';
-                                pageWrapper.dataset.pageIndex = page.index;
-                                
-                                pageWrapper.innerHTML = `
-                                    <div class="pdf-page-header">
-                                        <input type="checkbox" class="pdf-page-select" data-page-index="${page.index}" onchange="updatePdfPageSelection(this)" title="Select page for multi-copy">
-                                        <span class="pdf-page-number">${page.title}</span>
-                                        <div class="pdf-page-actions">
-                                            <button class="pdf-copy-image-btn" onclick="copyPageImage(this, ${page.index})" title="Copy page as image to clipboard">
-                                                <i class="fa-regular fa-image"></i> Copy Page
-                                            </button>
-                                        </div>
-                                    </div>
-                                    ${page.content}
-                                `;
-                                contentDiv.appendChild(pageWrapper);
-                            });
-                            
+                            appendPdfPages(data.pages);
                             currentPageIndex = Math.max(...data.pages.map(p => p.index));
                             updatePageIndicator();
                             updateProgressBar();
@@ -2522,9 +2552,7 @@
                 return;
             }
             
-            const btn = document.getElementById('pdf-multi-copy-btn');
-            const originalText = btn?.innerHTML || '';
-            if (btn) btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing...';
+            setPdfMultiCopyButtonState('processing');
             
             try {
                 // Sort selected pages by index
@@ -2551,7 +2579,7 @@
                 
                 if (images.length === 0) {
                     showCopyToast('No images found in selected pages', 'error');
-                    if (btn) btn.innerHTML = originalText;
+                    setPdfMultiCopyButtonState('idle');
                     return;
                 }
                 
@@ -2583,23 +2611,17 @@
                 const item = new ClipboardItem({ 'image/png': blob });
                 await navigator.clipboard.write([item]);
                 
-                if (btn) {
-                    btn.classList.add('copied');
-                    btn.innerHTML = '<i class="fa-solid fa-check"></i> Copied!';
-                }
+                setPdfMultiCopyButtonState('success');
                 showCopyToast(`${images.length} page${images.length > 1 ? 's' : ''} copied as image!`, 'success');
                 
                 setTimeout(() => {
-                    if (btn) {
-                        btn.classList.remove('copied');
-                        btn.innerHTML = originalText;
-                    }
+                    setPdfMultiCopyButtonState('idle');
                 }, 2000);
                 
             } catch (err) {
                 console.error('Failed to copy multi-page image:', err);
                 showCopyToast('Failed to copy images', 'error');
-                if (btn) btn.innerHTML = originalText;
+                setPdfMultiCopyButtonState('idle');
             }
         }
         
@@ -2848,30 +2870,7 @@
                 .then(resp => resp.json())
                 .then(data => {
                     if (data.pages && data.pages.length > 0) {
-                        const contentDiv = document.getElementById('book-content');
-                        data.pages.forEach(page => {
-                            const pageWrapper = document.createElement('div');
-                            pageWrapper.className = 'pdf-page';
-                            pageWrapper.dataset.pageIndex = page.index;
-                            
-                            pageWrapper.innerHTML = `
-                                <div class="pdf-page-header">
-                                    <input type="checkbox" class="pdf-page-select" data-page-index="${page.index}" onchange="updatePdfPageSelection(this)" title="Select page for multi-copy">
-                                    <span class="pdf-page-number">${page.title}</span>
-                                    <div class="pdf-page-actions">
-                                        <button class="pdf-copy-image-btn" onclick="copyPageImage(this, ${page.index})" title="Copy page as image to clipboard">
-                                            <i class="fa-regular fa-image"></i> Copy Image
-                                        </button>
-                                        <button class="pdf-copy-image-btn" onclick="copyPageText(this, ${page.index})" title="Copy page text to clipboard">
-                                            <i class="fa-regular fa-copy"></i> Copy Text
-                                        </button>
-                                    </div>
-                                </div>
-                                ${page.content}
-                            `;
-                            contentDiv.appendChild(pageWrapper);
-                        });
-                        
+                        appendPdfPages(data.pages);
                         currentPageIndex = Math.max(...data.pages.map(p => p.index));
                         updatePageIndicator();
                         updateProgressBar();

@@ -645,7 +645,7 @@ wheels = [
 [[package]]
 name = "reader3"
 version = "1.6.5"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "beautifulsoup4" },
     { name = "ebooklib" },
