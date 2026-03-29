@@ -21,7 +21,6 @@ from fastapi.responses import (
     FileResponse,
     HTMLResponse,
     JSONResponse,
-    ORJSONResponse,
     PlainTextResponse,
     RedirectResponse,
 )
@@ -255,7 +254,6 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     lifespan=lifespan,
-    default_response_class=ORJSONResponse,
 )
 
 # --- Middleware (applied bottom-to-top, so GZip wraps everything) ---

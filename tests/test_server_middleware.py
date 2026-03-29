@@ -7,6 +7,8 @@ import sys
 from unittest.mock import patch
 
 import pytest
+from fastapi.datastructures import DefaultPlaceholder
+from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
 
 # Add parent directory to path for imports
@@ -248,12 +250,14 @@ class TestAppConfiguration:
         # App should have middleware stack
         assert hasattr(app, "middleware_stack")
 
-    def test_app_default_response_class_orjson(self, client):
-        """Test that app uses ORJSONResponse by default."""
-        # This is configured but hard to test directly
-        # We can test indirectly through actual API calls
+    def test_app_default_response_class_json(self, client):
+        """Test that app uses the standard JSONResponse by default."""
+        default_response_class = app.router.default_response_class
+        assert isinstance(default_response_class, DefaultPlaceholder)
+        assert default_response_class.value is JSONResponse
+
+        # Keep an API call here so the test still exercises JSON serialization.
         response = client.get("/api/progress/test_book")
-        # Response should be valid JSON
         try:
             response.json()
         except ValueError:
