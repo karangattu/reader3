@@ -2453,21 +2453,23 @@
             // Clear existing selection first
             clearPdfSelection();
 
-            // Get the visible page (the one currently in view)
-            const pages = document.querySelectorAll('.pdf-page');
-            let startPageIndex = currentPageIndex;
-            
             // Find which page is most visible in the viewport
+            const pages = document.querySelectorAll('.pdf-page');
             const mainContent = document.getElementById('main');
-            const viewportCenter = mainContent.scrollTop + mainContent.clientHeight / 2;
+            const mainRect = mainContent.getBoundingClientRect();
+            const viewportCenter = mainRect.top + mainContent.clientHeight / 2;
+            
+            let startPageIndex = 0;
+            let closestDistance = Infinity;
             
             pages.forEach(page => {
                 const pageIndex = parseInt(page.dataset.pageIndex);
                 const rect = page.getBoundingClientRect();
                 const pageCenter = rect.top + rect.height / 2;
+                const distance = Math.abs(pageCenter - viewportCenter);
                 
-                // If this page is closer to center, use it as start
-                if (Math.abs(pageCenter - mainContent.clientHeight / 2) < mainContent.clientHeight / 3) {
+                if (distance < closestDistance) {
+                    closestDistance = distance;
                     startPageIndex = pageIndex;
                 }
             });
