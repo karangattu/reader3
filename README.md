@@ -48,7 +48,7 @@ uv run python build_executable.py --console
 Pushing a version tag triggers GitHub Actions to build and publish platform artifacts automatically.
 
 ```bash
-git tag v1.6.5 && git push origin v1.6.5
+git tag v1.7.0 && git push origin v1.7.0
 ```
 
 Release assets include:

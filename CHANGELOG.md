@@ -2,6 +2,30 @@
 
 All notable changes to Reader3 will be documented in this file.
 
+## [1.7.0] - 2026-03-29
+
+### Added
+
+- **Reader preferences and organization controls** — Added per-book font overrides, persistent reader appearance preferences, richer library sorting/filtering, and improved upload/library UI flows.
+- **PDF reading improvements** — Added visible-page detection fixes, page-read tracking during view/copy flows, and a refactored PDF page rendering path with multi-copy improvements.
+
+### Changed
+
+- **Framework dependencies** — Upgraded FastAPI to `0.135.2` and Starlette to `1.0.0`, refreshed the lockfile and pinned requirements, and updated template rendering calls for the current Starlette API.
+- **Packaging metadata** — `build_executable.py` now reads the app version from `pyproject.toml` so macOS bundle metadata stays aligned with releases.
+- **Project packaging** — Added explicit setuptools build metadata and py-modules configuration for cleaner installs and builds.
+
+### Fixed
+
+- **CI compatibility** — Fixed template rendering under newer Starlette/Jinja combinations that raised `TypeError: unhashable type: 'dict'` in tests and CI.
+- **Selection and toolbar polish** — Cleaned up selection toolbar layout and improved PDF copy/selection related behavior.
+
+### Technical
+
+- Tests: `pytest -q` (593 passed).
+
+---
+
 ## [1.6.5] - 2026-02-20
 
 ### Fixed

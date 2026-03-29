@@ -6,11 +6,21 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import tomllib
+
+
+def project_version() -> str:
+    """Read the project version from pyproject.toml."""
+    pyproject_path = os.path.join(os.path.dirname(__file__), "pyproject.toml")
+    with open(pyproject_path, "rb") as handle:
+        data = tomllib.load(handle)
+    return data["project"]["version"]
 
 
 def build(onefile: bool = False, console: bool = False):
     system = platform.system()
     sep = ';' if system == 'Windows' else ':'
+    version = project_version()
 
     # Hidden imports that PyInstaller may miss
     hidden_imports = [
@@ -113,8 +123,8 @@ def build(onefile: bool = False, console: bool = False):
             plist['CFBundleIdentifier'] = 'com.reader3.app'
 
             # Set version
-            plist['CFBundleShortVersionString'] = '1.0.0'
-            plist['CFBundleVersion'] = '1'
+            plist['CFBundleShortVersionString'] = version
+            plist['CFBundleVersion'] = version
 
             # Allow the app to access network
             plist['NSAppTransportSecurity'] = {'NSAllowsArbitraryLoads': True}
