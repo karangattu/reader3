@@ -485,6 +485,7 @@ async def library_view(
         sort = "recent"
 
     return templates.TemplateResponse(
+        request,
         "library.html",
         {
             "request": request,
@@ -814,6 +815,7 @@ async def read_chapter(request: Request, book_id: str, chapter_index: int):
             needs_reprocess = True
 
     return templates.TemplateResponse(
+        request,
         "reader.html",
         {
             "request": request,
