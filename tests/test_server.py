@@ -2357,3 +2357,13 @@ class TestReaderPreferencesAPI:
         assert response.status_code == 200
         assert "Reader Settings" in response.text
         assert "reader-settings-panel" in response.text
+
+    def test_pdf_reader_page_contains_copy_image_fallback_affordances(self, client):
+        """PDF reader page should expose copy-image fallback and additive range hints."""
+        create_test_book("reader_pdf_tools_data", "Reader PDF Tools Demo", is_pdf=True)
+
+        response = client.get("/read/reader_pdf_tools_data/0")
+
+        assert response.status_code == 200
+        assert "download it if clipboard image copy is unavailable" in response.text
+        assert "Add N pages starting from the current page to the current selection" in response.text

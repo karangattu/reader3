@@ -274,6 +274,7 @@
         .pdf-copy-image-btn { display: inline-flex; align-items: center; gap: 6px; background: #f8f9fa; border: 1px solid #ddd; color: #495057; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-family: -apple-system, sans-serif; font-size: 0.8em; transition: all 0.2s; }
         .pdf-copy-image-btn:hover { background: #495057; color: #fff; }
         .pdf-copy-image-btn.copied { background: #27ae60; color: #fff; border-color: #27ae60; }
+        .pdf-copy-image-btn.downloaded { background: #3498db; color: #fff; border-color: #3498db; }
         
         /* PDF page selection checkbox */
         .pdf-page-select { width: 18px; height: 18px; cursor: pointer; accent-color: #3498db; margin-right: 8px; }
@@ -281,6 +282,8 @@
         .pdf-multi-copy-btn { display: none; background: #3498db; color: #fff; border: none; }
         .pdf-multi-copy-btn:hover { background: #2980b9; }
         .pdf-multi-copy-btn.visible { display: inline-flex; }
+        .pdf-multi-copy-btn.copied { background: #27ae60; }
+        .pdf-multi-copy-btn.downloaded { background: #2980b9; }
         .pdf-clear-btn { display: none; background: #e74c3c; color: #fff; border: none; }
         .pdf-clear-btn:hover { background: #c0392b; }
         .pdf-clear-btn.visible { display: inline-flex; }
@@ -909,12 +912,12 @@
                 <div style="display: flex; align-items: center; gap: 5px; border-left: 1px solid #ddd; padding-left: 10px; margin-left: 5px;">
                     <input type="number" id="page-range-input" min="1" max="50" value="3" 
                            style="width: 50px; padding: 6px 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 0.9em; text-align: center;"
-                           title="Number of pages to select after current page">
-                    <button class="toolbar-btn" type="button" onclick="selectPageRange()" title="Select N pages after current page">
+                           title="Number of pages to add starting from the current page">
+                    <button class="toolbar-btn" type="button" onclick="selectPageRange()" title="Add N pages starting from the current page to the current selection">
                         <i class="fa-solid fa-layer-group"></i> Select Range
                     </button>
                 </div>
-                <button class="toolbar-btn pdf-multi-copy-btn" type="button" onclick="copySelectedPagesAsImage()" id="pdf-multi-copy-btn" title="Copy selected pages as a combined image">
+                <button class="toolbar-btn pdf-multi-copy-btn" type="button" onclick="copySelectedPagesAsImage()" id="pdf-multi-copy-btn" title="Copy selected pages as a combined image, or download it if clipboard image copy is unavailable">
                     <i class="fa-regular fa-images" id="pdf-multi-copy-icon"></i>
                     <span id="pdf-multi-copy-label">Copy Selected</span> (<span id="pdf-selected-count">0</span>)
                 </button>
@@ -933,7 +936,7 @@
                         <input type="checkbox" class="pdf-page-select" data-page-index="{{ chapter_index }}" onchange="updatePdfPageSelection(this)" title="Select page for multi-copy">
                         <span class="pdf-page-number">Page {{ chapter_index + 1 }}</span>
                         <div class="pdf-page-actions">
-                            <button class="pdf-copy-image-btn" onclick="copyPageImage(this, {{ chapter_index }})" title="Copy page as image to clipboard">
+                            <button class="pdf-copy-image-btn" onclick="copyPageImage(this, {{ chapter_index }})" title="Copy page as an image, or download it if clipboard image copy is unavailable">
                                 <i class="fa-regular fa-image"></i> Copy Image
                             </button>
                             <button class="pdf-copy-image-btn" onclick="copyPageText(this, {{ chapter_index }})" title="Copy page text to clipboard">
@@ -2168,7 +2171,7 @@
                     <input type="checkbox" class="pdf-page-select" data-page-index="${page.index}" onchange="updatePdfPageSelection(this)" title="Select page for multi-copy" ${isSelected ? 'checked' : ''}>
                     <span class="pdf-page-number">${page.title}</span>
                     <div class="pdf-page-actions">
-                        <button class="pdf-copy-image-btn" onclick="copyPageImage(this, ${page.index})" title="Copy page as image to clipboard">
+                        <button class="pdf-copy-image-btn" onclick="copyPageImage(this, ${page.index})" title="Copy page as an image, or download it if clipboard image copy is unavailable">
                             <i class="fa-regular fa-image"></i> Copy Image
                         </button>
                         <button class="pdf-copy-image-btn" onclick="copyPageText(this, ${page.index})" title="Copy page text to clipboard">
@@ -2198,6 +2201,7 @@
 
             btn.disabled = state === 'processing';
             btn.classList.toggle('copied', state === 'success');
+            btn.classList.toggle('downloaded', state === 'downloaded');
 
             if (state === 'processing') {
                 icon.className = 'fa-solid fa-spinner fa-spin';
@@ -2211,8 +2215,56 @@
                 return;
             }
 
+            if (state === 'downloaded') {
+                icon.className = 'fa-solid fa-download';
+                label.textContent = 'Downloaded!';
+                return;
+            }
+
             icon.className = 'fa-regular fa-images';
             label.textContent = 'Copy Selected';
+        }
+
+        function supportsImageClipboard() {
+            return !!(navigator.clipboard && window.ClipboardItem);
+        }
+
+        function triggerBlobDownload(blob, filename) {
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }
+
+        function pdfImageFilename(pageIndex, suffix = '') {
+            const safeBookId = (bookId || 'reader3').replace(/[^a-z0-9-_]+/gi, '-');
+            const extra = suffix ? `-${suffix}` : '';
+            return `${safeBookId}-page-${pageIndex + 1}${extra}.png`;
+        }
+
+        function flashPdfCopyButton(button, html, stateClass) {
+            if (!button) {
+                return;
+            }
+
+            const originalText = button.innerHTML;
+            button.disabled = true;
+            if (stateClass) {
+                button.classList.add(stateClass);
+            }
+            button.innerHTML = html;
+
+            setTimeout(() => {
+                button.disabled = false;
+                if (stateClass) {
+                    button.classList.remove(stateClass);
+                }
+                button.innerHTML = originalText;
+            }, 2000);
         }
 
         // PDF: Load all remaining pages
@@ -2346,11 +2398,6 @@
 
         // Copy a PDF page image to clipboard
         async function copyPageImage(button, pageIndex) {
-            if (!navigator.clipboard || !window.ClipboardItem) {
-                showCopyToast('Image clipboard not supported', 'error');
-                return;
-            }
-
             const pageEl = button.closest('.pdf-page') || document.querySelector(`.pdf-page[data-page-index="${pageIndex}"]`);
             if (!pageEl) {
                 showCopyToast('Page not found', 'error');
@@ -2367,17 +2414,22 @@
                 const response = await fetch(imgEl.src, { cache: 'force-cache' });
                 if (!response.ok) throw new Error('Image fetch failed');
                 const blob = await response.blob();
-                const item = new ClipboardItem({ [blob.type || 'image/png']: blob });
-                await navigator.clipboard.write([item]);
 
-                button.classList.add('copied');
-                const originalText = button.innerHTML;
-                button.innerHTML = '<i class="fa-solid fa-check"></i> Copied!';
-                showCopyToast('Page image copied!', 'success');
-                setTimeout(() => {
-                    button.classList.remove('copied');
-                    button.innerHTML = originalText;
-                }, 2000);
+                if (supportsImageClipboard()) {
+                    try {
+                        const item = new ClipboardItem({ [blob.type || 'image/png']: blob });
+                        await navigator.clipboard.write([item]);
+                        flashPdfCopyButton(button, '<i class="fa-solid fa-check"></i> Copied!', 'copied');
+                        showCopyToast('Page image copied!', 'success');
+                        return;
+                    } catch (err) {
+                        console.warn('Clipboard image copy failed, falling back to download.', err);
+                    }
+                }
+
+                triggerBlobDownload(blob, pdfImageFilename(pageIndex));
+                flashPdfCopyButton(button, '<i class="fa-solid fa-download"></i> Downloaded!', 'downloaded');
+                showCopyToast('Clipboard image copy was unavailable, so the page image was downloaded instead.', 'info');
             } catch (err) {
                 showCopyToast('Failed to copy image', 'error');
             }
@@ -2450,8 +2502,7 @@
                 return;
             }
 
-            // Clear existing selection first
-            clearPdfSelection();
+            const previousSelectionCount = selectedPdfPages.size;
 
             // Find which page is most visible in the viewport
             const pages = document.querySelectorAll('.pdf-page');
@@ -2521,7 +2572,11 @@
                 }
             }
 
-            showCopyToast(`Selected pages ${startPageIndex + 1}-${endPageIndex + 1} (${endPageIndex - startPageIndex + 1} pages)`, 'success');
+            const action = previousSelectionCount > 0 ? 'Added' : 'Selected';
+            showCopyToast(
+                `${action} pages ${startPageIndex + 1}-${endPageIndex + 1} (${selectedPdfPages.size} total selected)`,
+                'success'
+            );
         }
         
         // Clear all PDF page selections
@@ -2548,12 +2603,7 @@
                 showCopyToast('No pages selected', 'error');
                 return;
             }
-            
-            if (!navigator.clipboard || !window.ClipboardItem) {
-                showCopyToast('Image clipboard not supported', 'error');
-                return;
-            }
-            
+
             setPdfMultiCopyButtonState('processing');
             
             try {
@@ -2610,11 +2660,32 @@
                 
                 // Convert canvas to blob and copy to clipboard
                 const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-                const item = new ClipboardItem({ 'image/png': blob });
-                await navigator.clipboard.write([item]);
-                
-                setPdfMultiCopyButtonState('success');
-                showCopyToast(`${images.length} page${images.length > 1 ? 's' : ''} copied as image!`, 'success');
+                if (!blob) {
+                    throw new Error('Canvas export failed');
+                }
+
+                let usedClipboard = false;
+                if (supportsImageClipboard()) {
+                    try {
+                        const item = new ClipboardItem({ 'image/png': blob });
+                        await navigator.clipboard.write([item]);
+                        usedClipboard = true;
+                    } catch (err) {
+                        console.warn('Clipboard image copy failed, falling back to download.', err);
+                    }
+                }
+
+                if (usedClipboard) {
+                    setPdfMultiCopyButtonState('success');
+                    showCopyToast(`${images.length} page${images.length > 1 ? 's' : ''} copied as image!`, 'success');
+                } else {
+                    triggerBlobDownload(blob, pdfImageFilename(sortedPages[0], `${sortedPages.length}-pages`));
+                    setPdfMultiCopyButtonState('downloaded');
+                    showCopyToast(
+                        `Clipboard image copy was unavailable, so ${images.length} page${images.length > 1 ? 's were' : ' was'} downloaded instead.`,
+                        'info'
+                    );
+                }
                 
                 setTimeout(() => {
                     setPdfMultiCopyButtonState('idle');
