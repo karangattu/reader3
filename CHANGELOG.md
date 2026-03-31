@@ -2,6 +2,21 @@
 
 All notable changes to Reader3 will be documented in this file.
 
+## [1.8.0] - 2026-03-30
+
+### Added
+
+- **Copy badges for PDF and EPUB** — Green checkmark badges now appear on individual PDF pages and EPUB TOC chapters after they have been copied (image, text, or multi-select), giving users clear visual feedback of what has already been copied.
+- **Robust multi-page PDF copy** — Per-page error handling with skip-and-continue so a single broken image no longer aborts the entire batch; 15-second timeout on each image load; progress feedback in the copy button ("Loading 3/10…", "Compositing…"); canvas size guard that falls back to individual image downloads when the combined image would exceed browser limits.
+- **PDF image download fallback** — Single-page "Copy Image" now falls back to a file download when clipboard image copy is unavailable, instead of silently failing.
+
+### Technical
+
+- New test suite `test_copy_badges.py` (37 tests) covering badge rendering, multi-page robustness logic, EPUB multi-chapter copy API, canvas size guards, and progress tracking.
+- Tests: `pytest -q` (631 passed).
+
+---
+
 ## [1.7.0] - 2026-03-29
 
 ### Added
