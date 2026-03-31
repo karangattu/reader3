@@ -2,6 +2,19 @@
 
 All notable changes to Reader3 will be documented in this file.
 
+## [1.8.1] - 2026-03-30
+
+### Changed
+
+- **PDF toolbar decluttered** — Reorganized the PDF reader toolbar into a clean primary row (Reader Settings, Go to Page, Select Pages) with a collapsible selection strip that expands on demand. Selection tools (Select Range, Select All, Copy Selected, Clear) now live in a secondary row that auto-expands when pages are selected and collapses when cleared. A count badge on the "Select Pages" toggle shows how many pages are currently selected.
+
+### Technical
+
+- Added 3 new toolbar layout tests (`test_copy_badges.py`).
+- Tests: `pytest -q` (634 passed).
+
+---
+
 ## [1.8.0] - 2026-03-30
 
 ### Added

@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc -l /Users/karangathani/Documents/GitHub/reader3/templates/*.html)",
+      "Bash(wc -l /Users/karangathani/Documents/GitHub/reader3/*.py)",
+      "Bash(python -m pytest tests/test_user_data.py::TestExport -x -q)",
+      "Bash(python -m pytest tests/test_server.py::TestCollectionExportAPI -x -q)"
+    ]
+  }
+}

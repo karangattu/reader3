@@ -132,12 +132,21 @@
         #main { flex-grow: 1; overflow-y: auto; position: relative; scroll-behavior: smooth; background: var(--reader-bg); }
         .content-container { max-width: var(--reader-page-width); margin: 0 auto; padding: 60px 40px 60px 40px; line-height: var(--reader-line-height); font-size: var(--reader-font-size); color: var(--reader-text); background: var(--reader-surface); position: relative; z-index: 1; box-shadow: var(--reader-shadow); }
         .content-toolbar { display: flex; justify-content: flex-end; gap: 10px; margin-bottom: 25px; font-family: -apple-system, sans-serif; flex-wrap: wrap; }
-        .content-toolbar.pdf-toolbar { position: sticky; top: 0; background: var(--reader-toolbar-bg); padding: 15px 10px 15px 10px; margin: -15px -10px 25px -10px; z-index: 50; border-radius: 0 0 8px 8px; transition: box-shadow 0.3s ease; backdrop-filter: blur(8px); }
+        .content-toolbar.pdf-toolbar { position: sticky; top: 0; background: var(--reader-toolbar-bg); padding: 12px 10px 0 10px; margin: -15px -10px 25px -10px; z-index: 50; border-radius: 0 0 8px 8px; transition: box-shadow 0.3s ease; backdrop-filter: blur(8px); }
         .content-toolbar.pdf-toolbar.stuck { box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
         .toolbar-btn { border: 1px solid var(--reader-border); background: var(--reader-surface); color: var(--reader-muted); padding: 9px 16px; border-radius: 5px; cursor: pointer; font-size: 0.9em; font-weight: 500; transition: all 0.2s ease; }
         .toolbar-btn:hover { background: #495057; color: #fff; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); }
         .toolbar-btn:active { transform: scale(0.97); }
         .toolbar-btn.active { background: #3498db; color: #fff; border-color: #3498db; }
+        
+        /* PDF toolbar rows */
+        .pdf-toolbar-primary { display: flex; justify-content: flex-end; gap: 8px; padding-bottom: 10px; align-items: center; }
+        .pdf-toolbar-selection { display: none; align-items: center; gap: 8px; padding: 10px 0; border-top: 1px solid var(--reader-border, #eee); flex-wrap: wrap; justify-content: flex-end; }
+        .pdf-toolbar-selection.visible { display: flex; }
+        .pdf-select-toggle { position: relative; }
+        .pdf-select-toggle .toolbar-btn.active { background: #3498db; color: #fff; border-color: #3498db; }
+        .pdf-selection-count { display: inline-flex; align-items: center; justify-content: center; background: #3498db; color: #fff; font-size: 0.7em; font-weight: 700; min-width: 18px; height: 18px; border-radius: 9px; padding: 0 5px; position: absolute; top: -6px; right: -6px; opacity: 0; transition: opacity 0.2s; }
+        .pdf-selection-count.has-selection { opacity: 1; }
 #copy-status { font-family: -apple-system, sans-serif; font-size: 0.85em; color: #198754; text-align: right; min-height: 1.2em; opacity: 0; transition: opacity 0.3s ease-in-out; font-weight: 500; }
         
         /* Reading momentum toolbar */
@@ -916,10 +925,17 @@
     <div id="main">
         <div class="content-container">
             <div class="content-toolbar {% if is_pdf %}pdf-toolbar{% endif %}">
-                <button class="toolbar-btn" type="button" onclick="toggleReaderSettingsPanel(true)" title="Adjust theme, font size, spacing, and accessibility settings"><i class="fa-solid fa-sliders"></i> Reader Settings</button>
                 {% if is_pdf %}
+                <div class="pdf-toolbar-primary">
+                <button class="toolbar-btn" type="button" onclick="toggleReaderSettingsPanel(true)" title="Adjust theme, font size, spacing, and accessibility settings"><i class="fa-solid fa-sliders"></i> Reader Settings</button>
                 <button class="toolbar-btn" type="button" onclick="togglePageJump()" title="Jump to a specific page"><i class="fa-solid fa-hashtag"></i> Go to Page</button>
-                <div style="display: flex; align-items: center; gap: 5px; border-left: 1px solid #ddd; padding-left: 10px; margin-left: 5px;">
+                <div class="pdf-select-toggle">
+                    <button class="toolbar-btn" type="button" onclick="toggleSelectionBar()" id="pdf-select-toggle-btn" title="Show page selection tools"><i class="fa-regular fa-square-check"></i> Select Pages</button>
+                    <span class="pdf-selection-count" id="pdf-selection-count-badge">0</span>
+                </div>
+                </div>
+                <div class="pdf-toolbar-selection" id="pdf-toolbar-selection">
+                <div style="display: flex; align-items: center; gap: 5px;">
                     <input type="number" id="page-range-input" min="1" max="50" value="3" 
                            style="width: 50px; padding: 6px 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 0.9em; text-align: center;"
                            title="Number of pages to add starting from the current page">
@@ -927,12 +943,13 @@
                         <i class="fa-solid fa-layer-group"></i> Select Range
                     </button>
                 </div>
+                <button class="toolbar-btn" type="button" onclick="toggleSelectAllPages()" id="pdf-select-all-btn" title="Select/Deselect all loaded pages"><i class="fa-regular fa-square-check"></i> Select All</button>
                 <button class="toolbar-btn pdf-multi-copy-btn" type="button" onclick="copySelectedPagesAsImage()" id="pdf-multi-copy-btn" title="Copy selected pages as a combined image, or download it if clipboard image copy is unavailable">
                     <i class="fa-regular fa-images" id="pdf-multi-copy-icon"></i>
                     <span id="pdf-multi-copy-label">Copy Selected</span> (<span id="pdf-selected-count">0</span>)
                 </button>
                 <button class="toolbar-btn pdf-clear-btn" type="button" onclick="clearPdfSelection()" id="pdf-clear-btn" title="Clear selection"><i class="fa-solid fa-xmark"></i> Clear</button>
-                <button class="toolbar-btn" type="button" onclick="toggleSelectAllPages()" id="pdf-select-all-btn" title="Select/Deselect all loaded pages"><i class="fa-regular fa-square-check"></i> Select All</button>
+                </div>
                 {% else %}
                 <button class="toolbar-btn" type="button" onclick="copyAllLoaded()" id="copy-all-btn" title="Copy all loaded content"><i class="fa-regular fa-copy"></i> Copy All</button>
                 <button class="toolbar-btn" type="button" onclick="showBatchClipboard()" id="batch-clipboard-btn" style="display: none;"><i class="fa-regular fa-folder-open"></i> Batch (<span id="batch-count">0</span>)</button>
@@ -2501,19 +2518,43 @@
             const btn = document.getElementById('pdf-multi-copy-btn');
             const clearBtn = document.getElementById('pdf-clear-btn');
             const countSpan = document.getElementById('pdf-selected-count');
+            const badge = document.getElementById('pdf-selection-count-badge');
             
             if (countSpan) {
                 countSpan.textContent = selectedPdfPages.size;
+            }
+
+            // Update the badge on the "Select Pages" toggle button
+            if (badge) {
+                badge.textContent = selectedPdfPages.size;
+                badge.classList.toggle('has-selection', selectedPdfPages.size > 0);
             }
 
             if (btn) {
                 if (selectedPdfPages.size > 0) {
                     btn.classList.add('visible');
                     clearBtn?.classList.add('visible');
+                    // Auto-expand selection bar when pages are selected
+                    const selectionBar = document.getElementById('pdf-toolbar-selection');
+                    if (selectionBar && !selectionBar.classList.contains('visible')) {
+                        selectionBar.classList.add('visible');
+                        const toggleBtn = document.getElementById('pdf-select-toggle-btn');
+                        if (toggleBtn) toggleBtn.classList.add('active');
+                    }
                 } else {
                     btn.classList.remove('visible');
                     clearBtn?.classList.remove('visible');
                 }
+            }
+        }
+        
+        // Toggle the selection toolbar visibility
+        function toggleSelectionBar() {
+            const selectionBar = document.getElementById('pdf-toolbar-selection');
+            const toggleBtn = document.getElementById('pdf-select-toggle-btn');
+            if (selectionBar) {
+                selectionBar.classList.toggle('visible');
+                toggleBtn?.classList.toggle('active', selectionBar.classList.contains('visible'));
             }
         }
         
@@ -2636,6 +2677,14 @@
             const selectAllBtn = document.getElementById('pdf-select-all-btn');
             if (selectAllBtn) {
                 selectAllBtn.innerHTML = '<i class="fa-regular fa-square-check"></i> Select All';
+            }
+            
+            // Collapse selection bar when nothing is selected
+            const selectionBar = document.getElementById('pdf-toolbar-selection');
+            const toggleBtn = document.getElementById('pdf-select-toggle-btn');
+            if (selectionBar) {
+                selectionBar.classList.remove('visible');
+                toggleBtn?.classList.remove('active');
             }
         }
         

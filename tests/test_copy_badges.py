@@ -217,6 +217,36 @@ class TestPdfCopiedBadgeCSS:
         assert 'pdf-multi-copy-btn' in html
         assert 'copySelectedPagesAsImage' in html
 
+    def test_pdf_toolbar_has_select_pages_toggle(self, client):
+        """PDF toolbar should have a 'Select Pages' toggle button."""
+        bid = f"test_pdf_toggle_{uuid.uuid4().hex[:8]}"
+        create_test_book(bid, "Toggle PDF", is_pdf=True, chapters=1)
+
+        response = client.get(f"/read/{bid}/0")
+        html = response.text
+        assert 'pdf-select-toggle-btn' in html
+        assert 'toggleSelectionBar' in html
+        assert 'Select Pages' in html
+
+    def test_pdf_toolbar_has_collapsible_selection_row(self, client):
+        """PDF toolbar should have a collapsible selection row."""
+        bid = f"test_pdf_collapse_{uuid.uuid4().hex[:8]}"
+        create_test_book(bid, "Collapse PDF", is_pdf=True, chapters=1)
+
+        response = client.get(f"/read/{bid}/0")
+        html = response.text
+        assert 'pdf-toolbar-selection' in html
+        assert 'pdf-toolbar-primary' in html
+
+    def test_pdf_toolbar_selection_badge_exists(self, client):
+        """The selection count badge on the toggle button should exist."""
+        bid = f"test_pdf_badge_cnt_{uuid.uuid4().hex[:8]}"
+        create_test_book(bid, "Badge PDF", is_pdf=True, chapters=1)
+
+        response = client.get(f"/read/{bid}/0")
+        html = response.text
+        assert 'pdf-selection-count-badge' in html
+
 
 # ---------------------------------------------------------------------------
 # EPUB badge rendering tests
