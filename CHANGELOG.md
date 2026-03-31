@@ -2,6 +2,21 @@
 
 All notable changes to Reader3 will be documented in this file.
 
+## [1.8.2] - 2026-03-30
+
+### Added
+
+- **Persistent copy badges** — Green checkmark badges on copied PDF pages and EPUB chapters now persist across server restarts. Copied state is stored in `user_data.json` and restored automatically when you reopen a book.
+
+### Technical
+
+- Added `copied_pages` field to `UserData`, `get_copied_pages` / `save_copied_pages` methods in `UserDataManager`.
+- New API endpoints: `GET/POST /api/copied-pages/{book_id}`.
+- Frontend `markPagesCopied()` and `markChaptersCopied()` now POST to server; `loadUserData()` restores badges on load.
+- 7 new persistence tests (`TestCopiedPagesPersistence`). Tests: `pytest -q` (641 passed).
+
+---
+
 ## [1.8.1] - 2026-03-30
 
 ### Changed

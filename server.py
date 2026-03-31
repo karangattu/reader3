@@ -1551,6 +1551,22 @@ async def save_chapter_progress(
     return {"status": "saved"}
 
 
+@app.get("/api/copied-pages/{book_id}")
+async def get_copied_pages(book_id: str):
+    """Get copied page indices (PDF) or chapter hrefs (EPUB) for a book."""
+    items = user_data_manager.get_copied_pages(book_id)
+    return {"book_id": book_id, "items": items}
+
+
+@app.post("/api/copied-pages/{book_id}")
+async def save_copied_pages(book_id: str, request: Request):
+    """Save copied page indices or chapter hrefs for a book."""
+    data = await request.json()
+    items = data.get("items", [])
+    user_data_manager.save_copied_pages(book_id, items)
+    return {"status": "saved"}
+
+
 # ============================================================================
 # PDF-Specific API Endpoints
 # ============================================================================

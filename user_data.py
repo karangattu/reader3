@@ -147,6 +147,7 @@ class UserData:
     collections: List[Collection] = field(default_factory=list)
     reader_preferences: ReaderPreferences = field(default_factory=ReaderPreferences)
     book_fonts: Dict[str, str] = field(default_factory=dict)
+    copied_pages: Dict[str, List] = field(default_factory=dict)
     version: str = "1.3"
 
 
@@ -227,6 +228,7 @@ class UserDataManager:
                 ],
                 reader_preferences=ReaderPreferences(**raw.get('reader_preferences', {})),
                 book_fonts=raw.get('book_fonts', {}),
+                copied_pages=raw.get('copied_pages', {}),
                 version=raw.get('version', '1.3')
             )
         except Exception as e:
@@ -301,6 +303,7 @@ class UserDataManager:
             'collections': [asdict(c) for c in self._data.collections],
             'reader_preferences': asdict(self._data.reader_preferences),
             'book_fonts': self._data.book_fonts,
+            'copied_pages': self._data.copied_pages,
             'version': self._data.version
         }
         
@@ -502,7 +505,22 @@ class UserDataManager:
         if progress_percent > current:
             data.chapter_progress[book_id][chapter_index] = min(100, progress_percent)
             self.save()
-    
+
+    # Copied Pages / Chapters (persistent copy badges)
+    def get_copied_pages(self, book_id: str) -> List:
+        """Get list of copied page indices (PDF) or chapter hrefs (EPUB)."""
+        data = self.load()
+        return data.copied_pages.get(book_id, [])
+
+    def save_copied_pages(self, book_id: str, items: List):
+        """Save copied page indices or chapter hrefs for a book."""
+        data = self.load()
+        existing = set(data.copied_pages.get(book_id, []))
+        new_items = set(items)
+        merged = existing | new_items
+        data.copied_pages[book_id] = sorted(merged, key=lambda x: (isinstance(x, str), x))
+        self.save_deferred()
+
     # Search History
     def add_search(self, query: SearchQuery):
         """Add a search query to history."""
@@ -636,6 +654,9 @@ class UserDataManager:
             changed = True
         if book_id in data.annotations:
             del data.annotations[book_id]
+            changed = True
+        if book_id in data.copied_pages:
+            del data.copied_pages[book_id]
             changed = True
         
         # Remove reading sessions for this book

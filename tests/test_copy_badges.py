@@ -573,3 +573,97 @@ class TestImageLoadTimeoutLogic:
         loaded = [p for p in all_pages if p not in failed]
         assert len(loaded) == 8
         assert len(loaded) > 0  # partial result is non-empty
+
+
+# ---------------------------------------------------------------------------
+# Copied pages persistence API tests
+# ---------------------------------------------------------------------------
+class TestCopiedPagesPersistence:
+    """Tests for the /api/copied-pages/ endpoint and backend storage."""
+
+    def test_get_copied_pages_empty(self, client):
+        """GET should return empty list for a book with no copied pages."""
+        bid = f"test_cp_empty_{uuid.uuid4().hex[:8]}"
+        create_test_book(bid, "Empty Copy", is_pdf=True, chapters=2)
+        resp = client.get(f"/api/copied-pages/{bid}")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["items"] == []
+
+    def test_save_and_get_pdf_pages(self, client):
+        """POST page indices then GET them back."""
+        bid = f"test_cp_pdf_{uuid.uuid4().hex[:8]}"
+        create_test_book(bid, "Save PDF", is_pdf=True, chapters=5)
+        resp = client.post(
+            f"/api/copied-pages/{bid}",
+            json={"items": [0, 2, 4]},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "saved"
+
+        resp = client.get(f"/api/copied-pages/{bid}")
+        assert resp.status_code == 200
+        assert sorted(resp.json()["items"]) == [0, 2, 4]
+
+    def test_save_and_get_epub_chapters(self, client):
+        """POST chapter hrefs then GET them back."""
+        bid = f"test_cp_epub_{uuid.uuid4().hex[:8]}"
+        create_test_book(bid, "Save EPUB", is_pdf=False, chapters=3)
+        hrefs = ["chapter-0.html", "chapter-2.html"]
+        resp = client.post(
+            f"/api/copied-pages/{bid}",
+            json={"items": hrefs},
+        )
+        assert resp.status_code == 200
+
+        resp = client.get(f"/api/copied-pages/{bid}")
+        items = resp.json()["items"]
+        assert "chapter-0.html" in items
+        assert "chapter-2.html" in items
+
+    def test_merge_duplicates(self, client):
+        """Posting overlapping items should merge without duplicates."""
+        bid = f"test_cp_merge_{uuid.uuid4().hex[:8]}"
+        create_test_book(bid, "Merge", is_pdf=True, chapters=5)
+
+        client.post(f"/api/copied-pages/{bid}", json={"items": [0, 1]})
+        client.post(f"/api/copied-pages/{bid}", json={"items": [1, 2, 3]})
+
+        resp = client.get(f"/api/copied-pages/{bid}")
+        assert sorted(resp.json()["items"]) == [0, 1, 2, 3]
+
+    def test_persist_across_reload(self, client):
+        """Data should survive a manager reload (simulating server restart)."""
+        bid = f"test_cp_persist_{uuid.uuid4().hex[:8]}"
+        create_test_book(bid, "Persist", is_pdf=True, chapters=3)
+        client.post(f"/api/copied-pages/{bid}", json={"items": [0, 2]})
+
+        # Force flush and reload
+        server.user_data_manager.flush()
+        server.user_data_manager._data = None
+
+        resp = client.get(f"/api/copied-pages/{bid}")
+        assert sorted(resp.json()["items"]) == [0, 2]
+
+    def test_empty_items_post(self, client):
+        """Posting empty items should not break anything."""
+        bid = f"test_cp_empty_post_{uuid.uuid4().hex[:8]}"
+        create_test_book(bid, "EmptyPost", is_pdf=True, chapters=1)
+        resp = client.post(f"/api/copied-pages/{bid}", json={"items": []})
+        assert resp.status_code == 200
+
+    def test_delete_book_clears_copied(self, client):
+        """Deleting a book should also remove its copied pages data."""
+        bid = f"test_cp_delete_{uuid.uuid4().hex[:8]}"
+        create_test_book(bid, "DeleteBook", is_pdf=True, chapters=2)
+        client.post(f"/api/copied-pages/{bid}", json={"items": [0, 1]})
+        server.user_data_manager.flush()
+
+        # Verify data exists
+        resp = client.get(f"/api/copied-pages/{bid}")
+        assert len(resp.json()["items"]) == 2
+
+        # Delete book data
+        server.user_data_manager.cleanup_book_data(bid)
+        resp = client.get(f"/api/copied-pages/{bid}")
+        assert resp.json()["items"] == []

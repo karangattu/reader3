@@ -1338,6 +1338,20 @@
                 
                 // Start new reading session
                 startReadingSession();
+
+                // Load copied pages/chapters for badge persistence
+                const copiedRes = await fetch(`/api/copied-pages/${encodeURIComponent(bookId)}`);
+                if (copiedRes.ok) {
+                    const copiedData = await copiedRes.json();
+                    const items = copiedData.items || [];
+                    if (items.length > 0) {
+                        // Separate numeric page indices from string chapter hrefs
+                        const pageIndices = items.filter(i => typeof i === 'number');
+                        const chapterHrefs = items.filter(i => typeof i === 'string');
+                        if (pageIndices.length > 0) markPagesCopied(pageIndices);
+                        if (chapterHrefs.length > 0) markChaptersCopied(chapterHrefs);
+                    }
+                }
             } catch (error) {
                 console.error('Failed to load user data:', error);
             }
@@ -2479,22 +2493,37 @@
         
         // Mark EPUB chapter(s) as copied and show the green badge in the TOC
         function markChaptersCopied(hrefs) {
+            const newHrefs = [];
             for (const href of hrefs) {
+                if (!copiedEpubChapters.has(href)) newHrefs.push(href);
                 copiedEpubChapters.add(href);
                 const badges = document.querySelectorAll(`.toc-copied-badge[data-href="${href}"]`);
                 badges.forEach(badge => badge.classList.add('visible'));
             }
+            if (newHrefs.length > 0) persistCopiedItems(newHrefs);
         }
         
         // Mark a page (or pages) as copied and show the green checkmark badge
         function markPagesCopied(pageIndices) {
+            const newIndices = [];
             for (const idx of pageIndices) {
+                if (!copiedPdfPages.has(idx)) newIndices.push(idx);
                 copiedPdfPages.add(idx);
                 const badge = document.getElementById(`pdf-copied-badge-${idx}`);
                 if (badge) {
                     badge.classList.add('visible');
                 }
             }
+            if (newIndices.length > 0) persistCopiedItems(newIndices);
+        }
+
+        // Persist copied items to the server
+        function persistCopiedItems(items) {
+            fetch(`/api/copied-pages/${encodeURIComponent(bookId)}`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({items: items})
+            }).catch(err => console.warn('Failed to persist copied state:', err));
         }
         
         // Update PDF page selection state
