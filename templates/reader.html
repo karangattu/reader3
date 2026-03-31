@@ -111,6 +111,10 @@
         a.toc-link.read::after { content: '✓'; position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 0.8em; color: #27ae60; }
         a.toc-link.active::after { color: rgba(255,255,255,0.8); }
         
+        /* EPUB chapter copied badge in TOC sidebar */
+        .toc-copied-badge { display: none; color: #27ae60; font-size: 0.7em; margin-left: 6px; font-weight: 500; white-space: nowrap; }
+        .toc-copied-badge.visible { display: inline-flex; align-items: center; gap: 3px; }
+        
         /* Empty state illustrations */
         .empty-state { text-align: center; padding: 40px 20px; }
         .empty-state-icon { font-size: 4em; margin-bottom: 15px; opacity: 0.5; }
@@ -287,6 +291,11 @@
         .pdf-clear-btn { display: none; background: #e74c3c; color: #fff; border: none; }
         .pdf-clear-btn:hover { background: #c0392b; }
         .pdf-clear-btn.visible { display: inline-flex; }
+        
+        /* PDF page copied checkmark indicator */
+        .pdf-page-copied-badge { display: inline-flex; align-items: center; gap: 4px; color: #27ae60; font-size: 0.8em; margin-left: 8px; font-weight: 500; opacity: 0; transition: opacity 0.3s ease; }
+        .pdf-page-copied-badge.visible { opacity: 1; }
+        .pdf-page-copied-badge i { font-size: 0.9em; }
         
         /* PDF floating page indicator */
         #pdf-page-indicator { position: fixed; bottom: 30px; right: 30px; background: rgba(0,0,0,0.8); color: #fff; padding: 10px 18px; border-radius: 25px; font-family: -apple-system, sans-serif; font-size: 0.9em; z-index: 100; opacity: 0; transition: opacity 0.3s ease; pointer-events: none; }
@@ -881,6 +890,7 @@
                        data-href="{{ item.file_href }}">
                         <input type="checkbox" class="chapter-checkbox" data-href="{{ item.file_href }}" onclick="event.stopPropagation(); updateCopyButton();">
                         <span class="toc-title">{{ item.title }}</span>
+                        <span class="toc-copied-badge" data-href="{{ item.file_href }}" title="Chapter has been copied"><i class="fa-solid fa-circle-check"></i> Copied</span>
                         <span class="toc-chapter-percent" data-href="{{ item.file_href }}">0%</span>
                     </a>
                     <div class="chapter-progress" data-href="{{ item.file_href }}">
@@ -935,6 +945,7 @@
                     <div class="pdf-page-header">
                         <input type="checkbox" class="pdf-page-select" data-page-index="{{ chapter_index }}" onchange="updatePdfPageSelection(this)" title="Select page for multi-copy">
                         <span class="pdf-page-number">Page {{ chapter_index + 1 }}</span>
+                        <span class="pdf-page-copied-badge" id="pdf-copied-badge-{{ chapter_index }}" title="Page has been copied"><i class="fa-solid fa-circle-check"></i> Copied</span>
                         <div class="pdf-page-actions">
                             <button class="pdf-copy-image-btn" onclick="copyPageImage(this, {{ chapter_index }})" title="Copy page as an image, or download it if clipboard image copy is unavailable">
                                 <i class="fa-regular fa-image"></i> Copy Image
@@ -2164,12 +2175,14 @@
         function createPdfPageElement(page) {
             const pageWrapper = document.createElement('div');
             const isSelected = selectedPdfPages.has(page.index);
+            const isCopied = copiedPdfPages.has(page.index);
             pageWrapper.className = `pdf-page${isSelected ? ' selected' : ''}`;
             pageWrapper.dataset.pageIndex = page.index;
             pageWrapper.innerHTML = `
                 <div class="pdf-page-header">
                     <input type="checkbox" class="pdf-page-select" data-page-index="${page.index}" onchange="updatePdfPageSelection(this)" title="Select page for multi-copy" ${isSelected ? 'checked' : ''}>
                     <span class="pdf-page-number">${page.title}</span>
+                    <span class="pdf-page-copied-badge${isCopied ? ' visible' : ''}" id="pdf-copied-badge-${page.index}" title="Page has been copied"><i class="fa-solid fa-circle-check"></i> Copied</span>
                     <div class="pdf-page-actions">
                         <button class="pdf-copy-image-btn" onclick="copyPageImage(this, ${page.index})" title="Copy page as an image, or download it if clipboard image copy is unavailable">
                             <i class="fa-regular fa-image"></i> Copy Image
@@ -2383,6 +2396,7 @@
 
             try {
                 await clipboardWriteText(textToCopy);
+                markPagesCopied([pageIndex]);
                 button.classList.add('copied');
                 const originalText = button.innerHTML;
                 button.innerHTML = '<i class="fa-solid fa-check"></i> Copied!';
@@ -2419,6 +2433,7 @@
                     try {
                         const item = new ClipboardItem({ [blob.type || 'image/png']: blob });
                         await navigator.clipboard.write([item]);
+                        markPagesCopied([pageIndex]);
                         flashPdfCopyButton(button, '<i class="fa-solid fa-check"></i> Copied!', 'copied');
                         showCopyToast('Page image copied!', 'success');
                         return;
@@ -2428,6 +2443,7 @@
                 }
 
                 triggerBlobDownload(blob, pdfImageFilename(pageIndex));
+                markPagesCopied([pageIndex]);
                 flashPdfCopyButton(button, '<i class="fa-solid fa-download"></i> Downloaded!', 'downloaded');
                 showCopyToast('Clipboard image copy was unavailable, so the page image was downloaded instead.', 'info');
             } catch (err) {
@@ -2437,6 +2453,32 @@
         
         // Track selected PDF pages for multi-copy
         let selectedPdfPages = new Set();
+        
+        // Track pages that have been successfully copied
+        let copiedPdfPages = new Set();
+        
+        // Track EPUB chapters that have been successfully copied (by href)
+        let copiedEpubChapters = new Set();
+        
+        // Mark EPUB chapter(s) as copied and show the green badge in the TOC
+        function markChaptersCopied(hrefs) {
+            for (const href of hrefs) {
+                copiedEpubChapters.add(href);
+                const badges = document.querySelectorAll(`.toc-copied-badge[data-href="${href}"]`);
+                badges.forEach(badge => badge.classList.add('visible'));
+            }
+        }
+        
+        // Mark a page (or pages) as copied and show the green checkmark badge
+        function markPagesCopied(pageIndices) {
+            for (const idx of pageIndices) {
+                copiedPdfPages.add(idx);
+                const badge = document.getElementById(`pdf-copied-badge-${idx}`);
+                if (badge) {
+                    badge.classList.add('visible');
+                }
+            }
+        }
         
         // Update PDF page selection state
         function updatePdfPageSelection(checkbox) {
@@ -2610,35 +2652,86 @@
                 // Sort selected pages by index
                 const sortedPages = Array.from(selectedPdfPages).sort((a, b) => a - b);
                 
-                // Collect all image elements
+                // Collect all image elements, skipping pages that fail to load
                 const images = [];
-                for (const pageIndex of sortedPages) {
+                const loadedPageIndices = [];
+                const failedPages = [];
+                const IMAGE_LOAD_TIMEOUT_MS = 15000;
+                
+                for (let i = 0; i < sortedPages.length; i++) {
+                    const pageIndex = sortedPages[i];
+                    
+                    // Show progress in the button label
+                    const label = document.getElementById('pdf-multi-copy-label');
+                    if (label) {
+                        label.textContent = `Loading ${i + 1}/${sortedPages.length}...`;
+                    }
+                    
                     const pageEl = document.querySelector(`.pdf-page[data-page-index="${pageIndex}"]`);
                     const imgEl = pageEl?.querySelector('img.pdf-page-image');
                     
-                    if (imgEl && imgEl.src) {
-                        // Fetch image and create an Image object
+                    if (!imgEl || !imgEl.src) {
+                        failedPages.push(pageIndex + 1);
+                        continue;
+                    }
+                    
+                    try {
+                        // Load image with timeout to avoid hanging on broken images
                         const img = new Image();
                         img.crossOrigin = 'anonymous';
                         await new Promise((resolve, reject) => {
-                            img.onload = resolve;
-                            img.onerror = reject;
+                            const timer = setTimeout(() => reject(new Error('timeout')), IMAGE_LOAD_TIMEOUT_MS);
+                            img.onload = () => { clearTimeout(timer); resolve(); };
+                            img.onerror = () => { clearTimeout(timer); reject(new Error('load error')); };
                             img.src = imgEl.src;
                         });
                         images.push(img);
+                        loadedPageIndices.push(pageIndex);
+                    } catch (e) {
+                        console.warn(`Skipping page ${pageIndex + 1}: ${e.message}`);
+                        failedPages.push(pageIndex + 1);
                     }
                 }
                 
                 if (images.length === 0) {
-                    showCopyToast('No images found in selected pages', 'error');
+                    showCopyToast('No images could be loaded from selected pages', 'error');
                     setPdfMultiCopyButtonState('idle');
                     return;
                 }
                 
                 // Calculate combined canvas dimensions
-                const padding = 20; // Padding between pages
+                const padding = 20;
                 const maxWidth = Math.max(...images.map(img => img.naturalWidth));
                 const totalHeight = images.reduce((sum, img) => sum + img.naturalHeight, 0) + (padding * (images.length - 1));
+                
+                // Guard against exceeding browser canvas limits (~16384px or ~268M pixels)
+                const MAX_CANVAS_DIM = 16384;
+                const MAX_CANVAS_AREA = 268435456; // 256 MP
+                if (maxWidth > MAX_CANVAS_DIM || totalHeight > MAX_CANVAS_DIM || maxWidth * totalHeight > MAX_CANVAS_AREA) {
+                    // Fall back to downloading individual images
+                    showCopyToast(`Too many pages for a single image (${images.length} pages, ${totalHeight}px tall). Downloading individual pages instead.`, 'info');
+                    for (let i = 0; i < images.length; i++) {
+                        const singleCanvas = document.createElement('canvas');
+                        singleCanvas.width = images[i].naturalWidth;
+                        singleCanvas.height = images[i].naturalHeight;
+                        const sCtx = singleCanvas.getContext('2d');
+                        sCtx.drawImage(images[i], 0, 0);
+                        const sBlob = await new Promise(resolve => singleCanvas.toBlob(resolve, 'image/png'));
+                        if (sBlob) {
+                            triggerBlobDownload(sBlob, pdfImageFilename(loadedPageIndices[i]));
+                        }
+                    }
+                    markPagesCopied(loadedPageIndices);
+                    setPdfMultiCopyButtonState('downloaded');
+                    setTimeout(() => setPdfMultiCopyButtonState('idle'), 2000);
+                    return;
+                }
+                
+                // Update progress: compositing
+                const label = document.getElementById('pdf-multi-copy-label');
+                if (label) {
+                    label.textContent = 'Compositing...';
+                }
                 
                 // Create combined canvas
                 const canvas = document.createElement('canvas');
@@ -2675,14 +2768,19 @@
                     }
                 }
 
+                // Mark all successfully loaded pages as copied
+                markPagesCopied(loadedPageIndices);
+                
+                const failedNote = failedPages.length > 0 ? ` (skipped page${failedPages.length > 1 ? 's' : ''} ${failedPages.join(', ')})` : '';
+
                 if (usedClipboard) {
                     setPdfMultiCopyButtonState('success');
-                    showCopyToast(`${images.length} page${images.length > 1 ? 's' : ''} copied as image!`, 'success');
+                    showCopyToast(`${images.length} page${images.length > 1 ? 's' : ''} copied as image!${failedNote}`, 'success');
                 } else {
                     triggerBlobDownload(blob, pdfImageFilename(sortedPages[0], `${sortedPages.length}-pages`));
                     setPdfMultiCopyButtonState('downloaded');
                     showCopyToast(
-                        `Clipboard image copy was unavailable, so ${images.length} page${images.length > 1 ? 's were' : ' was'} downloaded instead.`,
+                        `Clipboard image copy was unavailable, so ${images.length} page${images.length > 1 ? 's were' : ' was'} downloaded instead.${failedNote}`,
                         'info'
                     );
                 }
@@ -2752,6 +2850,11 @@
             try {
                 await clipboardWriteText(textToCopy);
                 showCopyToast('All loaded content copied!', 'success');
+                // Mark the current chapter as copied in the TOC
+                const currentHref = document.querySelector('.toc-link.active')?.getAttribute('data-href');
+                if (currentHref) {
+                    markChaptersCopied([currentHref]);
+                }
                 await markChapterAsRead();
             } catch (err) {
                 showCopyToast('Clipboard unavailable.', 'error');
@@ -3119,6 +3222,11 @@
             try {
                 await clipboardWriteText(textToCopy);
                 showCopyToast('Chapter copied to clipboard!', 'success');
+                // Mark the current chapter as copied in the TOC
+                const currentHref = document.querySelector('.toc-link.active')?.getAttribute('data-href');
+                if (currentHref) {
+                    markChaptersCopied([currentHref]);
+                }
             } catch (err) {
                 console.error('Copy failed', err);
                 showCopyToast('Clipboard unavailable.', 'error');
@@ -4090,6 +4198,9 @@
 
                 // Copy to clipboard
                 await clipboardWriteText(combinedText);
+
+                // Mark copied chapters with green badge in the TOC
+                markChaptersCopied(chapters.map(ch => ch.href));
 
                 // Mark selected chapters as read
                 copyBtn.textContent = `Marking chapters as read... (0/${chapters.length})`;
