@@ -5,6 +5,7 @@ Parses an EPUB file into a structured object that can be used to serve the book 
 import json
 import os
 import pickle
+import posixpath
 import shutil
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -143,6 +144,26 @@ def extract_plain_text(soup: BeautifulSoup) -> str:
     return ' '.join(text.split())
 
 
+def extract_chapter_title(soup: BeautifulSoup, fallback_title: str) -> str:
+    """Derive a reasonable chapter title from the content document."""
+    body = soup.find('body') or soup
+
+    for heading_tag in ('h1', 'h2', 'h3', 'h4', 'h5', 'h6'):
+        heading = body.find(heading_tag)
+        if heading:
+            text = ' '.join(heading.get_text(separator=' ').split())
+            if text:
+                return text
+
+    title_tag = soup.find('title')
+    if title_tag:
+        text = ' '.join(title_tag.get_text(separator=' ').split())
+        if text:
+            return text
+
+    return fallback_title
+
+
 def sanitize_text(value: Optional[str]) -> Optional[str]:
     """Replace invalid UTF-16 surrogate code points with the replacement char."""
     if value is None or not isinstance(value, str):
@@ -244,6 +265,155 @@ def parse_toc_recursive(toc_list, depth=0) -> List[TOCEntry]:
              result.append(entry)
 
     return result
+
+
+def normalize_content_href(href: Optional[str]) -> str:
+    """Normalize EPUB content hrefs for matching across TOC and spine."""
+    if not href:
+        return ""
+
+    clean_href = unquote(href).split('#', 1)[0].strip().replace("\\", "/")
+    if not clean_href:
+        return ""
+
+    normalized = posixpath.normpath(clean_href)
+    if normalized == ".":
+        return ""
+    if normalized.startswith("./"):
+        normalized = normalized[2:]
+    return normalized
+
+
+def find_spine_index_for_href(
+    href: Optional[str],
+    normalized_spine_map: Dict[str, int],
+    basename_spine_map: Dict[str, int],
+) -> Optional[int]:
+    """Find the spine index for a TOC href using exact or basename matching."""
+    normalized_href = normalize_content_href(href)
+    if not normalized_href:
+        return None
+
+    exact_match = normalized_spine_map.get(normalized_href)
+    if exact_match is not None:
+        return exact_match
+
+    basename = posixpath.basename(normalized_href)
+    if not basename:
+        return None
+    return basename_spine_map.get(basename)
+
+
+def collect_toc_spine_indices(
+    entries: List[TOCEntry],
+    normalized_spine_map: Dict[str, int],
+    basename_spine_map: Dict[str, int],
+) -> set[int]:
+    """Collect every spine index already represented by the TOC tree."""
+    matched_indices = set()
+
+    for entry in entries:
+        matched_index = find_spine_index_for_href(
+            entry.file_href or entry.href,
+            normalized_spine_map,
+            basename_spine_map,
+        )
+        if matched_index is not None:
+            matched_indices.add(matched_index)
+
+        if entry.children:
+            matched_indices.update(
+                collect_toc_spine_indices(
+                    entry.children,
+                    normalized_spine_map,
+                    basename_spine_map,
+                )
+            )
+
+    return matched_indices
+
+
+def complete_toc_with_spine(
+    toc_entries: List[TOCEntry],
+    spine_chapters: List[ChapterContent],
+) -> List[TOCEntry]:
+    """
+    Ensure every spine chapter is reachable from the sidebar.
+
+    Some EPUBs ship an incomplete NCX/nav document. When that happens, preserve the
+    declared TOC entries and synthesize flat fallback entries for any spine files
+    that are otherwise unreachable.
+    """
+    if not spine_chapters:
+        return toc_entries
+
+    normalized_spine_map = {}
+    basename_spine_map = {}
+    for idx, chapter in enumerate(spine_chapters):
+        normalized_href = normalize_content_href(chapter.href)
+        if not normalized_href:
+            continue
+        normalized_spine_map.setdefault(normalized_href, idx)
+        basename_spine_map.setdefault(posixpath.basename(normalized_href), idx)
+
+    covered_indices = collect_toc_spine_indices(
+        toc_entries,
+        normalized_spine_map,
+        basename_spine_map,
+    )
+
+    if len(covered_indices) >= len(spine_chapters):
+        return toc_entries
+
+    root_entries_with_positions = []
+    for entry in toc_entries:
+        matched_indices = collect_toc_spine_indices(
+            [entry],
+            normalized_spine_map,
+            basename_spine_map,
+        )
+        first_match = min(matched_indices) if matched_indices else None
+        root_entries_with_positions.append((entry, first_match))
+
+    completed_toc = []
+    next_spine_index = 0
+
+    for entry, first_match in root_entries_with_positions:
+        boundary = first_match if first_match is not None else len(spine_chapters)
+
+        while next_spine_index < boundary:
+            if next_spine_index not in covered_indices:
+                chapter = spine_chapters[next_spine_index]
+                completed_toc.append(
+                    TOCEntry(
+                        title=chapter.title,
+                        href=chapter.href,
+                        file_href=chapter.href,
+                        anchor="",
+                    )
+                )
+                covered_indices.add(next_spine_index)
+            next_spine_index += 1
+
+        completed_toc.append(entry)
+
+        if first_match is not None and next_spine_index <= first_match:
+            next_spine_index = first_match + 1
+
+    while next_spine_index < len(spine_chapters):
+        if next_spine_index not in covered_indices:
+            chapter = spine_chapters[next_spine_index]
+            completed_toc.append(
+                TOCEntry(
+                    title=chapter.title,
+                    href=chapter.href,
+                    file_href=chapter.href,
+                    anchor="",
+                )
+            )
+        next_spine_index += 1
+
+    return completed_toc
 
 
 def is_content_document(item) -> bool:
@@ -1256,12 +1426,14 @@ def process_epub(epub_path: str, output_dir: str) -> Book:
                 chapter = ChapterContent(
                     id=item_id,
                     href=item.get_name(), # Important: This links TOC to Content
-                    title=f"Section {i+1}", # Fallback, real titles come from TOC
+                    title=extract_chapter_title(soup, f"Section {i+1}"),
                     content=final_html,
                     text=extract_plain_text(soup),
                     order=i
                 )
                 spine_chapters.append(chapter)
+
+        toc_structure = complete_toc_with_spine(toc_structure, spine_chapters)
 
         # 7. Final Assembly
         final_book = Book(

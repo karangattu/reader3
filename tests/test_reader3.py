@@ -5,6 +5,7 @@ Tests for Reader3 core functionality.
 import ebooklib
 import pytest
 from bs4 import BeautifulSoup
+from ebooklib import epub
 
 from reader3 import (
     Book,
@@ -15,6 +16,7 @@ from reader3 import (
     PDFTextBlock,
     TOCEntry,
     clean_html_content,
+    extract_chapter_title,
     extract_plain_text,
     get_pdf_page_stats,
     is_content_document,
@@ -316,6 +318,20 @@ class TestExtractPlainText:
         soup = BeautifulSoup(html, "html.parser")
         text = extract_plain_text(soup)
         assert text == ""
+
+
+class TestExtractChapterTitle:
+    """Tests for deriving chapter titles from EPUB content."""
+
+    def test_prefers_first_heading_in_body(self):
+        """Visible headings should win over generic fallback titles."""
+        soup = BeautifulSoup(
+            "<html><head><title>Document Title</title></head>"
+            "<body><h1>Visible Chapter Title</h1><p>Body</p></body></html>",
+            "html.parser",
+        )
+
+        assert extract_chapter_title(soup, "Fallback Section") == "Visible Chapter Title"
 
 
 class TestParseTocRecursive:
@@ -815,3 +831,76 @@ class TestProcessEpubAtomicWrites:
 
         assert sentinel.exists()
         assert sentinel.read_text(encoding="utf-8") == "preserve me"
+
+
+class TestProcessEpubTOCCompletion:
+    """Tests for filling navigation gaps from the spine."""
+
+    def test_missing_spine_chapters_are_added_to_toc(self, tmp_path, monkeypatch):
+        """Real spine documents missing from the EPUB TOC should still be navigable."""
+
+        class FakeDocumentItem:
+            media_type = "application/xhtml+xml"
+
+            def __init__(self, name, heading):
+                self._name = name
+                self._heading = heading
+
+            def get_type(self):
+                return ebooklib.ITEM_DOCUMENT
+
+            def get_name(self):
+                return self._name
+
+            def get_content(self):
+                return (
+                    f"<html><body><h1>{self._heading}</h1><p>{self._heading} body</p></body></html>"
+                ).encode("utf-8")
+
+        class FakeEpubBook:
+            toc = [
+                epub.Link("text/chapter1.xhtml", "Chapter 1", "chapter1"),
+                epub.Link("text/chapter3.xhtml", "Chapter 3", "chapter3"),
+            ]
+            spine = [
+                ("item_1", "yes"),
+                ("item_2", "yes"),
+                ("item_3", "yes"),
+            ]
+
+            def __init__(self):
+                self._items = {
+                    "item_1": FakeDocumentItem("text/chapter1.xhtml", "Chapter 1"),
+                    "item_2": FakeDocumentItem("text/chapter2.xhtml", "Chapter 2"),
+                    "item_3": FakeDocumentItem("text/chapter3.xhtml", "Chapter 3"),
+                }
+
+            def get_metadata(self, namespace, key):
+                return []
+
+            def get_items(self):
+                return list(self._items.values())
+
+            def get_item_with_id(self, item_id):
+                return self._items[item_id]
+
+        monkeypatch.setattr("reader3.epub.read_epub", lambda _: FakeEpubBook())
+
+        output_dir = tmp_path / "book_data"
+        book = process_epub("dummy.epub", str(output_dir))
+
+        assert [chapter.href for chapter in book.spine] == [
+            "text/chapter1.xhtml",
+            "text/chapter2.xhtml",
+            "text/chapter3.xhtml",
+        ]
+        assert [entry.file_href for entry in book.toc] == [
+            "text/chapter1.xhtml",
+            "text/chapter2.xhtml",
+            "text/chapter3.xhtml",
+        ]
+        assert [entry.title for entry in book.toc] == [
+            "Chapter 1",
+            "Chapter 2",
+            "Chapter 3",
+        ]
