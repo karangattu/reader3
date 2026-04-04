@@ -217,6 +217,15 @@ class TestPdfCopiedBadgeCSS:
         assert 'pdf-multi-copy-btn' in html
         assert 'copySelectedPagesAsImage' in html
 
+    def test_pdf_copy_uses_high_resolution_export_route(self, client):
+        """PDF image copy should use the dedicated high-resolution export route."""
+        bid = f"test_pdf_export_route_{uuid.uuid4().hex[:8]}"
+        create_test_book(bid, "Export Route PDF", is_pdf=True, chapters=1)
+
+        response = client.get(f"/read/{bid}/0")
+        html = response.text
+        assert "/api/pdf/${encodeURIComponent(bookId)}/page-image/${pageIndex}" in html
+
     def test_pdf_toolbar_has_select_pages_toggle(self, client):
         """PDF toolbar should have a 'Select Pages' toggle button."""
         bid = f"test_pdf_toggle_{uuid.uuid4().hex[:8]}"

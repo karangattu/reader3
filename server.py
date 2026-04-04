@@ -23,6 +23,7 @@ from fastapi.responses import (
     JSONResponse,
     PlainTextResponse,
     RedirectResponse,
+    Response,
 )
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -77,6 +78,9 @@ VALID_READER_FONTS = {
     "Crimson Text", "IBM Plex Serif", "Libre Baskerville", "Vollkorn",
     "Inter",
 }
+
+PDF_COPY_IMAGE_DPI = int(os.environ.get("PDF_COPY_IMAGE_DPI", 300))
+PDF_COPY_IMAGE_MAX_DPI = 600
 
 
 def _run_sync(fn, *args):
@@ -991,6 +995,51 @@ async def serve_image(book_id: str, image_name: str):
         raise HTTPException(status_code=404, detail="Image not found")
 
     return FileResponse(img_path)
+
+
+@app.get("/api/pdf/{book_id}/page-image/{page_num}")
+async def render_pdf_page_image(book_id: str, page_num: int, dpi: int = PDF_COPY_IMAGE_DPI):
+    """Render a PDF page on demand as a PNG for clipboard/export workflows."""
+    book = load_book_cached(book_id)
+    if not book:
+        raise HTTPException(status_code=404, detail="Book not found")
+
+    if not book.is_pdf:
+        raise HTTPException(status_code=400, detail="Not a PDF book")
+
+    if not book.pdf_source_path:
+        raise HTTPException(status_code=404, detail="Source PDF not available")
+
+    safe_book_id = os.path.basename(book_id)
+    pdf_path = os.path.join(BOOKS_DIR, safe_book_id, book.pdf_source_path)
+    if not os.path.exists(pdf_path):
+        raise HTTPException(status_code=404, detail="Source PDF not found")
+
+    export_dpi = max(72, min(int(dpi), PDF_COPY_IMAGE_MAX_DPI))
+
+    try:
+        import fitz
+
+        with fitz.open(pdf_path) as doc:
+            if page_num < 0 or page_num >= len(doc):
+                raise HTTPException(status_code=404, detail="Page not found")
+
+            zoom = export_dpi / 72
+            pix = doc[page_num].get_pixmap(
+                matrix=fitz.Matrix(zoom, zoom),
+                alpha=False,
+            )
+            return Response(content=pix.tobytes("png"), media_type="image/png")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(
+            "Failed to render PDF page image for %s page %s: %s",
+            book_id,
+            page_num,
+            exc,
+        )
+        raise HTTPException(status_code=500, detail="Failed to render PDF page image")
 
 
 @app.delete("/delete/{book_id}")

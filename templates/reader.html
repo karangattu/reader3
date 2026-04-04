@@ -2273,6 +2273,60 @@
             return !!(navigator.clipboard && window.ClipboardItem);
         }
 
+        function getPdfPageExportImageUrl(pageIndex) {
+            return `/api/pdf/${encodeURIComponent(bookId)}/page-image/${pageIndex}?dpi=300`;
+        }
+
+        async function fetchPdfPageImageBlob(pageIndex, fallbackSrc = null) {
+            const sources = [getPdfPageExportImageUrl(pageIndex)];
+            if (fallbackSrc && !sources.includes(fallbackSrc)) {
+                sources.push(fallbackSrc);
+            }
+
+            let lastError = null;
+            for (const src of sources) {
+                try {
+                    const response = await fetch(src, { cache: 'force-cache' });
+                    if (!response.ok) {
+                        throw new Error(`Image fetch failed (${response.status})`);
+                    }
+                    return await response.blob();
+                } catch (err) {
+                    lastError = err;
+                }
+            }
+
+            throw lastError || new Error('Image fetch failed');
+        }
+
+        async function loadPdfPageImageForCopy(pageIndex, fallbackSrc = null, timeoutMs = 15000) {
+            const blob = await fetchPdfPageImageBlob(pageIndex, fallbackSrc);
+            const objectUrl = URL.createObjectURL(blob);
+
+            try {
+                const img = new Image();
+                await new Promise((resolve, reject) => {
+                    const timer = setTimeout(() => reject(new Error('timeout')), timeoutMs);
+                    img.onload = () => {
+                        clearTimeout(timer);
+                        resolve();
+                    };
+                    img.onerror = () => {
+                        clearTimeout(timer);
+                        reject(new Error('load error'));
+                    };
+                    img.src = objectUrl;
+                });
+                return {
+                    img,
+                    dispose: () => URL.revokeObjectURL(objectUrl),
+                };
+            } catch (err) {
+                URL.revokeObjectURL(objectUrl);
+                throw err;
+            }
+        }
+
         function triggerBlobDownload(blob, filename) {
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
@@ -2444,21 +2498,10 @@
         // Copy a PDF page image to clipboard
         async function copyPageImage(button, pageIndex) {
             const pageEl = button.closest('.pdf-page') || document.querySelector(`.pdf-page[data-page-index="${pageIndex}"]`);
-            if (!pageEl) {
-                showCopyToast('Page not found', 'error');
-                return;
-            }
-
-            const imgEl = pageEl.querySelector('img.pdf-page-image');
-            if (!imgEl || !imgEl.src) {
-                showCopyToast('Page image not available', 'error');
-                return;
-            }
+            const imgEl = pageEl?.querySelector('img.pdf-page-image');
 
             try {
-                const response = await fetch(imgEl.src, { cache: 'force-cache' });
-                if (!response.ok) throw new Error('Image fetch failed');
-                const blob = await response.blob();
+                const blob = await fetchPdfPageImageBlob(pageIndex, imgEl?.src);
 
                 if (supportsImageClipboard()) {
                     try {
@@ -2732,140 +2775,143 @@
                 
                 // Collect all image elements, skipping pages that fail to load
                 const images = [];
+                const cleanupFns = [];
                 const loadedPageIndices = [];
                 const failedPages = [];
                 const IMAGE_LOAD_TIMEOUT_MS = 15000;
                 
-                for (let i = 0; i < sortedPages.length; i++) {
-                    const pageIndex = sortedPages[i];
-                    
-                    // Show progress in the button label
-                    const label = document.getElementById('pdf-multi-copy-label');
-                    if (label) {
-                        label.textContent = `Loading ${i + 1}/${sortedPages.length}...`;
-                    }
-                    
-                    const pageEl = document.querySelector(`.pdf-page[data-page-index="${pageIndex}"]`);
-                    const imgEl = pageEl?.querySelector('img.pdf-page-image');
-                    
-                    if (!imgEl || !imgEl.src) {
-                        failedPages.push(pageIndex + 1);
-                        continue;
-                    }
-                    
-                    try {
-                        // Load image with timeout to avoid hanging on broken images
-                        const img = new Image();
-                        img.crossOrigin = 'anonymous';
-                        await new Promise((resolve, reject) => {
-                            const timer = setTimeout(() => reject(new Error('timeout')), IMAGE_LOAD_TIMEOUT_MS);
-                            img.onload = () => { clearTimeout(timer); resolve(); };
-                            img.onerror = () => { clearTimeout(timer); reject(new Error('load error')); };
-                            img.src = imgEl.src;
-                        });
-                        images.push(img);
-                        loadedPageIndices.push(pageIndex);
-                    } catch (e) {
-                        console.warn(`Skipping page ${pageIndex + 1}: ${e.message}`);
-                        failedPages.push(pageIndex + 1);
-                    }
-                }
-                
-                if (images.length === 0) {
-                    showCopyToast('No images could be loaded from selected pages', 'error');
-                    setPdfMultiCopyButtonState('idle');
-                    return;
-                }
-                
-                // Calculate combined canvas dimensions
-                const padding = 20;
-                const maxWidth = Math.max(...images.map(img => img.naturalWidth));
-                const totalHeight = images.reduce((sum, img) => sum + img.naturalHeight, 0) + (padding * (images.length - 1));
-                
-                // Guard against exceeding browser canvas limits (~16384px or ~268M pixels)
-                const MAX_CANVAS_DIM = 16384;
-                const MAX_CANVAS_AREA = 268435456; // 256 MP
-                if (maxWidth > MAX_CANVAS_DIM || totalHeight > MAX_CANVAS_DIM || maxWidth * totalHeight > MAX_CANVAS_AREA) {
-                    // Fall back to downloading individual images
-                    showCopyToast(`Too many pages for a single image (${images.length} pages, ${totalHeight}px tall). Downloading individual pages instead.`, 'info');
-                    for (let i = 0; i < images.length; i++) {
-                        const singleCanvas = document.createElement('canvas');
-                        singleCanvas.width = images[i].naturalWidth;
-                        singleCanvas.height = images[i].naturalHeight;
-                        const sCtx = singleCanvas.getContext('2d');
-                        sCtx.drawImage(images[i], 0, 0);
-                        const sBlob = await new Promise(resolve => singleCanvas.toBlob(resolve, 'image/png'));
-                        if (sBlob) {
-                            triggerBlobDownload(sBlob, pdfImageFilename(loadedPageIndices[i]));
+                try {
+                    for (let i = 0; i < sortedPages.length; i++) {
+                        const pageIndex = sortedPages[i];
+                        
+                        // Show progress in the button label
+                        const label = document.getElementById('pdf-multi-copy-label');
+                        if (label) {
+                            label.textContent = `Loading ${i + 1}/${sortedPages.length}...`;
+                        }
+                        
+                        const pageEl = document.querySelector(`.pdf-page[data-page-index="${pageIndex}"]`);
+                        const imgEl = pageEl?.querySelector('img.pdf-page-image');
+                        
+                        try {
+                            const { img, dispose } = await loadPdfPageImageForCopy(
+                                pageIndex,
+                                imgEl?.src,
+                                IMAGE_LOAD_TIMEOUT_MS
+                            );
+                            images.push(img);
+                            cleanupFns.push(dispose);
+                            loadedPageIndices.push(pageIndex);
+                        } catch (e) {
+                            console.warn(`Skipping page ${pageIndex + 1}: ${e.message}`);
+                            failedPages.push(pageIndex + 1);
                         }
                     }
-                    markPagesCopied(loadedPageIndices);
-                    setPdfMultiCopyButtonState('downloaded');
-                    setTimeout(() => setPdfMultiCopyButtonState('idle'), 2000);
-                    return;
-                }
-                
-                // Update progress: compositing
-                const label = document.getElementById('pdf-multi-copy-label');
-                if (label) {
-                    label.textContent = 'Compositing...';
-                }
-                
-                // Create combined canvas
-                const canvas = document.createElement('canvas');
-                canvas.width = maxWidth;
-                canvas.height = totalHeight;
-                const ctx = canvas.getContext('2d');
-                
-                // Fill with white background
-                ctx.fillStyle = '#ffffff';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                
-                // Draw each image centered horizontally
-                let yOffset = 0;
-                for (const img of images) {
-                    const xOffset = (maxWidth - img.naturalWidth) / 2;
-                    ctx.drawImage(img, xOffset, yOffset);
-                    yOffset += img.naturalHeight + padding;
-                }
-                
-                // Convert canvas to blob and copy to clipboard
-                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-                if (!blob) {
-                    throw new Error('Canvas export failed');
-                }
-
-                let usedClipboard = false;
-                if (supportsImageClipboard()) {
-                    try {
-                        const item = new ClipboardItem({ 'image/png': blob });
-                        await navigator.clipboard.write([item]);
-                        usedClipboard = true;
-                    } catch (err) {
-                        console.warn('Clipboard image copy failed, falling back to download.', err);
+                    
+                    if (images.length === 0) {
+                        showCopyToast('No images could be loaded from selected pages', 'error');
+                        setPdfMultiCopyButtonState('idle');
+                        return;
                     }
-                }
+                    
+                    // Calculate combined canvas dimensions
+                    const padding = 20;
+                    const maxWidth = Math.max(...images.map(img => img.naturalWidth));
+                    const totalHeight = images.reduce((sum, img) => sum + img.naturalHeight, 0) + (padding * (images.length - 1));
+                    
+                    // Guard against exceeding browser canvas limits (~16384px or ~268M pixels)
+                    const MAX_CANVAS_DIM = 16384;
+                    const MAX_CANVAS_AREA = 268435456; // 256 MP
+                    if (maxWidth > MAX_CANVAS_DIM || totalHeight > MAX_CANVAS_DIM || maxWidth * totalHeight > MAX_CANVAS_AREA) {
+                        // Fall back to downloading individual images
+                        showCopyToast(`Too many pages for a single image (${images.length} pages, ${totalHeight}px tall). Downloading individual pages instead.`, 'info');
+                        for (let i = 0; i < images.length; i++) {
+                            const singleCanvas = document.createElement('canvas');
+                            singleCanvas.width = images[i].naturalWidth;
+                            singleCanvas.height = images[i].naturalHeight;
+                            const sCtx = singleCanvas.getContext('2d');
+                            sCtx.drawImage(images[i], 0, 0);
+                            const sBlob = await new Promise(resolve => singleCanvas.toBlob(resolve, 'image/png'));
+                            if (sBlob) {
+                                triggerBlobDownload(sBlob, pdfImageFilename(loadedPageIndices[i]));
+                            }
+                        }
+                        markPagesCopied(loadedPageIndices);
+                        setPdfMultiCopyButtonState('downloaded');
+                        setTimeout(() => setPdfMultiCopyButtonState('idle'), 2000);
+                        return;
+                    }
+                    
+                    // Update progress: compositing
+                    const label = document.getElementById('pdf-multi-copy-label');
+                    if (label) {
+                        label.textContent = 'Compositing...';
+                    }
+                    
+                    // Create combined canvas
+                    const canvas = document.createElement('canvas');
+                    canvas.width = maxWidth;
+                    canvas.height = totalHeight;
+                    const ctx = canvas.getContext('2d');
+                    
+                    // Fill with white background
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    
+                    // Draw each image centered horizontally
+                    let yOffset = 0;
+                    for (const img of images) {
+                        const xOffset = (maxWidth - img.naturalWidth) / 2;
+                        ctx.drawImage(img, xOffset, yOffset);
+                        yOffset += img.naturalHeight + padding;
+                    }
+                    
+                    // Convert canvas to blob and copy to clipboard
+                    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+                    if (!blob) {
+                        throw new Error('Canvas export failed');
+                    }
 
-                // Mark all successfully loaded pages as copied
-                markPagesCopied(loadedPageIndices);
-                
-                const failedNote = failedPages.length > 0 ? ` (skipped page${failedPages.length > 1 ? 's' : ''} ${failedPages.join(', ')})` : '';
+                    let usedClipboard = false;
+                    if (supportsImageClipboard()) {
+                        try {
+                            const item = new ClipboardItem({ 'image/png': blob });
+                            await navigator.clipboard.write([item]);
+                            usedClipboard = true;
+                        } catch (err) {
+                            console.warn('Clipboard image copy failed, falling back to download.', err);
+                        }
+                    }
 
-                if (usedClipboard) {
-                    setPdfMultiCopyButtonState('success');
-                    showCopyToast(`${images.length} page${images.length > 1 ? 's' : ''} copied as image!${failedNote}`, 'success');
-                } else {
-                    triggerBlobDownload(blob, pdfImageFilename(sortedPages[0], `${sortedPages.length}-pages`));
-                    setPdfMultiCopyButtonState('downloaded');
-                    showCopyToast(
-                        `Clipboard image copy was unavailable, so ${images.length} page${images.length > 1 ? 's were' : ' was'} downloaded instead.${failedNote}`,
-                        'info'
-                    );
+                    // Mark all successfully loaded pages as copied
+                    markPagesCopied(loadedPageIndices);
+                    
+                    const failedNote = failedPages.length > 0 ? ` (skipped page${failedPages.length > 1 ? 's' : ''} ${failedPages.join(', ')})` : '';
+
+                    if (usedClipboard) {
+                        setPdfMultiCopyButtonState('success');
+                        showCopyToast(`${images.length} page${images.length > 1 ? 's' : ''} copied as image!${failedNote}`, 'success');
+                    } else {
+                        triggerBlobDownload(blob, pdfImageFilename(sortedPages[0], `${sortedPages.length}-pages`));
+                        setPdfMultiCopyButtonState('downloaded');
+                        showCopyToast(
+                            `Clipboard image copy was unavailable, so ${images.length} page${images.length > 1 ? 's were' : ' was'} downloaded instead.${failedNote}`,
+                            'info'
+                        );
+                    }
+                    
+                    setTimeout(() => {
+                        setPdfMultiCopyButtonState('idle');
+                    }, 2000);
+                } finally {
+                    cleanupFns.forEach(dispose => {
+                        try {
+                            dispose();
+                        } catch (err) {
+                            console.warn('Failed to release temporary page image URL.', err);
+                        }
+                    });
                 }
-                
-                setTimeout(() => {
-                    setPdfMultiCopyButtonState('idle');
-                }, 2000);
                 
             } catch (err) {
                 console.error('Failed to copy multi-page image:', err);

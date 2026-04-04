@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import sys
+import types
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -28,6 +29,7 @@ def create_test_book(
     added_at=None,
     chapters=3,
     is_pdf=False,
+    include_pdf_source=False,
 ):
     """Create a minimal processed book in the test library."""
     added_at = added_at or datetime.now().isoformat()
@@ -67,8 +69,12 @@ def create_test_book(
         processed_at=added_at,
         added_at=added_at,
         is_pdf=is_pdf,
+        pdf_source_path="source.pdf" if is_pdf and include_pdf_source else None,
     )
     save_to_pickle(book, str(book_dir))
+
+    if is_pdf and include_pdf_source:
+        (book_dir / "source.pdf").write_bytes(b"%PDF-1.4\n%%EOF\n")
 
     server.load_book_cached.cache_clear()
     server.load_book_metadata.cache_clear()
@@ -2367,3 +2373,69 @@ class TestReaderPreferencesAPI:
         assert response.status_code == 200
         assert "download it if clipboard image copy is unavailable" in response.text
         assert "Add N pages starting from the current page to the current selection" in response.text
+
+
+class TestPdfPageImageExport:
+    """Tests for high-resolution PDF page image export."""
+
+    def test_pdf_page_image_endpoint_returns_png(self, client, monkeypatch):
+        """Export endpoint should render a PDF page to PNG at high resolution."""
+        bid = "pdf_page_image_export_data"
+        create_test_book(
+            bid,
+            "PDF Export",
+            is_pdf=True,
+            include_pdf_source=True,
+        )
+
+        requested = {}
+
+        class FakeMatrix:
+            def __init__(self, x, y):
+                requested["zoom_x"] = x
+                requested["zoom_y"] = y
+
+        class FakePixmap:
+            def tobytes(self, image_format):
+                requested["format"] = image_format
+                return b"png-bytes"
+
+        class FakePage:
+            def get_pixmap(self, matrix, alpha=False):
+                requested["alpha"] = alpha
+                requested["matrix"] = matrix
+                return FakePixmap()
+
+        class FakeDoc:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+            def __len__(self):
+                return 1
+
+            def __getitem__(self, page_num):
+                requested["page_num"] = page_num
+                return FakePage()
+
+        monkeypatch.setitem(
+            sys.modules,
+            "fitz",
+            types.SimpleNamespace(
+                Matrix=FakeMatrix,
+                open=lambda path: FakeDoc(),
+            ),
+        )
+
+        response = client.get(f"/api/pdf/{bid}/page-image/0")
+
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "image/png"
+        assert response.content == b"png-bytes"
+        assert requested["page_num"] == 0
+        assert requested["alpha"] is False
+        assert requested["format"] == "png"
+        assert requested["zoom_x"] == pytest.approx(300 / 72)
+        assert requested["zoom_y"] == pytest.approx(300 / 72)
