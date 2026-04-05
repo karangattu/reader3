@@ -1670,8 +1670,8 @@
                 return;
             }
 
-            // Client-side file size check (200 MB default, matches server)
-            const maxSizeMB = 200;
+            // Client-side file size check uses the server-configured limit.
+            const maxSizeMB = {{ max_upload_mb }};
             if (file.size > maxSizeMB * 1024 * 1024) {
                 alert(`File is too large (${(file.size / (1024*1024)).toFixed(1)} MB). Maximum size is ${maxSizeMB} MB.`);
                 return;

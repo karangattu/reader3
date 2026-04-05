@@ -213,8 +213,8 @@ class TestPdfThumbnailsConfig:
 class TestMaxUploadSize:
     """Tests for upload size configuration."""
 
-    def test_default_max_upload_200mb(self):
-        """Test default max upload size is 200 MB."""
+    def test_default_max_upload_500mb(self):
+        """Test default max upload size is 500 MB."""
         with patch.dict(os.environ, {}, clear=False):
             # Import fresh to get env value
             import importlib
@@ -222,8 +222,9 @@ class TestMaxUploadSize:
             import server as server_module
             importlib.reload(server_module)
 
-            # Default should be 200 MB
-            assert server_module.MAX_UPLOAD_BYTES == 200 * 1024 * 1024
+            # Default should be 500 MB
+            assert server_module.MAX_UPLOAD_MB == 500
+            assert server_module.MAX_UPLOAD_BYTES == 500 * 1024 * 1024
 
     def test_max_upload_configurable(self):
         """Test that max upload size is configurable."""

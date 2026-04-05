@@ -68,8 +68,9 @@ _io_executor = ThreadPoolExecutor(
     thread_name_prefix="reader3-io",
 )
 
-# Maximum upload size: 200 MB (configurable via env)
-MAX_UPLOAD_BYTES = int(os.environ.get("MAX_UPLOAD_MB", 200)) * 1024 * 1024
+# Maximum upload size: 500 MB by default (configurable via env)
+MAX_UPLOAD_MB = int(os.environ.get("MAX_UPLOAD_MB", 500))
+MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024
 
 VALID_READER_THEMES = {"light", "sepia", "dark"}
 
@@ -495,6 +496,7 @@ async def library_view(
             "sort": sort,
             "library_query": q,
             "status": status,
+            "max_upload_mb": MAX_UPLOAD_MB,
         },
     )
 
@@ -652,7 +654,7 @@ async def upload_book(file: UploadFile = File(...), background: bool = False, ba
                 os.remove(tmp.name)
                 raise HTTPException(
                     status_code=413,
-                    detail=f"File too large. Maximum size is {MAX_UPLOAD_BYTES // (1024*1024)} MB.",
+                    detail=f"File too large. Maximum size is {MAX_UPLOAD_MB} MB.",
                 )
             hasher.update(chunk)
             tmp.write(chunk)

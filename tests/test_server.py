@@ -114,6 +114,13 @@ class TestLibraryEndpoint:
         assert "Progress" in response.text
         assert "Reading status" in response.text
 
+    def test_library_uses_server_upload_limit(self, client):
+        """Library page should render the current server upload limit."""
+        response = client.get("/")
+
+        assert response.status_code == 200
+        assert f"const maxSizeMB = {server.MAX_UPLOAD_MB};" in response.text
+
     def test_library_can_sort_by_progress(self, client):
         """Library view should sort matching books by reading progress."""
         create_test_book(
