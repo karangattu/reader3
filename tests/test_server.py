@@ -2334,6 +2334,9 @@ class TestReaderPreferencesAPI:
         assert data["font_size_px"] == 19
         assert data["line_height"] == 1.8
         assert data["page_width_px"] == 700
+        assert data["pdf_copy_image_dpi"] == server._clamp_pdf_copy_image_dpi(
+            server.PDF_COPY_IMAGE_DPI
+        )
 
     def test_update_reader_preferences_round_trip(self, client):
         """Reader settings updates should persist and be returned on read."""
@@ -2346,11 +2349,13 @@ class TestReaderPreferencesAPI:
                 "page_width_px": 840,
                 "reduced_motion": True,
                 "high_contrast": True,
+                "pdf_copy_image_dpi": 450,
             },
         )
 
         assert response.status_code == 200
         assert response.json()["theme"] == "sepia"
+        assert response.json()["pdf_copy_image_dpi"] == 450
 
         follow_up = client.get("/api/reader/preferences")
         data = follow_up.json()
@@ -2360,6 +2365,23 @@ class TestReaderPreferencesAPI:
         assert data["page_width_px"] == 840
         assert data["reduced_motion"] is True
         assert data["high_contrast"] is True
+        assert data["pdf_copy_image_dpi"] == 450
+
+    def test_pdf_reader_page_uses_saved_copy_image_dpi_default(self, client):
+        """Saved PDF copy DPI should become the selected default in the reader UI."""
+        create_test_book("reader_pdf_copy_dpi_data", "Reader PDF Copy DPI", is_pdf=True)
+
+        update_response = client.put(
+            "/api/reader/preferences",
+            json={"pdf_copy_image_dpi": 450},
+        )
+        assert update_response.status_code == 200
+
+        response = client.get("/read/reader_pdf_copy_dpi_data/0")
+
+        assert response.status_code == 200
+        assert 'value="450" selected' in response.text
+        assert 'const defaultPdfCopyImageDpi = 450;' in response.text
 
     def test_reader_page_contains_settings_ui(self, client):
         """Reader page should expose the settings panel affordance."""

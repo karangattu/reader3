@@ -82,6 +82,17 @@ VALID_READER_FONTS = {
 
 PDF_COPY_IMAGE_DPI = int(os.environ.get("PDF_COPY_IMAGE_DPI", 300))
 PDF_COPY_IMAGE_MAX_DPI = 600
+PDF_COPY_IMAGE_DPI_OPTIONS = (150, 200, 300, 450, 600)
+
+
+def _clamp_pdf_copy_image_dpi(dpi: int) -> int:
+    """Clamp PDF image export DPI to a safe supported range."""
+    return max(72, min(int(dpi), PDF_COPY_IMAGE_MAX_DPI))
+
+
+def _pdf_copy_image_dpi_options(default_dpi: int) -> list[int]:
+    """Return copy/export DPI options while preserving the configured default."""
+    return sorted({*PDF_COPY_IMAGE_DPI_OPTIONS, default_dpi})
 
 
 def _run_sync(fn, *args):
@@ -196,6 +207,15 @@ def _build_library_entry(folder_name: str, metadata: dict) -> dict:
     }
 
 
+def _effective_pdf_copy_image_dpi(preferences: Optional[ReaderPreferences] = None) -> int:
+    """Return the saved PDF copy DPI or the configured default when unset."""
+    if preferences is None:
+        return _clamp_pdf_copy_image_dpi(PDF_COPY_IMAGE_DPI)
+
+    preferred_dpi = getattr(preferences, "pdf_copy_image_dpi", PDF_COPY_IMAGE_DPI)
+    return _clamp_pdf_copy_image_dpi(preferred_dpi)
+
+
 def _serialize_reader_preferences(preferences: ReaderPreferences) -> dict:
     """Convert reader preferences to a response/template payload."""
     return {
@@ -206,6 +226,7 @@ def _serialize_reader_preferences(preferences: ReaderPreferences) -> dict:
         "reduced_motion": preferences.reduced_motion,
         "high_contrast": preferences.high_contrast,
         "font_family": preferences.font_family,
+        "pdf_copy_image_dpi": _effective_pdf_copy_image_dpi(preferences),
     }
 
 
@@ -818,6 +839,9 @@ async def read_chapter(request: Request, book_id: str, chapter_index: int):
         if '<div id="page' in first_content or 'style="top:' in first_content:
             needs_reprocess = True
 
+    reader_preferences = user_data_manager.get_reader_preferences()
+    pdf_copy_image_dpi_default = _effective_pdf_copy_image_dpi(reader_preferences)
+
     return templates.TemplateResponse(
         request,
         "reader.html",
@@ -831,10 +855,12 @@ async def read_chapter(request: Request, book_id: str, chapter_index: int):
             "next_idx": next_idx,
             "is_pdf": book.is_pdf,
             "needs_reprocess": needs_reprocess,
-            "reader_preferences": _serialize_reader_preferences(
-                user_data_manager.get_reader_preferences()
-            ),
+            "reader_preferences": _serialize_reader_preferences(reader_preferences),
             "book_font": user_data_manager.get_book_font(book_id),
+            "pdf_copy_image_dpi_default": pdf_copy_image_dpi_default,
+            "pdf_copy_image_dpi_options": _pdf_copy_image_dpi_options(
+                pdf_copy_image_dpi_default
+            ),
         },
     )
 
@@ -884,6 +910,11 @@ async def update_reader_preferences(request: Request):
         if font not in VALID_READER_FONTS:
             raise HTTPException(status_code=400, detail="Invalid font family")
         updates["font_family"] = font
+
+    if "pdf_copy_image_dpi" in payload:
+        updates["pdf_copy_image_dpi"] = _clamp_pdf_copy_image_dpi(
+            int(payload["pdf_copy_image_dpi"])
+        )
 
     preferences = user_data_manager.update_reader_preferences(**updates)
     return _serialize_reader_preferences(preferences)
@@ -1017,7 +1048,7 @@ async def render_pdf_page_image(book_id: str, page_num: int, dpi: int = PDF_COPY
     if not os.path.exists(pdf_path):
         raise HTTPException(status_code=404, detail="Source PDF not found")
 
-    export_dpi = max(72, min(int(dpi), PDF_COPY_IMAGE_MAX_DPI))
+    export_dpi = _clamp_pdf_copy_image_dpi(dpi)
 
     try:
         import fitz

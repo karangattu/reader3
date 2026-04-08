@@ -226,6 +226,17 @@ class TestPdfCopiedBadgeCSS:
         html = response.text
         assert "/api/pdf/${encodeURIComponent(bookId)}/page-image/${pageIndex}" in html
 
+    def test_pdf_copy_allows_selecting_export_dpi(self, client):
+        """PDF copy should expose a DPI selector and avoid hardcoding 300 DPI."""
+        bid = f"test_pdf_copy_dpi_{uuid.uuid4().hex[:8]}"
+        create_test_book(bid, "Copy DPI PDF", is_pdf=True, chapters=1)
+
+        response = client.get(f"/read/{bid}/0")
+        html = response.text
+        assert 'pdf-copy-dpi-select' in html
+        assert 'getSelectedPdfCopyImageDpi' in html
+        assert '?dpi=300' not in html
+
     def test_pdf_toolbar_has_select_pages_toggle(self, client):
         """PDF toolbar should have a 'Select Pages' toggle button."""
         bid = f"test_pdf_toggle_{uuid.uuid4().hex[:8]}"

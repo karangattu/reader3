@@ -147,6 +147,10 @@
         .pdf-select-toggle .toolbar-btn.active { background: #3498db; color: #fff; border-color: #3498db; }
         .pdf-selection-count { display: inline-flex; align-items: center; justify-content: center; background: #3498db; color: #fff; font-size: 0.7em; font-weight: 700; min-width: 18px; height: 18px; border-radius: 9px; padding: 0 5px; position: absolute; top: -6px; right: -6px; opacity: 0; transition: opacity 0.2s; }
         .pdf-selection-count.has-selection { opacity: 1; }
+        .pdf-copy-dpi-control { display: inline-flex; align-items: center; gap: 8px; min-height: 38px; padding: 0 12px; border: 1px solid var(--reader-border); border-radius: 5px; background: var(--reader-surface); color: var(--reader-muted); font-size: 0.88em; }
+        .pdf-copy-dpi-control span { font-weight: 600; }
+        .pdf-copy-dpi-control select { border: none; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+        .pdf-copy-dpi-control select:focus { outline: none; }
 #copy-status { font-family: -apple-system, sans-serif; font-size: 0.85em; color: #198754; text-align: right; min-height: 1.2em; opacity: 0; transition: opacity 0.3s ease-in-out; font-weight: 500; }
         
         /* Reading momentum toolbar */
@@ -944,6 +948,14 @@
                     </button>
                 </div>
                 <button class="toolbar-btn" type="button" onclick="toggleSelectAllPages()" id="pdf-select-all-btn" title="Select/Deselect all loaded pages"><i class="fa-regular fa-square-check"></i> Select All</button>
+                <label class="pdf-copy-dpi-control" for="pdf-copy-dpi-select" title="Resolution used when copying or downloading PDF page images">
+                    <span>Image DPI</span>
+                    <select id="pdf-copy-dpi-select" aria-label="PDF copy image DPI">
+                        {% for dpi_option in pdf_copy_image_dpi_options %}
+                        <option value="{{ dpi_option }}"{% if dpi_option == pdf_copy_image_dpi_default %} selected{% endif %}>{{ dpi_option }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
                 <button class="toolbar-btn pdf-multi-copy-btn" type="button" onclick="copySelectedPagesAsImage()" id="pdf-multi-copy-btn" title="Copy selected pages as a combined image, or download it if clipboard image copy is unavailable">
                     <i class="fa-regular fa-images" id="pdf-multi-copy-icon"></i>
                     <span id="pdf-multi-copy-label">Copy Selected</span> (<span id="pdf-selected-count">0</span>)
@@ -1015,7 +1027,8 @@
         const isPDF = {{ 'true' if is_pdf else 'false' }};
         const bookId = {{ book_id | tojson }};
         const totalPages = {{ book.spine|length }};
-        const defaultReaderPreferences = {"theme": "light", "font_size_px": 19, "line_height": 1.8, "page_width_px": 700, "reduced_motion": false, "high_contrast": false, "font_family": "Georgia"};
+        const defaultPdfCopyImageDpi = {{ pdf_copy_image_dpi_default }};
+        const defaultReaderPreferences = {"theme": "light", "font_size_px": 19, "line_height": 1.8, "page_width_px": 700, "reduced_motion": false, "high_contrast": false, "font_family": "Georgia", "pdf_copy_image_dpi": {{ pdf_copy_image_dpi_default }}};
         let readerPreferences = {{ reader_preferences | tojson }};
         let bookFont = {{ (book_font | tojson) if book_font else 'null' }};
         let currentPageIndex = {{ chapter_index }};
@@ -1057,6 +1070,7 @@
             const highContrast = document.getElementById('reader-high-contrast');
             const fontFamily = document.getElementById('reader-font-family');
             const bookFontCheckbox = document.getElementById('reader-book-font');
+            const pdfCopyDpiSelect = document.getElementById('pdf-copy-dpi-select');
 
             if (!theme) return;
 
@@ -1070,6 +1084,11 @@
             const activeFont = bookFont || readerPreferences.font_family;
             fontFamily.value = activeFont;
             bookFontCheckbox.checked = !!bookFont;
+            if (pdfCopyDpiSelect) {
+                pdfCopyDpiSelect.value = String(
+                    readerPreferences.pdf_copy_image_dpi || defaultPdfCopyImageDpi
+                );
+            }
 
             document.getElementById('reader-theme-value').textContent = theme.options[theme.selectedIndex].text;
             document.getElementById('reader-font-size-value').textContent = `${readerPreferences.font_size_px}px`;
@@ -1161,6 +1180,7 @@
                 page_width_px: document.getElementById('reader-page-width'),
                 reduced_motion: document.getElementById('reader-reduced-motion'),
                 high_contrast: document.getElementById('reader-high-contrast'),
+                pdf_copy_image_dpi: document.getElementById('pdf-copy-dpi-select'),
             };
 
             const fontFamilySelect = document.getElementById('reader-font-family');
@@ -1188,6 +1208,10 @@
             });
             controls.high_contrast.addEventListener('change', (event) => {
                 readerPreferences.high_contrast = event.target.checked;
+                queueReaderPreferencesSave();
+            });
+            controls.pdf_copy_image_dpi?.addEventListener('change', (event) => {
+                readerPreferences.pdf_copy_image_dpi = Number(event.target.value);
                 queueReaderPreferencesSave();
             });
 
@@ -2273,8 +2297,18 @@
             return !!(navigator.clipboard && window.ClipboardItem);
         }
 
+        function getSelectedPdfCopyImageDpi() {
+            const select = document.getElementById('pdf-copy-dpi-select');
+            const selectedDpi = select ? parseInt(select.value, 10) : NaN;
+            if (Number.isFinite(selectedDpi)) {
+                return selectedDpi;
+            }
+            return readerPreferences.pdf_copy_image_dpi || defaultPdfCopyImageDpi;
+        }
+
         function getPdfPageExportImageUrl(pageIndex) {
-            return `/api/pdf/${encodeURIComponent(bookId)}/page-image/${pageIndex}?dpi=300`;
+            const dpi = getSelectedPdfCopyImageDpi();
+            return `/api/pdf/${encodeURIComponent(bookId)}/page-image/${pageIndex}?dpi=${encodeURIComponent(dpi)}`;
         }
 
         async function fetchPdfPageImageBlob(pageIndex, fallbackSrc = null) {
