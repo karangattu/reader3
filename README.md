@@ -16,10 +16,28 @@ uv run python launcher.py
 
 The browser opens automatically. Upload a book and start reading!
 
+## Copilot Summaries
+
+Reader3 can now summarize:
+
+- the current chapter
+- selected text
+- PDF page images
+- inline EPUB images
+
+The reader keeps working if Copilot is unavailable, but summary actions will show an error until the SDK can authenticate.
+
+Setup notes:
+
+- Run `uv sync` so the Python Copilot SDK is installed.
+- The default Copilot model is `gpt-4.1`. Override it with `READER3_COPILOT_MODEL` if you want a different model.
+- Image summaries require a vision-capable model.
+- The current integration is single-user, local, and non-streaming.
+
 ## Keyboard Shortcuts
 
 | Shortcut | Action |
-|----------|--------|
+| -------- | ------ |
 | `Ctrl/⌘+F` | Search |
 | `Ctrl/⌘+B` | Bookmarks panel |
 | `Escape` | Close modals |
@@ -31,11 +49,13 @@ uv run python build_executable.py
 ```
 
 Creates:
+
 - macOS: `dist/Reader3.app`
 - macOS installer: `dist/Reader3-macOS.dmg` (drag `Reader3.app` into `Applications`)
 - Windows (default): `dist/Reader3/Reader3.exe` and `dist/Reader3-windows-portable.zip`
 
 Windows notes:
+
 - Keep the entire `Reader3` folder together (do not move only the `.exe`).
 - For debugging startup issues on Windows, build with console logs:
 
@@ -52,6 +72,7 @@ git tag v1.7.0 && git push origin v1.7.0
 ```
 
 Release assets include:
+
 - `Reader3-windows-portable.zip`
 - `Reader3.exe`
 - `Reader3-macOS.zip`

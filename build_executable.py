@@ -55,6 +55,9 @@ def build(onefile: bool = False, console: bool = False):
         'pymupdf',
         'ebooklib',
         'bs4',
+        'copilot',
+        'copilot.client',
+        'copilot.session',
     ]
 
     # Packages to collect all files from
@@ -63,6 +66,7 @@ def build(onefile: bool = False, console: bool = False):
         'starlette',
         'uvicorn',
         'pymupdf',
+        'copilot',
     ]
 
     mode_flag = '--onefile' if onefile else '--onedir'
@@ -164,7 +168,7 @@ def build(onefile: bool = False, console: bool = False):
 
 
 def create_macos_dmg(dist_dir: str):
-    """Create a drag-and-drop DMG containing Reader3.app and Applications link."""
+    """Create a drag-and-drop DMG installer for Reader3.app."""
     app_path = os.path.join(dist_dir, "Reader3.app")
     dmg_path = os.path.join(dist_dir, "Reader3-macOS.dmg")
 
@@ -201,7 +205,9 @@ def create_macos_dmg(dist_dir: str):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Build Reader3 executable via PyInstaller")
+    parser = argparse.ArgumentParser(
+        description="Build Reader3 executable via PyInstaller"
+    )
     parser.add_argument(
         "--onefile",
         action="store_true",

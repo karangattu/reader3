@@ -28,6 +28,7 @@ from fastapi.responses import (
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from copilot_service import CopilotSummaryError, CopilotSummaryService
 from reader3 import (
     Book,
     get_pdf_page_stats,
@@ -272,8 +273,12 @@ class CacheControlMiddleware(BaseHTTPMiddleware):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Reader3 starting up")
+    startup_error = await copilot_summary_service.start()
+    if startup_error:
+        logger.warning("Copilot summaries unavailable: %s", startup_error)
     yield
     logger.info("Reader3 shutting down – flushing user data")
+    await copilot_summary_service.stop()
     user_data_manager.flush()
     _io_executor.shutdown(wait=False)
 
@@ -343,6 +348,7 @@ else:
 
 # Initialize user data manager
 user_data_manager = UserDataManager(BOOKS_DIR)
+copilot_summary_service = CopilotSummaryService()
 
 logger.info("Books directory: %s", BOOKS_DIR)
 logger.info("Templates directory: %s", templates_dir)
@@ -359,6 +365,12 @@ async def health_check():
         "status": "ok",
         "books_dir_exists": os.path.exists(BOOKS_DIR),
     }
+
+
+@app.get("/api/copilot/status")
+async def get_copilot_status():
+    """Return Reader3's Copilot SDK availability and model status."""
+    return await copilot_summary_service.get_status()
 
 
 @lru_cache(maxsize=50)
@@ -456,6 +468,70 @@ def get_cached_reading_times(book_id: str) -> Optional[dict]:
         }
 
     return reading_times
+
+
+def _chapter_or_none(book: Optional[Book], chapter_index: Optional[int]):
+    """Return a chapter when the index is in range, otherwise None."""
+    if book is None or chapter_index is None:
+        return None
+    if chapter_index < 0 or chapter_index >= len(book.spine):
+        return None
+    return book.spine[chapter_index]
+
+
+def _resolve_book_image_path(book_id: str, image_name: str) -> str:
+    """Resolve an EPUB image name to its on-disk path."""
+    safe_book_id = os.path.basename(book_id)
+    safe_image_name = os.path.basename(image_name)
+    return os.path.join(BOOKS_DIR, safe_book_id, "images", safe_image_name)
+
+
+def _render_pdf_page_image_bytes(
+    book_id: str,
+    page_num: int,
+    dpi: int = PDF_COPY_IMAGE_DPI,
+) -> bytes:
+    """Render a PDF page on demand and return PNG bytes."""
+    book = load_book_cached(book_id)
+    if not book:
+        raise HTTPException(status_code=404, detail="Book not found")
+
+    if not book.is_pdf:
+        raise HTTPException(status_code=400, detail="Not a PDF book")
+
+    if not book.pdf_source_path:
+        raise HTTPException(status_code=404, detail="Source PDF not available")
+
+    safe_book_id = os.path.basename(book_id)
+    pdf_path = os.path.join(BOOKS_DIR, safe_book_id, book.pdf_source_path)
+    if not os.path.exists(pdf_path):
+        raise HTTPException(status_code=404, detail="Source PDF not found")
+
+    export_dpi = _clamp_pdf_copy_image_dpi(dpi)
+
+    try:
+        import fitz
+
+        with fitz.open(pdf_path) as doc:
+            if page_num < 0 or page_num >= len(doc):
+                raise HTTPException(status_code=404, detail="Page not found")
+
+            zoom = export_dpi / 72
+            pix = doc[page_num].get_pixmap(
+                matrix=fitz.Matrix(zoom, zoom),
+                alpha=False,
+            )
+            return pix.tobytes("png")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(
+            "Failed to render PDF page image for %s page %s: %s",
+            book_id,
+            page_num,
+            exc,
+        )
+        raise HTTPException(status_code=500, detail="Failed to render PDF page image")
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -1011,6 +1087,148 @@ async def get_chapters_text(request: Request):
     return {"chapters": chapters_data}
 
 
+@app.post("/api/copilot/summarize/text")
+async def summarize_text_with_copilot(request: Request):
+    """Summarize chapter text or a selected passage with Copilot SDK."""
+    payload = await request.json()
+    source = str(payload.get("source", "")).strip().lower()
+    book_id = str(payload.get("book_id", "")).strip()
+
+    chapter_index_raw = payload.get("chapter_index")
+    chapter_index = None
+    if chapter_index_raw is not None:
+        chapter_index = int(chapter_index_raw)
+
+    book = load_book_cached(book_id) if book_id else None
+    chapter = _chapter_or_none(book, chapter_index)
+    book_title = book.metadata.title if book else None
+    chapter_title = chapter.title if chapter else None
+
+    if source == "selection":
+        text = str(payload.get("selected_text", "")).strip()
+        if not text:
+            raise HTTPException(
+                status_code=400,
+                detail="Selected text is required for selection summaries",
+            )
+    elif source == "chapter":
+        if not book:
+            raise HTTPException(status_code=404, detail="Book not found")
+        if chapter is None:
+            raise HTTPException(status_code=404, detail="Chapter not found")
+        text = str(chapter.text or "").strip()
+        if not text:
+            raise HTTPException(
+                status_code=400,
+                detail="Chapter text is empty and cannot be summarized",
+            )
+    else:
+        raise HTTPException(status_code=400, detail="Invalid summary source")
+
+    try:
+        summary = await copilot_summary_service.summarize_text(
+            text,
+            scope=source,
+            book_title=book_title,
+            chapter_title=chapter_title,
+        )
+    except CopilotSummaryError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    return {
+        "summary": summary,
+        "source": source,
+        "book_id": book_id or None,
+        "chapter_index": chapter_index,
+    }
+
+
+@app.post("/api/copilot/summarize/image")
+async def summarize_image_with_copilot(request: Request):
+    """Summarize an EPUB image or rendered PDF page with Copilot SDK."""
+    payload = await request.json()
+    source = str(payload.get("source", "")).strip().lower()
+    book_id = str(payload.get("book_id", "")).strip()
+
+    if not book_id:
+        raise HTTPException(status_code=400, detail="book_id is required")
+
+    book = load_book_cached(book_id)
+    if not book:
+        raise HTTPException(status_code=404, detail="Book not found")
+
+    status = await copilot_summary_service.get_status()
+    if not status.get("available"):
+        raise HTTPException(
+            status_code=503,
+            detail=status.get("error") or "Copilot summaries are unavailable",
+        )
+    if status.get("supports_vision") is False:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Configured model '{status['model']}' does not support image summaries"
+            ),
+        )
+
+    if source == "epub":
+        image_name = str(payload.get("image_name", "")).strip()
+        if not image_name:
+            raise HTTPException(status_code=400, detail="image_name is required")
+
+        chapter_index_raw = payload.get("chapter_index")
+        chapter_index = int(chapter_index_raw) if chapter_index_raw is not None else None
+        chapter = _chapter_or_none(book, chapter_index)
+        image_path = _resolve_book_image_path(book_id, image_name)
+        if not os.path.exists(image_path):
+            raise HTTPException(status_code=404, detail="Image not found")
+
+        try:
+            summary = await copilot_summary_service.summarize_image_file(
+                image_path,
+                book_title=book.metadata.title,
+                chapter_title=chapter.title if chapter else None,
+            )
+        except CopilotSummaryError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+        return {
+            "summary": summary,
+            "source": source,
+            "book_id": book_id,
+            "image_name": os.path.basename(image_name),
+        }
+
+    if source == "pdf":
+        page_index_raw = payload.get("page_index")
+        if page_index_raw is None:
+            raise HTTPException(status_code=400, detail="page_index is required")
+
+        page_index = int(page_index_raw)
+        image_bytes = _render_pdf_page_image_bytes(book_id, page_index)
+        display_name = f"{os.path.basename(book_id)}-page-{page_index + 1}.png"
+
+        try:
+            summary = await copilot_summary_service.summarize_image_blob(
+                image_bytes,
+                mime_type="image/png",
+                display_name=display_name,
+                book_title=book.metadata.title,
+                chapter_title=f"Page {page_index + 1}",
+            )
+        except CopilotSummaryError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+        return {
+            "summary": summary,
+            "source": source,
+            "book_id": book_id,
+            "page_index": page_index,
+        }
+
+    raise HTTPException(status_code=400, detail="Invalid image summary source")
+
+
 @app.get("/read/{book_id}/images/{image_name}")
 async def serve_image(book_id: str, image_name: str):
     """
@@ -1031,48 +1249,14 @@ async def serve_image(book_id: str, image_name: str):
 
 
 @app.get("/api/pdf/{book_id}/page-image/{page_num}")
-async def render_pdf_page_image(book_id: str, page_num: int, dpi: int = PDF_COPY_IMAGE_DPI):
+async def render_pdf_page_image(
+    book_id: str,
+    page_num: int,
+    dpi: int = PDF_COPY_IMAGE_DPI,
+):
     """Render a PDF page on demand as a PNG for clipboard/export workflows."""
-    book = load_book_cached(book_id)
-    if not book:
-        raise HTTPException(status_code=404, detail="Book not found")
-
-    if not book.is_pdf:
-        raise HTTPException(status_code=400, detail="Not a PDF book")
-
-    if not book.pdf_source_path:
-        raise HTTPException(status_code=404, detail="Source PDF not available")
-
-    safe_book_id = os.path.basename(book_id)
-    pdf_path = os.path.join(BOOKS_DIR, safe_book_id, book.pdf_source_path)
-    if not os.path.exists(pdf_path):
-        raise HTTPException(status_code=404, detail="Source PDF not found")
-
-    export_dpi = _clamp_pdf_copy_image_dpi(dpi)
-
-    try:
-        import fitz
-
-        with fitz.open(pdf_path) as doc:
-            if page_num < 0 or page_num >= len(doc):
-                raise HTTPException(status_code=404, detail="Page not found")
-
-            zoom = export_dpi / 72
-            pix = doc[page_num].get_pixmap(
-                matrix=fitz.Matrix(zoom, zoom),
-                alpha=False,
-            )
-            return Response(content=pix.tobytes("png"), media_type="image/png")
-    except HTTPException:
-        raise
-    except Exception as exc:
-        logger.error(
-            "Failed to render PDF page image for %s page %s: %s",
-            book_id,
-            page_num,
-            exc,
-        )
-        raise HTTPException(status_code=500, detail="Failed to render PDF page image")
+    image_bytes = _render_pdf_page_image_bytes(book_id, page_num, dpi=dpi)
+    return Response(content=image_bytes, media_type="image/png")
 
 
 @app.delete("/delete/{book_id}")
