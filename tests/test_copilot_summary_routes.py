@@ -367,10 +367,10 @@ class TestCopilotSummaryReaderUi:
 
         assert 'enhanceInlineImageSummaryControls' in content
         assert 'summarizeInlineImage' in content
-        assert 'Copilot status: Checking sign-in' in content
+        assert 'Checking' in content
         assert (
             'Reader3 uses the local GitHub Copilot sign-in on this machine.'
             in content
         )
-        assert 'Type /login' in content
+        assert '/login' in content
         assert 'Refresh status' in content

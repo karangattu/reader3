@@ -519,22 +519,33 @@
         .copilot-summary-status { padding: 0 20px 14px; font-size: 0.85em; color: #666; border-bottom: 1px solid #eee; min-height: 20px; }
         .copilot-summary-status.error { color: #c0392b; }
         .copilot-summary-status.loading { color: #2980b9; }
-        .copilot-summary-content { flex: 1; overflow-y: auto; padding: 20px; font-size: 0.95em; color: #333; line-height: 1.6; white-space: pre-wrap; }
+        .copilot-summary-content { flex: 1; overflow-y: auto; padding: 20px; font-size: 0.95em; color: #333; line-height: 1.6; }
+        .copilot-summary-content h1, .copilot-summary-content h2, .copilot-summary-content h3 { margin: 0.8em 0 0.4em; color: #1e293b; }
+        .copilot-summary-content h1 { font-size: 1.2em; } .copilot-summary-content h2 { font-size: 1.1em; } .copilot-summary-content h3 { font-size: 1.0em; }
+        .copilot-summary-content ul, .copilot-summary-content ol { margin: 0.4em 0; padding-left: 1.4em; }
+        .copilot-summary-content li { margin-bottom: 0.3em; }
+        .copilot-summary-content p { margin: 0.5em 0; }
+        .copilot-summary-content code { padding: 1px 5px; border-radius: 4px; background: #f1f5f9; font-size: 0.9em; }
+        .copilot-summary-content hr { border: none; border-top: 1px solid #e2e8f0; margin: 0.8em 0; }
         .copilot-summary-actions { padding: 15px 20px; background: #f8f9fa; border-top: 1px solid #eee; }
         .copilot-summary-copy-btn { width: 100%; padding: 10px 14px; border: 1px solid #d0d7ff; border-radius: 8px; background: #eef2ff; color: #2c3e50; cursor: pointer; font-size: 0.9em; }
         .copilot-summary-copy-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 
-        /* Copilot auth status */
-        #copilot-status-banner { position: fixed; top: 18px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 14px; width: min(720px, calc(100vw - 32px)); padding: 12px 14px; border: 1px solid #d6dae4; border-radius: 12px; background: rgba(255,255,255,0.96); box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12); z-index: 1100; backdrop-filter: blur(12px); }
-        #copilot-status-banner.checking { border-color: #d0d7ff; background: rgba(238,242,255,0.96); }
-        #copilot-status-banner.signed-in { border-color: #cfe9d8; background: rgba(240, 253, 244, 0.96); }
-        #copilot-status-banner.signed-out { border-color: #f2d7b7; background: rgba(255, 248, 235, 0.97); }
-        .copilot-status-copy { min-width: 0; flex: 1; }
-        .copilot-status-label { display: block; font-size: 0.94em; font-weight: 700; color: #1f2937; }
-        .copilot-status-detail { display: block; margin-top: 3px; font-size: 0.83em; color: #5b6472; }
-        .copilot-status-actions { display: flex; align-items: center; gap: 8px; }
-        .copilot-status-btn { border: 1px solid #d6dae4; border-radius: 8px; background: #fff; color: #334155; cursor: pointer; font-size: 0.84em; font-weight: 600; padding: 8px 10px; }
-        .copilot-status-btn:hover { background: #f8fafc; }
+        /* Copilot auth status – compact pill */
+        #copilot-status-banner { position: fixed; top: 10px; right: 14px; display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px; border: 1px solid #d6dae4; border-radius: 20px; background: rgba(255,255,255,0.92); box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08); z-index: 1100; backdrop-filter: blur(8px); font-size: 0.78em; transition: opacity 0.4s ease; }
+        #copilot-status-banner.checking { border-color: #d0d7ff; background: rgba(238,242,255,0.92); }
+        #copilot-status-banner.signed-in { border-color: #cfe9d8; background: rgba(240, 253, 244, 0.92); }
+        #copilot-status-banner.signed-out { border-color: #f2d7b7; background: rgba(255, 248, 235, 0.94); }
+        #copilot-status-banner.faded { opacity: 0.35; }
+        #copilot-status-banner.faded:hover { opacity: 1; }
+        .copilot-status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+        .checking .copilot-status-dot { background: #818cf8; }
+        .signed-in .copilot-status-dot { background: #22c55e; }
+        .signed-out .copilot-status-dot { background: #f59e0b; }
+        .copilot-status-label { font-weight: 600; color: #1f2937; white-space: nowrap; }
+        .copilot-status-actions { display: inline-flex; align-items: center; gap: 4px; }
+        .copilot-status-btn { border: none; border-radius: 6px; background: transparent; color: #475569; cursor: pointer; font-size: 1em; font-weight: 600; padding: 2px 6px; }
+        .copilot-status-btn:hover { background: rgba(0,0,0,0.06); }
 
         /* Copilot help dialog */
         #copilot-help-modal { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; padding: 20px; background: rgba(15, 23, 42, 0.42); z-index: 1200; }
@@ -551,8 +562,6 @@
         .copilot-help-link:hover { text-decoration: underline; }
 
         @media (max-width: 700px) {
-            #copilot-status-banner { top: 12px; align-items: stretch; flex-direction: column; }
-            .copilot-status-actions { width: 100%; justify-content: flex-end; }
             .copilot-help-actions { align-items: stretch; flex-direction: column; }
         }
 
@@ -599,14 +608,12 @@
     <div id="copy-toast"></div>
 
     <div id="copilot-status-banner" class="checking" role="status" aria-live="polite">
-        <div class="copilot-status-copy">
-            <span class="copilot-status-label" id="copilot-status-label">Copilot status: Checking sign-in…</span>
-            <span class="copilot-status-detail" id="copilot-status-detail">Reader3 uses the local GitHub Copilot sign-in on this machine.</span>
-        </div>
-        <div class="copilot-status-actions">
-            <button class="copilot-status-btn" type="button" onclick="refreshCopilotStatus()">Refresh status</button>
-            <button class="copilot-status-btn" type="button" onclick="openCopilotHelpDialog()">Help</button>
-        </div>
+        <span class="copilot-status-dot"></span>
+        <span class="copilot-status-label" id="copilot-status-label">Checking…</span>
+        <span class="copilot-status-actions">
+            <button class="copilot-status-btn" type="button" onclick="refreshCopilotStatus()" title="Refresh status">↻</button>
+            <button class="copilot-status-btn" type="button" onclick="openCopilotHelpDialog()" title="Help">?</button>
+        </span>
     </div>
 
     <div id="copilot-help-modal" aria-hidden="true">
@@ -3131,36 +3138,30 @@
         function updateCopilotStatusBanner() {
             const banner = document.getElementById('copilot-status-banner');
             const label = document.getElementById('copilot-status-label');
-            const detail = document.getElementById('copilot-status-detail');
             const helpError = document.getElementById('copilot-help-error');
-            if (!banner || !label || !detail || !helpError) return;
+            if (!banner || !label) return;
 
-            banner.classList.remove('checking', 'signed-in', 'signed-out');
+            banner.classList.remove('checking', 'signed-in', 'signed-out', 'faded');
 
             if (!copilotStatusState.checked) {
                 banner.classList.add('checking');
-                label.textContent = 'Copilot status: Checking sign-in…';
-                detail.textContent = 'Reader3 uses the local GitHub Copilot sign-in on this machine.';
+                label.textContent = 'Checking…';
             } else if (copilotStatusState.authenticated) {
                 banner.classList.add('signed-in');
-                label.textContent = 'Copilot status: Signed in';
-                if (copilotStatusState.available) {
-                    detail.textContent = copilotStatusState.model
-                        ? `Connected with ${copilotStatusState.model}.`
-                        : 'Signed in and ready to summarize.';
-                } else {
-                    detail.textContent = copilotStatusState.error
-                        || 'Signed in, but summaries are currently unavailable.';
-                }
+                label.textContent = copilotStatusState.model
+                    ? `Copilot · ${copilotStatusState.model}`
+                    : 'Copilot · Signed in';
+                // Fade out after 4s when signed in so it doesn't distract
+                setTimeout(() => banner.classList.add('faded'), 4000);
             } else {
                 banner.classList.add('signed-out');
-                label.textContent = 'Copilot status: Not signed in';
-                detail.textContent = copilotStatusState.error
-                    || 'Open Copilot CLI, then Type /login to sign in with GitHub.';
+                label.textContent = 'Copilot · Not signed in';
             }
 
-            helpError.textContent = copilotStatusState.error
-                || 'Reader3 will use the local Copilot credentials once they are available.';
+            if (helpError) {
+                helpError.textContent = copilotStatusState.error
+                    || 'Reader3 will use the local Copilot credentials once they are available.';
+            }
         }
 
         async function fetchCopilotStatus(showToast = false) {
@@ -3221,6 +3222,43 @@
             });
         }
 
+        function renderMarkdown(md) {
+            // Lightweight markdown-to-HTML (handles the subset LLMs typically produce)
+            function esc(s) {
+                return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            }
+            const lines = md.split('\n');
+            const out = [];
+            let inUl = false, inOl = false;
+            for (let i = 0; i < lines.length; i++) {
+                let line = lines[i];
+                // Headings
+                const hMatch = line.match(/^(#{1,3})\s+(.*)/);
+                if (hMatch) { closeLists(); out.push(`<h${hMatch[1].length}>${inline(esc(hMatch[2]))}</h${hMatch[1].length}>`); continue; }
+                // Horizontal rule
+                if (/^[-*_]{3,}\s*$/.test(line)) { closeLists(); out.push('<hr>'); continue; }
+                // Unordered list
+                const ulMatch = line.match(/^\s*[-*+]\s+(.*)/);
+                if (ulMatch) { if (!inUl) { closeLists(); out.push('<ul>'); inUl = true; } out.push(`<li>${inline(esc(ulMatch[1]))}</li>`); continue; }
+                // Ordered list
+                const olMatch = line.match(/^\s*\d+[.)\s]\s*(.*)/);
+                if (olMatch) { if (!inOl) { closeLists(); out.push('<ol>'); inOl = true; } out.push(`<li>${inline(esc(olMatch[1]))}</li>`); continue; }
+                // Blank line
+                if (!line.trim()) { closeLists(); out.push(''); continue; }
+                // Paragraph text
+                closeLists(); out.push(`<p>${inline(esc(line))}</p>`);
+            }
+            closeLists();
+            function closeLists() { if (inUl) { out.push('</ul>'); inUl = false; } if (inOl) { out.push('</ol>'); inOl = false; } }
+            function inline(s) {
+                return s
+                    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+                    .replace(/`(.+?)`/g, '<code>$1</code>');
+            }
+            return out.join('\n');
+        }
+
         function setCopilotSummaryState(message, type = 'idle', summary = '') {
             const statusEl = document.getElementById('copilot-summary-status');
             const contentEl = document.getElementById('copilot-summary-content');
@@ -3234,7 +3272,11 @@
             }
 
             copilotSummaryLastText = summary || '';
-            contentEl.textContent = summary || (type === 'loading' ? 'Working…' : 'No summary yet.');
+            if (summary) {
+                contentEl.innerHTML = renderMarkdown(summary);
+            } else {
+                contentEl.textContent = type === 'loading' ? 'Working…' : 'No summary yet.';
+            }
             copyBtn.disabled = !copilotSummaryLastText;
         }
 

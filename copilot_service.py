@@ -14,7 +14,7 @@ except ImportError:  # pragma: no cover - exercised through runtime status check
     PermissionHandler = None
 
 
-DEFAULT_COPILOT_MODEL = os.environ.get("READER3_COPILOT_MODEL", "gpt-4.1")
+DEFAULT_COPILOT_MODEL = os.environ.get("READER3_COPILOT_MODEL", "claude-sonnet-4")
 DEFAULT_TIMEOUT_SECONDS = float(
     os.environ.get("READER3_COPILOT_TIMEOUT_SECONDS", "90")
 )
