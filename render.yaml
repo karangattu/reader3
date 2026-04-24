@@ -24,10 +24,10 @@ services:
       - key: IO_WORKERS
         value: "4"
       - key: MAX_UPLOAD_MB
-        value: "500"
+        value: "1024"
       - key: LOG_LEVEL
         value: info
     disk:
       name: reader_data
       mountPath: /var/data
-      sizeGB: 1
+      sizeGB: 2

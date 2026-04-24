@@ -69,8 +69,8 @@ _io_executor = ThreadPoolExecutor(
     thread_name_prefix="reader3-io",
 )
 
-# Maximum upload size: 500 MB by default (configurable via env)
-MAX_UPLOAD_MB = int(os.environ.get("MAX_UPLOAD_MB", 500))
+# Maximum upload size: 1024 MB by default (configurable via env)
+MAX_UPLOAD_MB = int(os.environ.get("MAX_UPLOAD_MB", 1024))
 MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024
 
 VALID_READER_THEMES = {"light", "sepia", "dark"}
