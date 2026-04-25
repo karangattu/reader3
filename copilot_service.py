@@ -9,9 +9,11 @@ from typing import Any
 try:
     from copilot import CopilotClient
     from copilot.session import PermissionHandler
-except ImportError:  # pragma: no cover - exercised through runtime status checks
+    _COPILOT_IMPORT_ERROR = None
+except Exception as exc:  # pragma: no cover - exercised through runtime status checks
     CopilotClient = None
     PermissionHandler = None
+    _COPILOT_IMPORT_ERROR = str(exc)
 
 
 DEFAULT_COPILOT_MODEL = os.environ.get("READER3_COPILOT_MODEL", "claude-sonnet-4")
@@ -54,10 +56,11 @@ class CopilotSummaryService:
             self._startup_error = None
             return None
 
-        if CopilotClient is None:
+        if CopilotClient is None or PermissionHandler is None:
+            details = f" ({_COPILOT_IMPORT_ERROR})" if _COPILOT_IMPORT_ERROR else ""
             self._startup_error = (
-                "github-copilot-sdk is not installed. "
-                "Run `uv sync` to enable Reader3 summaries."
+                "github-copilot-sdk is not installed or could not be loaded. "
+                f"Run `uv sync` to enable Reader3 summaries.{details}"
             )
             return self._startup_error
 
@@ -212,6 +215,10 @@ class CopilotSummaryService:
     ) -> str:
         """Send a single summary request through a short-lived Copilot session."""
         client = await self._ensure_runtime_started()
+        if PermissionHandler is None:
+            raise CopilotSummaryError(
+                "github-copilot-sdk is not installed or could not be loaded."
+            )
         session = await client.create_session(
             on_permission_request=PermissionHandler.approve_all,
             model=self.model,

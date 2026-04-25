@@ -549,6 +549,9 @@
         .copilot-model-select { border: 1px solid #d6dae4; border-radius: 6px; background: rgba(255,255,255,0.95); color: #1f2937; font-size: 0.85em; font-weight: 600; padding: 2px 6px; cursor: pointer; max-width: 180px; }
         .copilot-model-select:disabled { opacity: 0.55; cursor: not-allowed; }
         .copilot-model-select.hidden { display: none; }
+        body.copilot-disabled #copilot-status-banner,
+        body.copilot-disabled #copilot-summary-panel,
+        body.copilot-disabled [data-summary-action] { display: none !important; }
 
         /* Copilot help dialog */
         #copilot-help-modal { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; padding: 20px; background: rgba(15, 23, 42, 0.42); z-index: 1200; }
@@ -575,7 +578,7 @@
 
     </style>
 </head>
-<body class="{{ 'is-pdf ' if is_pdf else '' }}theme-{{ reader_preferences.theme }}{% if reader_preferences.high_contrast %} high-contrast{% endif %}{% if reader_preferences.reduced_motion %} reduced-motion{% endif %}" style="--reader-font-size: {{ reader_preferences.font_size_px }}px; --reader-line-height: {{ reader_preferences.line_height }}; --reader-page-width: {{ reader_preferences.page_width_px }}px; --reader-font-family: '{{ book_font or reader_preferences.font_family }}';">
+<body class="{{ 'is-pdf ' if is_pdf else '' }}theme-{{ reader_preferences.theme }}{% if reader_preferences.high_contrast %} high-contrast{% endif %}{% if reader_preferences.reduced_motion %} reduced-motion{% endif %}{% if reader_preferences.copilot_enabled is sameas false %} copilot-disabled{% endif %}" style="--reader-font-size: {{ reader_preferences.font_size_px }}px; --reader-line-height: {{ reader_preferences.line_height }}; --reader-page-width: {{ reader_preferences.page_width_px }}px; --reader-font-family: '{{ book_font or reader_preferences.font_family }}';">
 
     <!-- Reading progress bar at top -->
     <div id="reading-progress">
@@ -923,6 +926,14 @@
                     <input id="reader-high-contrast" type="checkbox">
                 </label>
 
+                <label class="reader-toggle-row" for="reader-copilot-enabled">
+                    <div>
+                        <div class="reader-setting-label"><span>Copilot assistance</span></div>
+                        <div class="reader-setting-help">Show summary controls and use local Copilot credentials when available.</div>
+                    </div>
+                    <input id="reader-copilot-enabled" type="checkbox">
+                </label>
+
                 <div class="reader-settings-actions">
                     <button class="toolbar-btn" type="button" onclick="resetReaderPreferences()"><i class="fa-solid fa-rotate-left"></i> Reset</button>
                     <div id="reader-settings-status" class="reader-settings-status" aria-live="polite"></div>
@@ -1141,7 +1152,7 @@
         const bookId = {{ book_id | tojson }};
         const totalPages = {{ book.spine|length }};
         const defaultPdfCopyImageDpi = {{ pdf_copy_image_dpi_default }};
-        const defaultReaderPreferences = {"theme": "light", "font_size_px": 19, "line_height": 1.8, "page_width_px": 700, "reduced_motion": false, "high_contrast": false, "font_family": "Georgia", "pdf_copy_image_dpi": {{ pdf_copy_image_dpi_default }}};
+        const defaultReaderPreferences = {"theme": "light", "font_size_px": 19, "line_height": 1.8, "page_width_px": 700, "reduced_motion": false, "high_contrast": false, "font_family": "Georgia", "pdf_copy_image_dpi": {{ pdf_copy_image_dpi_default }}, "copilot_enabled": true};
         let readerPreferences = {{ reader_preferences | tojson }};
         let bookFont = {{ (book_font | tojson) if book_font else 'null' }};
         let currentPageIndex = {{ chapter_index }};
@@ -1170,6 +1181,7 @@
         let copilotSummaryLastText = '';
         let copilotStatusState = {
             checked: false,
+            enabled: readerPreferences.copilot_enabled !== false,
             available: false,
             authenticated: false,
             model: null,
@@ -1192,6 +1204,7 @@
             const pageWidth = document.getElementById('reader-page-width');
             const reducedMotion = document.getElementById('reader-reduced-motion');
             const highContrast = document.getElementById('reader-high-contrast');
+            const copilotEnabled = document.getElementById('reader-copilot-enabled');
             const fontFamily = document.getElementById('reader-font-family');
             const bookFontCheckbox = document.getElementById('reader-book-font');
             const pdfCopyDpiSelect = document.getElementById('pdf-copy-dpi-select');
@@ -1204,6 +1217,9 @@
             pageWidth.value = readerPreferences.page_width_px;
             reducedMotion.checked = !!readerPreferences.reduced_motion;
             highContrast.checked = !!readerPreferences.high_contrast;
+            if (copilotEnabled) {
+                copilotEnabled.checked = readerPreferences.copilot_enabled !== false;
+            }
 
             const activeFont = bookFont || readerPreferences.font_family;
             fontFamily.value = activeFont;
@@ -1221,14 +1237,21 @@
             document.getElementById('reader-font-family-value').textContent = activeFont;
         }
 
+        function isCopilotEnabled() {
+            return readerPreferences.copilot_enabled !== false;
+        }
+
         function applyReaderPreferences() {
-            document.body.classList.remove('theme-light', 'theme-sepia', 'theme-dark', 'high-contrast', 'reduced-motion');
+            document.body.classList.remove('theme-light', 'theme-sepia', 'theme-dark', 'high-contrast', 'reduced-motion', 'copilot-disabled');
             document.body.classList.add(`theme-${readerPreferences.theme}`);
             if (readerPreferences.high_contrast) {
                 document.body.classList.add('high-contrast');
             }
             if (readerPreferences.reduced_motion) {
                 document.body.classList.add('reduced-motion');
+            }
+            if (!isCopilotEnabled()) {
+                document.body.classList.add('copilot-disabled');
             }
 
             const activeFont = bookFont || readerPreferences.font_family;
@@ -1237,6 +1260,7 @@
             document.body.style.setProperty('--reader-page-width', `${readerPreferences.page_width_px}px`);
             document.body.style.setProperty('--reader-font-family', `'${activeFont}'`);
             syncReaderSettingsForm();
+            updateCopilotSummaryActionState();
         }
 
         async function persistReaderPreferences() {
@@ -1305,6 +1329,7 @@
                 reduced_motion: document.getElementById('reader-reduced-motion'),
                 high_contrast: document.getElementById('reader-high-contrast'),
                 pdf_copy_image_dpi: document.getElementById('pdf-copy-dpi-select'),
+                copilot_enabled: document.getElementById('reader-copilot-enabled'),
             };
 
             const fontFamilySelect = document.getElementById('reader-font-family');
@@ -1333,6 +1358,27 @@
             controls.high_contrast.addEventListener('change', (event) => {
                 readerPreferences.high_contrast = event.target.checked;
                 queueReaderPreferencesSave();
+            });
+            controls.copilot_enabled?.addEventListener('change', (event) => {
+                readerPreferences.copilot_enabled = event.target.checked;
+                queueReaderPreferencesSave();
+                if (event.target.checked) {
+                    fetchCopilotStatus(true);
+                } else {
+                    closeCopilotHelpDialog();
+                    toggleCopilotSummaryPanel(false);
+                    copilotStatusState = {
+                        checked: true,
+                        enabled: false,
+                        available: false,
+                        authenticated: false,
+                        model: null,
+                        supports_vision: null,
+                        error: null,
+                        models: [],
+                    };
+                    updateCopilotStatusBanner();
+                }
             });
             controls.pdf_copy_image_dpi?.addEventListener('change', (event) => {
                 readerPreferences.pdf_copy_image_dpi = Number(event.target.value);
@@ -3149,7 +3195,10 @@
 
             banner.classList.remove('checking', 'signed-in', 'signed-out', 'faded');
 
-            if (!copilotStatusState.checked) {
+            if (!isCopilotEnabled()) {
+                banner.classList.add('signed-out');
+                label.textContent = 'Copilot · Off';
+            } else if (!copilotStatusState.checked) {
                 banner.classList.add('checking');
                 label.textContent = 'Checking…';
             } else if (copilotStatusState.authenticated) {
@@ -3171,7 +3220,7 @@
 
             if (select) {
                 const models = Array.isArray(copilotStatusState.models) ? copilotStatusState.models : [];
-                if (copilotStatusState.authenticated && models.length > 0) {
+                if (isCopilotEnabled() && copilotStatusState.authenticated && models.length > 0) {
                     // Rebuild options only when model list changed to preserve selection state
                     const signature = models.map(m => m.id).join('|') + '::' + (copilotStatusState.model || '');
                     if (select.dataset.signature !== signature) {
@@ -3235,9 +3284,25 @@
         }
 
         async function fetchCopilotStatus(showToast = false) {
+            if (!isCopilotEnabled()) {
+                copilotStatusState = {
+                    checked: true,
+                    enabled: false,
+                    available: false,
+                    authenticated: false,
+                    model: null,
+                    supports_vision: null,
+                    error: null,
+                    models: [],
+                };
+                updateCopilotStatusBanner();
+                return copilotStatusState;
+            }
+
             copilotStatusState = {
                 ...copilotStatusState,
                 checked: false,
+                enabled: true,
                 error: null,
             };
             updateCopilotStatusBanner();
@@ -3251,6 +3316,7 @@
 
                 copilotStatusState = {
                     checked: true,
+                    enabled: data.enabled !== false,
                     available: Boolean(data.available),
                     authenticated: Boolean(data.authenticated),
                     model: data.model || null,
@@ -3261,6 +3327,7 @@
             } catch (err) {
                 copilotStatusState = {
                     checked: true,
+                    enabled: true,
                     available: false,
                     authenticated: false,
                     model: null,
@@ -3296,7 +3363,7 @@
 
         function updateCopilotSummaryActionState() {
             document.querySelectorAll('[data-summary-action]').forEach(button => {
-                button.disabled = copilotSummaryInFlight;
+                button.disabled = copilotSummaryInFlight || !isCopilotEnabled();
             });
         }
 
@@ -3375,6 +3442,11 @@
         async function requestCopilotSummary(endpoint, payload, loadingMessage) {
             if (copilotSummaryInFlight) {
                 showCopyToast('A summary is already in progress.', 'info');
+                return;
+            }
+
+            if (!isCopilotEnabled()) {
+                showCopyToast('Copilot assistance is turned off.', 'info');
                 return;
             }
 

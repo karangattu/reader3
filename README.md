@@ -25,7 +25,7 @@ Reader3 can now summarize:
 - PDF page images
 - inline EPUB images
 
-The reader keeps working if Copilot is unavailable, but summary actions will show an error until the SDK can authenticate.
+The reader keeps working if Copilot is unavailable. You can also turn Copilot assistance off or on from Reader Settings; when it is off, Reader3 skips Copilot status checks and hides summary controls.
 
 Setup notes:
 

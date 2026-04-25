@@ -120,12 +120,16 @@ def client():
 
 class _FakeCopilotSummaryService:
     def __init__(self):
+        self.model = "gpt-4.1"
+        self.status_calls = 0
         self.text_calls = []
         self.file_calls = []
         self.blob_calls = []
 
     async def get_status(self):
+        self.status_calls += 1
         return {
+            "enabled": True,
             "available": True,
             "authenticated": True,
             "model": "gpt-4.1",
@@ -165,6 +169,65 @@ class TestCopilotSummaryRoutes:
         assert response.status_code == 200
         assert response.json()["available"] is True
         assert response.json()["supports_vision"] is True
+
+    def test_status_endpoint_does_not_touch_sdk_when_copilot_disabled(
+        self,
+        client,
+        monkeypatch,
+    ):
+        fake_service = _FakeCopilotSummaryService()
+        monkeypatch.setattr(
+            server,
+            "copilot_summary_service",
+            fake_service,
+            raising=False,
+        )
+
+        try:
+            server.user_data_manager.update_reader_preferences(
+                copilot_enabled=False
+            )
+            response = client.get("/api/copilot/status")
+        finally:
+            server.user_data_manager.update_reader_preferences(copilot_enabled=True)
+
+        assert response.status_code == 200
+        assert response.json()["enabled"] is False
+        assert response.json()["available"] is False
+        assert fake_service.status_calls == 0
+
+    def test_text_summary_endpoint_rejects_when_copilot_disabled(
+        self,
+        client,
+        monkeypatch,
+    ):
+        fake_service = _FakeCopilotSummaryService()
+        monkeypatch.setattr(
+            server,
+            "copilot_summary_service",
+            fake_service,
+            raising=False,
+        )
+
+        try:
+            server.user_data_manager.update_reader_preferences(
+                copilot_enabled=False
+            )
+            response = client.post(
+                "/api/copilot/summarize/text",
+                json={
+                    "book_id": "selection-summary-book",
+                    "source": "selection",
+                    "selected_text": "No SDK should be touched.",
+                    "chapter_index": 0,
+                },
+            )
+        finally:
+            server.user_data_manager.update_reader_preferences(copilot_enabled=True)
+
+        assert response.status_code == 403
+        assert "turned off" in response.json()["detail"].lower()
+        assert fake_service.text_calls == []
 
     def test_text_summary_endpoint_summarizes_selected_text(
         self,
@@ -372,5 +435,6 @@ class TestCopilotSummaryReaderUi:
             'Reader3 uses the local GitHub Copilot sign-in on this machine.'
             in content
         )
+        assert 'reader-copilot-enabled' in content
         assert '/login' in content
         assert 'Refresh status' in content

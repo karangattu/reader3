@@ -228,6 +228,7 @@ def _serialize_reader_preferences(preferences: ReaderPreferences) -> dict:
         "high_contrast": preferences.high_contrast,
         "font_family": preferences.font_family,
         "pdf_copy_image_dpi": _effective_pdf_copy_image_dpi(preferences),
+        "copilot_enabled": preferences.copilot_enabled,
     }
 
 
@@ -273,12 +274,19 @@ class CacheControlMiddleware(BaseHTTPMiddleware):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Reader3 starting up")
-    startup_error = await copilot_summary_service.start()
-    if startup_error:
-        logger.warning("Copilot summaries unavailable: %s", startup_error)
+    try:
+        if _copilot_assistance_enabled():
+            startup_error = await copilot_summary_service.start()
+            if startup_error:
+                logger.warning("Copilot summaries unavailable: %s", startup_error)
+    except Exception as exc:  # pragma: no cover - defensive startup guard
+        logger.warning("Copilot startup skipped after error: %s", exc)
     yield
     logger.info("Reader3 shutting down – flushing user data")
-    await copilot_summary_service.stop()
+    try:
+        await copilot_summary_service.stop()
+    except Exception as exc:  # pragma: no cover - defensive shutdown guard
+        logger.warning("Copilot shutdown skipped after error: %s", exc)
     user_data_manager.flush()
     _io_executor.shutdown(wait=False)
 
@@ -355,6 +363,23 @@ logger.info("Templates directory: %s", templates_dir)
 logger.info("Current working directory: %s", os.getcwd())
 
 
+def _copilot_assistance_enabled() -> bool:
+    """Return whether user settings allow Copilot-backed assistance."""
+    return bool(user_data_manager.get_reader_preferences().copilot_enabled)
+
+
+def _copilot_disabled_status() -> dict:
+    """Return a stable status payload when Copilot assistance is turned off."""
+    return {
+        "enabled": False,
+        "available": False,
+        "authenticated": False,
+        "model": copilot_summary_service.model,
+        "supports_vision": None,
+        "error": None,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Health check
 # ---------------------------------------------------------------------------
@@ -370,17 +395,40 @@ async def health_check():
 @app.get("/api/copilot/status")
 async def get_copilot_status():
     """Return Reader3's Copilot SDK availability and model status."""
-    return await copilot_summary_service.get_status()
+    if not _copilot_assistance_enabled():
+        return _copilot_disabled_status()
+
+    try:
+        status = await copilot_summary_service.get_status()
+    except Exception as exc:  # pragma: no cover - SDK/runtime dependent
+        logger.warning("Copilot status check failed: %s", exc)
+        status = {
+            "available": False,
+            "authenticated": False,
+            "model": copilot_summary_service.model,
+            "supports_vision": None,
+            "error": str(exc) or "Copilot status check failed.",
+        }
+    status["enabled"] = True
+    return status
 
 
 @app.get("/api/copilot/models")
 async def list_copilot_models():
     """List the Copilot models available to the signed-in user."""
+    if not _copilot_assistance_enabled():
+        return {
+            "enabled": False,
+            "models": [],
+            "current_model": copilot_summary_service.model,
+        }
+
     try:
         models = await copilot_summary_service.list_available_models()
-    except CopilotSummaryError as exc:
+    except Exception as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     return {
+        "enabled": True,
         "models": models,
         "current_model": copilot_summary_service.model,
     }
@@ -389,6 +437,9 @@ async def list_copilot_models():
 @app.post("/api/copilot/model")
 async def set_copilot_model(request: Request):
     """Switch the Copilot model used for subsequent summary requests."""
+    if not _copilot_assistance_enabled():
+        raise HTTPException(status_code=403, detail="Copilot assistance is turned off")
+
     payload = await request.json()
     model_name = str(payload.get("model", "")).strip()
     if not model_name:
@@ -399,7 +450,7 @@ async def set_copilot_model(request: Request):
     except CopilotSummaryError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    status = await copilot_summary_service.get_status()
+    status = await get_copilot_status()
     return {
         "model": copilot_summary_service.model,
         "status": status,
@@ -1014,6 +1065,9 @@ async def update_reader_preferences(request: Request):
         if flag_name in payload:
             updates[flag_name] = bool(payload[flag_name])
 
+    if "copilot_enabled" in payload:
+        updates["copilot_enabled"] = bool(payload["copilot_enabled"])
+
     if "font_family" in payload:
         font = str(payload["font_family"])
         if font not in VALID_READER_FONTS:
@@ -1123,6 +1177,9 @@ async def get_chapters_text(request: Request):
 @app.post("/api/copilot/summarize/text")
 async def summarize_text_with_copilot(request: Request):
     """Summarize chapter text or a selected passage with Copilot SDK."""
+    if not _copilot_assistance_enabled():
+        raise HTTPException(status_code=403, detail="Copilot assistance is turned off")
+
     payload = await request.json()
     source = str(payload.get("source", "")).strip().lower()
     book_id = str(payload.get("book_id", "")).strip()
@@ -1165,7 +1222,8 @@ async def summarize_text_with_copilot(request: Request):
             book_title=book_title,
             chapter_title=chapter_title,
         )
-    except CopilotSummaryError as exc:
+    except Exception as exc:
+        logger.warning("Copilot text summary failed: %s", exc)
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     return {
@@ -1179,6 +1237,9 @@ async def summarize_text_with_copilot(request: Request):
 @app.post("/api/copilot/summarize/image")
 async def summarize_image_with_copilot(request: Request):
     """Summarize an EPUB image or rendered PDF page with Copilot SDK."""
+    if not _copilot_assistance_enabled():
+        raise HTTPException(status_code=403, detail="Copilot assistance is turned off")
+
     payload = await request.json()
     source = str(payload.get("source", "")).strip().lower()
     book_id = str(payload.get("book_id", "")).strip()
@@ -1190,7 +1251,7 @@ async def summarize_image_with_copilot(request: Request):
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
 
-    status = await copilot_summary_service.get_status()
+    status = await get_copilot_status()
     if not status.get("available"):
         raise HTTPException(
             status_code=503,
@@ -1222,7 +1283,8 @@ async def summarize_image_with_copilot(request: Request):
                 book_title=book.metadata.title,
                 chapter_title=chapter.title if chapter else None,
             )
-        except CopilotSummaryError as exc:
+        except Exception as exc:
+            logger.warning("Copilot image-file summary failed: %s", exc)
             raise HTTPException(status_code=503, detail=str(exc)) from exc
 
         return {
@@ -1249,7 +1311,8 @@ async def summarize_image_with_copilot(request: Request):
                 book_title=book.metadata.title,
                 chapter_title=f"Page {page_index + 1}",
             )
-        except CopilotSummaryError as exc:
+        except Exception as exc:
+            logger.warning("Copilot image-blob summary failed: %s", exc)
             raise HTTPException(status_code=503, detail=str(exc)) from exc
 
         return {
