@@ -546,6 +546,9 @@
         .copilot-status-actions { display: inline-flex; align-items: center; gap: 4px; }
         .copilot-status-btn { border: none; border-radius: 6px; background: transparent; color: #475569; cursor: pointer; font-size: 1em; font-weight: 600; padding: 2px 6px; }
         .copilot-status-btn:hover { background: rgba(0,0,0,0.06); }
+        .copilot-model-select { border: 1px solid #d6dae4; border-radius: 6px; background: rgba(255,255,255,0.95); color: #1f2937; font-size: 0.85em; font-weight: 600; padding: 2px 6px; cursor: pointer; max-width: 180px; }
+        .copilot-model-select:disabled { opacity: 0.55; cursor: not-allowed; }
+        .copilot-model-select.hidden { display: none; }
 
         /* Copilot help dialog */
         #copilot-help-modal { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; padding: 20px; background: rgba(15, 23, 42, 0.42); z-index: 1200; }
@@ -611,6 +614,7 @@
         <span class="copilot-status-dot"></span>
         <span class="copilot-status-label" id="copilot-status-label">Checking…</span>
         <span class="copilot-status-actions">
+            <select id="copilot-model-select" class="copilot-model-select hidden" onchange="onCopilotModelChange(event)" title="Select Copilot model" aria-label="Copilot model"></select>
             <button class="copilot-status-btn" type="button" onclick="refreshCopilotStatus()" title="Refresh status">↻</button>
             <button class="copilot-status-btn" type="button" onclick="openCopilotHelpDialog()" title="Help">?</button>
         </span>
@@ -1171,6 +1175,7 @@
             model: null,
             supports_vision: null,
             error: null,
+            models: [],
         };
 
         function updateReaderSettingsStatus(message, isError = false) {
@@ -3139,6 +3144,7 @@
             const banner = document.getElementById('copilot-status-banner');
             const label = document.getElementById('copilot-status-label');
             const helpError = document.getElementById('copilot-help-error');
+            const select = document.getElementById('copilot-model-select');
             if (!banner || !label) return;
 
             banner.classList.remove('checking', 'signed-in', 'signed-out', 'faded');
@@ -3161,6 +3167,70 @@
             if (helpError) {
                 helpError.textContent = copilotStatusState.error
                     || 'Reader3 will use the local Copilot credentials once they are available.';
+            }
+
+            if (select) {
+                const models = Array.isArray(copilotStatusState.models) ? copilotStatusState.models : [];
+                if (copilotStatusState.authenticated && models.length > 0) {
+                    // Rebuild options only when model list changed to preserve selection state
+                    const signature = models.map(m => m.id).join('|') + '::' + (copilotStatusState.model || '');
+                    if (select.dataset.signature !== signature) {
+                        select.innerHTML = '';
+                        models.forEach(m => {
+                            const opt = document.createElement('option');
+                            opt.value = m.id;
+                            const visionTag = m.supports_vision ? ' (vision)' : '';
+                            opt.textContent = `${m.name || m.id}${visionTag}`;
+                            if (m.id === copilotStatusState.model) opt.selected = true;
+                            select.appendChild(opt);
+                        });
+                        select.dataset.signature = signature;
+                    }
+                    select.classList.remove('hidden');
+                    select.disabled = false;
+                } else {
+                    select.classList.add('hidden');
+                    select.dataset.signature = '';
+                }
+            }
+        }
+
+        async function fetchCopilotModels() {
+            try {
+                const response = await fetch('/api/copilot/models');
+                if (!response.ok) return [];
+                const data = await response.json();
+                return Array.isArray(data.models) ? data.models : [];
+            } catch (err) {
+                return [];
+            }
+        }
+
+        async function onCopilotModelChange(event) {
+            const select = event.target;
+            const newModel = select.value;
+            if (!newModel || newModel === copilotStatusState.model) return;
+
+            const previousModel = copilotStatusState.model;
+            select.disabled = true;
+            try {
+                const response = await fetch('/api/copilot/model', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ model: newModel }),
+                });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    throw new Error(data.detail || 'Failed to switch Copilot model.');
+                }
+                showCopyToast(`Copilot model switched to ${newModel}.`, 'success');
+                await fetchCopilotStatus(false);
+            } catch (err) {
+                showCopyToast(err.message || 'Could not switch Copilot model.', 'error');
+                // Revert selection in UI
+                select.value = previousModel || '';
+            } finally {
+                select.disabled = false;
             }
         }
 
@@ -3186,6 +3256,7 @@
                     model: data.model || null,
                     supports_vision: data.supports_vision,
                     error: data.error || null,
+                    models: copilotStatusState.models || [],
                 };
             } catch (err) {
                 copilotStatusState = {
@@ -3195,7 +3266,14 @@
                     model: null,
                     supports_vision: null,
                     error: err.message || 'Unable to contact Copilot status endpoint.',
+                    models: [],
                 };
+            }
+
+            if (copilotStatusState.authenticated) {
+                copilotStatusState.models = await fetchCopilotModels();
+            } else {
+                copilotStatusState.models = [];
             }
 
             updateCopilotStatusBanner();

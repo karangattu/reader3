@@ -373,6 +373,39 @@ async def get_copilot_status():
     return await copilot_summary_service.get_status()
 
 
+@app.get("/api/copilot/models")
+async def list_copilot_models():
+    """List the Copilot models available to the signed-in user."""
+    try:
+        models = await copilot_summary_service.list_available_models()
+    except CopilotSummaryError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return {
+        "models": models,
+        "current_model": copilot_summary_service.model,
+    }
+
+
+@app.post("/api/copilot/model")
+async def set_copilot_model(request: Request):
+    """Switch the Copilot model used for subsequent summary requests."""
+    payload = await request.json()
+    model_name = str(payload.get("model", "")).strip()
+    if not model_name:
+        raise HTTPException(status_code=400, detail="model is required")
+
+    try:
+        copilot_summary_service.set_model(model_name)
+    except CopilotSummaryError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    status = await copilot_summary_service.get_status()
+    return {
+        "model": copilot_summary_service.model,
+        "status": status,
+    }
+
+
 @lru_cache(maxsize=50)
 def load_book_cached(folder_name: str) -> Optional[Book]:
     """

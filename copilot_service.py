@@ -114,6 +114,34 @@ class CopilotSummaryService:
         status["supports_vision"] = self._extract_vision_support(model_info)
         return status
 
+    async def list_available_models(self) -> list[dict[str, Any]]:
+        """Return the set of Copilot models the current user can switch to."""
+        client = await self._ensure_runtime_started()
+        try:
+            models = await client.list_models()
+        except Exception as exc:  # pragma: no cover - network/auth dependent
+            raise CopilotSummaryError(str(exc)) from exc
+
+        normalized: list[dict[str, Any]] = []
+        for model in models or []:
+            model_id = self._read_value(model, "id", "name", "model")
+            if not model_id:
+                continue
+            display_name = self._read_value(model, "name", "display_name", "id") or model_id
+            normalized.append({
+                "id": model_id,
+                "name": display_name,
+                "supports_vision": self._extract_vision_support(model),
+            })
+        return normalized
+
+    def set_model(self, model_name: str) -> None:
+        """Update the active Copilot model used for new summary sessions."""
+        cleaned = (model_name or "").strip()
+        if not cleaned:
+            raise CopilotSummaryError("Model name is required.")
+        self.model = cleaned
+
     async def summarize_text(
         self,
         text: str,

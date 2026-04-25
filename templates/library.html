@@ -1469,10 +1469,10 @@
                 </div>
                 <div class="book-actions">
                     <a href="/read/{{ book.id }}/0" class="btn">Read</a>
-                    <button type="button" class="btn btn-add-to-collection" onclick="openBookCollectionsModal('{{ book.id }}', '{{ book.title | e }}')" title="Add to Collection">
+                    <button type="button" class="btn btn-add-to-collection" data-book-id="{{ book.id | e }}" data-book-title="{{ book.title | e }}" onclick="openBookCollectionsModal(this.dataset.bookId, this.dataset.bookTitle)" title="Add to Collection">
                         <i class="fa-solid fa-layer-group"></i>
                     </button>
-                    <button type="button" class="btn btn-delete" onclick="deleteBook('{{ book.id }}', '{{ book.title }}')">
+                    <button type="button" class="btn btn-delete" data-book-id="{{ book.id | e }}" data-book-title="{{ book.title | e }}" onclick="deleteBook(this.dataset.bookId, this.dataset.bookTitle)">
                         Delete
                     </button>
                 </div>
