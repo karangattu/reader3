@@ -62,7 +62,6 @@ class ReaderPreferences:
     high_contrast: bool = False
     font_family: str = "Georgia"
     pdf_copy_image_dpi: int = 300
-    copilot_enabled: bool = True
 
 
 @dataclass
@@ -466,7 +465,6 @@ class UserDataManager:
             'high_contrast',
             'font_family',
             'pdf_copy_image_dpi',
-            'copilot_enabled',
         ):
             if field_name in kwargs and kwargs[field_name] is not None:
                 setattr(prefs, field_name, kwargs[field_name])

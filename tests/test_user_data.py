@@ -605,7 +605,6 @@ class TestReaderPreferences:
         assert prefs.page_width_px == 700
         assert prefs.reduced_motion is False
         assert prefs.high_contrast is False
-        assert prefs.copilot_enabled is True
 
     def test_update_reader_preferences_persists(self, temp_data_dir):
         """Updated reader preferences should persist across manager instances."""
@@ -618,7 +617,6 @@ class TestReaderPreferences:
             page_width_px=820,
             reduced_motion=True,
             high_contrast=True,
-            copilot_enabled=False,
         )
 
         assert updated.theme == "sepia"
@@ -627,7 +625,6 @@ class TestReaderPreferences:
         assert updated.page_width_px == 820
         assert updated.reduced_motion is True
         assert updated.high_contrast is True
-        assert updated.copilot_enabled is False
 
         reloaded = UserDataManager(temp_data_dir).get_reader_preferences()
         assert reloaded.theme == "sepia"
@@ -636,7 +633,6 @@ class TestReaderPreferences:
         assert reloaded.page_width_px == 820
         assert reloaded.reduced_motion is True
         assert reloaded.high_contrast is True
-        assert reloaded.copilot_enabled is False
 
     def test_update_reader_preferences_merges_partial_updates(self, manager):
         """Partial updates should preserve previously saved preference values."""

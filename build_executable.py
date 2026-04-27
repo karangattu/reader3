@@ -55,9 +55,6 @@ def build(onefile: bool = False, console: bool = False):
         'pymupdf',
         'ebooklib',
         'bs4',
-        'copilot',
-        'copilot.client',
-        'copilot.session',
     ]
 
     # Packages to collect all files from
@@ -66,7 +63,6 @@ def build(onefile: bool = False, console: bool = False):
         'starlette',
         'uvicorn',
         'pymupdf',
-        'copilot',
     ]
 
     mode_flag = '--onefile' if onefile else '--onedir'

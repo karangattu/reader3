@@ -512,73 +512,9 @@
         /* Inline copy buttons next to headings */
         .heading-copy-btn { margin-left: 8px; display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border: 1px solid #ddd; border-radius: 6px; background: #f8f9fa; color: #444; font-size: 0.8em; cursor: pointer; transition: all 0.15s; }
         .heading-copy-btn:hover { background: #eef2ff; border-color: #d0d7ff; color: #2c3e50; }
-
-        /* Copilot summary panel */
-        #copilot-summary-panel { position: fixed; top: 60px; right: -400px; width: 360px; height: calc(100vh - 80px); background: #fff; border-left: 1px solid #ddd; box-shadow: -4px 0 12px rgba(0,0,0,0.1); z-index: 999; transition: right 0.3s ease; overflow: hidden; font-family: -apple-system, sans-serif; display: flex; flex-direction: column; }
-        #copilot-summary-panel.visible { right: 0; }
-        .copilot-summary-status { padding: 0 20px 14px; font-size: 0.85em; color: #666; border-bottom: 1px solid #eee; min-height: 20px; }
-        .copilot-summary-status.error { color: #c0392b; }
-        .copilot-summary-status.loading { color: #2980b9; }
-        .copilot-summary-content { flex: 1; overflow-y: auto; padding: 20px; font-size: 0.95em; color: #333; line-height: 1.6; }
-        .copilot-summary-content h1, .copilot-summary-content h2, .copilot-summary-content h3 { margin: 0.8em 0 0.4em; color: #1e293b; }
-        .copilot-summary-content h1 { font-size: 1.2em; } .copilot-summary-content h2 { font-size: 1.1em; } .copilot-summary-content h3 { font-size: 1.0em; }
-        .copilot-summary-content ul, .copilot-summary-content ol { margin: 0.4em 0; padding-left: 1.4em; }
-        .copilot-summary-content li { margin-bottom: 0.3em; }
-        .copilot-summary-content p { margin: 0.5em 0; }
-        .copilot-summary-content code { padding: 1px 5px; border-radius: 4px; background: #f1f5f9; font-size: 0.9em; }
-        .copilot-summary-content hr { border: none; border-top: 1px solid #e2e8f0; margin: 0.8em 0; }
-        .copilot-summary-actions { padding: 15px 20px; background: #f8f9fa; border-top: 1px solid #eee; }
-        .copilot-summary-copy-btn { width: 100%; padding: 10px 14px; border: 1px solid #d0d7ff; border-radius: 8px; background: #eef2ff; color: #2c3e50; cursor: pointer; font-size: 0.9em; }
-        .copilot-summary-copy-btn:disabled { opacity: 0.55; cursor: not-allowed; }
-
-        /* Copilot auth status – compact pill */
-        #copilot-status-banner { position: fixed; top: 10px; right: 14px; display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px; border: 1px solid #d6dae4; border-radius: 20px; background: rgba(255,255,255,0.92); box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08); z-index: 1100; backdrop-filter: blur(8px); font-size: 0.78em; transition: opacity 0.4s ease; }
-        #copilot-status-banner.checking { border-color: #d0d7ff; background: rgba(238,242,255,0.92); }
-        #copilot-status-banner.signed-in { border-color: #cfe9d8; background: rgba(240, 253, 244, 0.92); }
-        #copilot-status-banner.signed-out { border-color: #f2d7b7; background: rgba(255, 248, 235, 0.94); }
-        #copilot-status-banner.faded { opacity: 0.35; }
-        #copilot-status-banner.faded:hover { opacity: 1; }
-        .copilot-status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-        .checking .copilot-status-dot { background: #818cf8; }
-        .signed-in .copilot-status-dot { background: #22c55e; }
-        .signed-out .copilot-status-dot { background: #f59e0b; }
-        .copilot-status-label { font-weight: 600; color: #1f2937; white-space: nowrap; }
-        .copilot-status-actions { display: inline-flex; align-items: center; gap: 4px; }
-        .copilot-status-btn { border: none; border-radius: 6px; background: transparent; color: #475569; cursor: pointer; font-size: 1em; font-weight: 600; padding: 2px 6px; }
-        .copilot-status-btn:hover { background: rgba(0,0,0,0.06); }
-        .copilot-model-select { border: 1px solid #d6dae4; border-radius: 6px; background: rgba(255,255,255,0.95); color: #1f2937; font-size: 0.85em; font-weight: 600; padding: 2px 6px; cursor: pointer; max-width: 180px; }
-        .copilot-model-select:disabled { opacity: 0.55; cursor: not-allowed; }
-        .copilot-model-select.hidden { display: none; }
-        body.copilot-disabled #copilot-status-banner,
-        body.copilot-disabled #copilot-summary-panel,
-        body.copilot-disabled [data-summary-action] { display: none !important; }
-
-        /* Copilot help dialog */
-        #copilot-help-modal { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; padding: 20px; background: rgba(15, 23, 42, 0.42); z-index: 1200; }
-        #copilot-help-modal.visible { display: flex; }
-        .copilot-help-dialog { width: min(520px, 100%); max-height: calc(100vh - 40px); overflow-y: auto; border-radius: 16px; background: #fff; box-shadow: 0 20px 60px rgba(15, 23, 42, 0.28); }
-        .copilot-help-body { padding: 18px 20px 22px; color: #334155; font-size: 0.94em; line-height: 1.6; }
-        .copilot-help-body p { margin: 0 0 14px; }
-        .copilot-help-steps { margin: 0 0 16px 20px; padding: 0; }
-        .copilot-help-steps li { margin-bottom: 8px; }
-        .copilot-help-inline-code { padding: 2px 6px; border-radius: 6px; background: #eef2ff; color: #1e3a8a; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.92em; }
-        .copilot-help-error { margin: 14px 0 0; padding: 10px 12px; border-radius: 10px; background: #fff7ed; color: #9a3412; font-size: 0.86em; }
-        .copilot-help-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 18px; }
-        .copilot-help-link { color: #1d4ed8; font-weight: 600; text-decoration: none; }
-        .copilot-help-link:hover { text-decoration: underline; }
-
-        @media (max-width: 700px) {
-            .copilot-help-actions { align-items: stretch; flex-direction: column; }
-        }
-
-        /* Inline image summary controls */
-        .inline-image-summary-wrapper { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 8px; margin: 14px 0; }
-        .inline-image-summary-btn { padding: 7px 11px; border: 1px solid #d0d7ff; border-radius: 8px; background: #eef2ff; color: #2c3e50; font-size: 0.85em; cursor: pointer; }
-        .inline-image-summary-btn:disabled { opacity: 0.55; cursor: not-allowed; }
-
-    </style>
+\n    </style>
 </head>
-<body class="{{ 'is-pdf ' if is_pdf else '' }}theme-{{ reader_preferences.theme }}{% if reader_preferences.high_contrast %} high-contrast{% endif %}{% if reader_preferences.reduced_motion %} reduced-motion{% endif %}{% if reader_preferences.copilot_enabled is sameas false %} copilot-disabled{% endif %}" style="--reader-font-size: {{ reader_preferences.font_size_px }}px; --reader-line-height: {{ reader_preferences.line_height }}; --reader-page-width: {{ reader_preferences.page_width_px }}px; --reader-font-family: '{{ book_font or reader_preferences.font_family }}';">
+<body class="{{ 'is-pdf ' if is_pdf else '' }}theme-{{ reader_preferences.theme }}{% if reader_preferences.high_contrast %} high-contrast{% endif %}{% if reader_preferences.reduced_motion %} reduced-motion{% endif %}" style="--reader-font-size: {{ reader_preferences.font_size_px }}px; --reader-line-height: {{ reader_preferences.line_height }}; --reader-page-width: {{ reader_preferences.page_width_px }}px; --reader-font-family: '{{ book_font or reader_preferences.font_family }}';">
 
     <!-- Reading progress bar at top -->
     <div id="reading-progress">
@@ -605,61 +541,13 @@
         <button onclick="addBookmark()" title="Bookmark this passage"><i class="fa-regular fa-bookmark"></i> Bookmark</button>
         <button onclick="openAddNoteModal()" title="Add a note"><i class="fa-regular fa-note-sticky"></i> Note</button>
         <button onclick="copySelectedText()" title="Copy selected text"><i class="fa-regular fa-copy"></i> Copy</button>
-        <button data-summary-action onclick="summarizeSelectedText()" title="Summarize selected text"><i class="fa-solid fa-wand-magic-sparkles"></i> Summarize</button>
+
         <button onclick="appendToClipboard()" title="Add to existing clipboard"><i class="fa-solid fa-plus"></i> Add to Batch</button>
         <button onclick="clearSelection()" title="Clear selection"><i class="fa-solid fa-xmark"></i></button>
     </div>
     
     <!-- Copy toast notification -->
     <div id="copy-toast"></div>
-
-    <div id="copilot-status-banner" class="checking" role="status" aria-live="polite">
-        <span class="copilot-status-dot"></span>
-        <span class="copilot-status-label" id="copilot-status-label">Checking…</span>
-        <span class="copilot-status-actions">
-            <select id="copilot-model-select" class="copilot-model-select hidden" onchange="onCopilotModelChange(event)" title="Select Copilot model" aria-label="Copilot model"></select>
-            <button class="copilot-status-btn" type="button" onclick="refreshCopilotStatus()" title="Refresh status">↻</button>
-            <button class="copilot-status-btn" type="button" onclick="openCopilotHelpDialog()" title="Help">?</button>
-        </span>
-    </div>
-
-    <div id="copilot-help-modal" aria-hidden="true">
-        <div class="copilot-help-dialog" role="dialog" aria-modal="true" aria-labelledby="copilot-help-title">
-            <div class="panel-header">
-                <span class="panel-title" id="copilot-help-title"><i class="fa-solid fa-circle-info"></i> Copilot Sign-in Help</span>
-                <button class="panel-close" onclick="closeCopilotHelpDialog()"><i class="fa-solid fa-xmark"></i></button>
-            </div>
-            <div class="copilot-help-body">
-                <p>Reader3 uses the local GitHub Copilot sign-in on this machine. It does not open its own GitHub login page.</p>
-                <ol class="copilot-help-steps">
-                    <li>Install Copilot CLI if it is not already available on this machine.</li>
-                    <li>Open Terminal and run <span class="copilot-help-inline-code">copilot</span>.</li>
-                    <li>Type <span class="copilot-help-inline-code">/login</span> and follow the GitHub device-flow prompts in your browser.</li>
-                    <li>Come back to Reader3 and click <strong>Refresh status</strong>.</li>
-                </ol>
-                <p>You can also authenticate with <span class="copilot-help-inline-code">COPILOT_GITHUB_TOKEN</span>, <span class="copilot-help-inline-code">GH_TOKEN</span>, or <span class="copilot-help-inline-code">GITHUB_TOKEN</span>.</p>
-                <div class="copilot-help-error" id="copilot-help-error">Current status details will appear here after Reader3 checks Copilot.</div>
-                <div class="copilot-help-actions">
-                    <a class="copilot-help-link" href="https://docs.github.com/en/copilot/how-tos/set-up/install-copilot-cli" target="_blank" rel="noopener noreferrer">Install Copilot CLI</a>
-                    <button class="copilot-status-btn" type="button" onclick="refreshCopilotStatus()">Refresh status</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div id="copilot-summary-panel" aria-hidden="true">
-        <div class="panel-header">
-            <span class="panel-title"><i class="fa-solid fa-wand-magic-sparkles"></i> Summary</span>
-            <button class="panel-close" onclick="toggleCopilotSummaryPanel(false)"><i class="fa-solid fa-xmark"></i></button>
-        </div>
-        <div class="copilot-summary-status" id="copilot-summary-status">Select text, a chapter, or an image to summarize it.</div>
-        <div class="copilot-summary-content" id="copilot-summary-content">No summary yet.</div>
-        <div class="copilot-summary-actions">
-            <button class="copilot-summary-copy-btn" id="copilot-summary-copy-btn" onclick="copyCopilotSummary()" disabled>
-                <i class="fa-regular fa-copy"></i> Copy Summary
-            </button>
-        </div>
-    </div>
     
     <!-- Highlight context menu -->
     <div id="highlight-context-menu">
@@ -925,16 +813,7 @@
                     </div>
                     <input id="reader-high-contrast" type="checkbox">
                 </label>
-
-                <label class="reader-toggle-row" for="reader-copilot-enabled">
-                    <div>
-                        <div class="reader-setting-label"><span>Copilot assistance</span></div>
-                        <div class="reader-setting-help">Show summary controls and use local Copilot credentials when available.</div>
-                    </div>
-                    <input id="reader-copilot-enabled" type="checkbox">
-                </label>
-
-                <div class="reader-settings-actions">
+\n                <div class="reader-settings-actions">
                     <button class="toolbar-btn" type="button" onclick="resetReaderPreferences()"><i class="fa-solid fa-rotate-left"></i> Reset</button>
                     <div id="reader-settings-status" class="reader-settings-status" aria-live="polite"></div>
                 </div>
@@ -1084,7 +963,6 @@
                 </div>
                 {% else %}
                 <button class="toolbar-btn" type="button" onclick="copyAllLoaded()" id="copy-all-btn" title="Copy all loaded content"><i class="fa-regular fa-copy"></i> Copy All</button>
-                <button class="toolbar-btn" type="button" data-summary-action onclick="summarizeCurrentChapter()" title="Summarize this chapter"><i class="fa-solid fa-wand-magic-sparkles"></i> Summarize Chapter</button>
                 <button class="toolbar-btn" type="button" onclick="showBatchClipboard()" id="batch-clipboard-btn" style="display: none;"><i class="fa-regular fa-folder-open"></i> Batch (<span id="batch-count">0</span>)</button>
                 {% endif %}
             </div>
@@ -1102,9 +980,6 @@
                             </button>
                             <button class="pdf-copy-image-btn" onclick="copyPageText(this, {{ chapter_index }})" title="Copy page text to clipboard">
                                 <i class="fa-regular fa-copy"></i> Copy Text
-                            </button>
-                            <button class="pdf-copy-image-btn" data-summary-action onclick="summarizePdfPageImage({{ chapter_index }})" title="Summarize this page image">
-                                <i class="fa-solid fa-wand-magic-sparkles"></i> Summarize Image
                             </button>
                         </div>
                     </div>
@@ -1152,7 +1027,7 @@
         const bookId = {{ book_id | tojson }};
         const totalPages = {{ book.spine|length }};
         const defaultPdfCopyImageDpi = {{ pdf_copy_image_dpi_default }};
-        const defaultReaderPreferences = {"theme": "light", "font_size_px": 19, "line_height": 1.8, "page_width_px": 700, "reduced_motion": false, "high_contrast": false, "font_family": "Georgia", "pdf_copy_image_dpi": {{ pdf_copy_image_dpi_default }}, "copilot_enabled": true};
+        const defaultReaderPreferences = {"theme": "light", "font_size_px": 19, "line_height": 1.8, "page_width_px": 700, "reduced_motion": false, "high_contrast": false, "font_family": "Georgia", "pdf_copy_image_dpi": {{ pdf_copy_image_dpi_default }}};
         let readerPreferences = {{ reader_preferences | tojson }};
         let bookFont = {{ (book_font | tojson) if book_font else 'null' }};
         let currentPageIndex = {{ chapter_index }};
@@ -1177,18 +1052,6 @@
         let sessionStartTime = null;
         let currentNoteContext = null; // For add note modal
         let readerSettingsSaveTimeout = null;
-        let copilotSummaryInFlight = false;
-        let copilotSummaryLastText = '';
-        let copilotStatusState = {
-            checked: false,
-            enabled: readerPreferences.copilot_enabled !== false,
-            available: false,
-            authenticated: false,
-            model: null,
-            supports_vision: null,
-            error: null,
-            models: [],
-        };
 
         function updateReaderSettingsStatus(message, isError = false) {
             const statusEl = document.getElementById('reader-settings-status');
@@ -1204,7 +1067,7 @@
             const pageWidth = document.getElementById('reader-page-width');
             const reducedMotion = document.getElementById('reader-reduced-motion');
             const highContrast = document.getElementById('reader-high-contrast');
-            const copilotEnabled = document.getElementById('reader-copilot-enabled');
+
             const fontFamily = document.getElementById('reader-font-family');
             const bookFontCheckbox = document.getElementById('reader-book-font');
             const pdfCopyDpiSelect = document.getElementById('pdf-copy-dpi-select');
@@ -1217,10 +1080,6 @@
             pageWidth.value = readerPreferences.page_width_px;
             reducedMotion.checked = !!readerPreferences.reduced_motion;
             highContrast.checked = !!readerPreferences.high_contrast;
-            if (copilotEnabled) {
-                copilotEnabled.checked = readerPreferences.copilot_enabled !== false;
-            }
-
             const activeFont = bookFont || readerPreferences.font_family;
             fontFamily.value = activeFont;
             bookFontCheckbox.checked = !!bookFont;
@@ -1237,21 +1096,14 @@
             document.getElementById('reader-font-family-value').textContent = activeFont;
         }
 
-        function isCopilotEnabled() {
-            return readerPreferences.copilot_enabled !== false;
-        }
-
         function applyReaderPreferences() {
-            document.body.classList.remove('theme-light', 'theme-sepia', 'theme-dark', 'high-contrast', 'reduced-motion', 'copilot-disabled');
+            document.body.classList.remove('theme-light', 'theme-sepia', 'theme-dark', 'high-contrast', 'reduced-motion');
             document.body.classList.add(`theme-${readerPreferences.theme}`);
             if (readerPreferences.high_contrast) {
                 document.body.classList.add('high-contrast');
             }
             if (readerPreferences.reduced_motion) {
                 document.body.classList.add('reduced-motion');
-            }
-            if (!isCopilotEnabled()) {
-                document.body.classList.add('copilot-disabled');
             }
 
             const activeFont = bookFont || readerPreferences.font_family;
@@ -1260,7 +1112,7 @@
             document.body.style.setProperty('--reader-page-width', `${readerPreferences.page_width_px}px`);
             document.body.style.setProperty('--reader-font-family', `'${activeFont}'`);
             syncReaderSettingsForm();
-            updateCopilotSummaryActionState();
+
         }
 
         async function persistReaderPreferences() {
@@ -1329,7 +1181,7 @@
                 reduced_motion: document.getElementById('reader-reduced-motion'),
                 high_contrast: document.getElementById('reader-high-contrast'),
                 pdf_copy_image_dpi: document.getElementById('pdf-copy-dpi-select'),
-                copilot_enabled: document.getElementById('reader-copilot-enabled'),
+
             };
 
             const fontFamilySelect = document.getElementById('reader-font-family');
@@ -1358,27 +1210,6 @@
             controls.high_contrast.addEventListener('change', (event) => {
                 readerPreferences.high_contrast = event.target.checked;
                 queueReaderPreferencesSave();
-            });
-            controls.copilot_enabled?.addEventListener('change', (event) => {
-                readerPreferences.copilot_enabled = event.target.checked;
-                queueReaderPreferencesSave();
-                if (event.target.checked) {
-                    fetchCopilotStatus(true);
-                } else {
-                    closeCopilotHelpDialog();
-                    toggleCopilotSummaryPanel(false);
-                    copilotStatusState = {
-                        checked: true,
-                        enabled: false,
-                        available: false,
-                        authenticated: false,
-                        model: null,
-                        supports_vision: null,
-                        error: null,
-                        models: [],
-                    };
-                    updateCopilotStatusBanner();
-                }
             });
             controls.pdf_copy_image_dpi?.addEventListener('change', (event) => {
                 readerPreferences.pdf_copy_image_dpi = Number(event.target.value);
@@ -2415,9 +2246,6 @@
                         <button class="pdf-copy-image-btn" onclick="copyPageText(this, ${page.index})" title="Copy page text to clipboard">
                             <i class="fa-regular fa-copy"></i> Copy Text
                         </button>
-                        <button class="pdf-copy-image-btn" data-summary-action onclick="summarizePdfPageImage(${page.index})" title="Summarize this page image">
-                            <i class="fa-solid fa-wand-magic-sparkles"></i> Summarize Image
-                        </button>
                     </div>
                 </div>
                 ${page.content}
@@ -3161,456 +2989,7 @@
                 toast.classList.remove('visible');
             }, 2000);
         }
-
-        function toggleCopilotSummaryPanel(visible) {
-            const panel = document.getElementById('copilot-summary-panel');
-            if (!panel) return;
-
-            panel.classList.toggle('visible', Boolean(visible));
-            panel.setAttribute('aria-hidden', visible ? 'false' : 'true');
-        }
-
-        function openCopilotHelpDialog() {
-            const modal = document.getElementById('copilot-help-modal');
-            if (!modal) return;
-
-            modal.classList.add('visible');
-            modal.setAttribute('aria-hidden', 'false');
-        }
-
-        function closeCopilotHelpDialog() {
-            const modal = document.getElementById('copilot-help-modal');
-            if (!modal) return;
-
-            modal.classList.remove('visible');
-            modal.setAttribute('aria-hidden', 'true');
-        }
-
-        function updateCopilotStatusBanner() {
-            const banner = document.getElementById('copilot-status-banner');
-            const label = document.getElementById('copilot-status-label');
-            const helpError = document.getElementById('copilot-help-error');
-            const select = document.getElementById('copilot-model-select');
-            if (!banner || !label) return;
-
-            banner.classList.remove('checking', 'signed-in', 'signed-out', 'faded');
-
-            if (!isCopilotEnabled()) {
-                banner.classList.add('signed-out');
-                label.textContent = 'Copilot · Off';
-            } else if (!copilotStatusState.checked) {
-                banner.classList.add('checking');
-                label.textContent = 'Checking…';
-            } else if (copilotStatusState.authenticated) {
-                banner.classList.add('signed-in');
-                label.textContent = copilotStatusState.model
-                    ? `Copilot · ${copilotStatusState.model}`
-                    : 'Copilot · Signed in';
-                // Fade out after 4s when signed in so it doesn't distract
-                setTimeout(() => banner.classList.add('faded'), 4000);
-            } else {
-                banner.classList.add('signed-out');
-                label.textContent = 'Copilot · Not signed in';
-            }
-
-            if (helpError) {
-                helpError.textContent = copilotStatusState.error
-                    || 'Reader3 will use the local Copilot credentials once they are available.';
-            }
-
-            if (select) {
-                const models = Array.isArray(copilotStatusState.models) ? copilotStatusState.models : [];
-                if (isCopilotEnabled() && copilotStatusState.authenticated && models.length > 0) {
-                    // Rebuild options only when model list changed to preserve selection state
-                    const signature = models.map(m => m.id).join('|') + '::' + (copilotStatusState.model || '');
-                    if (select.dataset.signature !== signature) {
-                        select.innerHTML = '';
-                        models.forEach(m => {
-                            const opt = document.createElement('option');
-                            opt.value = m.id;
-                            const visionTag = m.supports_vision ? ' (vision)' : '';
-                            opt.textContent = `${m.name || m.id}${visionTag}`;
-                            if (m.id === copilotStatusState.model) opt.selected = true;
-                            select.appendChild(opt);
-                        });
-                        select.dataset.signature = signature;
-                    }
-                    select.classList.remove('hidden');
-                    select.disabled = false;
-                } else {
-                    select.classList.add('hidden');
-                    select.dataset.signature = '';
-                }
-            }
-        }
-
-        async function fetchCopilotModels() {
-            try {
-                const response = await fetch('/api/copilot/models');
-                if (!response.ok) return [];
-                const data = await response.json();
-                return Array.isArray(data.models) ? data.models : [];
-            } catch (err) {
-                return [];
-            }
-        }
-
-        async function onCopilotModelChange(event) {
-            const select = event.target;
-            const newModel = select.value;
-            if (!newModel || newModel === copilotStatusState.model) return;
-
-            const previousModel = copilotStatusState.model;
-            select.disabled = true;
-            try {
-                const response = await fetch('/api/copilot/model', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ model: newModel }),
-                });
-                const data = await response.json().catch(() => ({}));
-                if (!response.ok) {
-                    throw new Error(data.detail || 'Failed to switch Copilot model.');
-                }
-                showCopyToast(`Copilot model switched to ${newModel}.`, 'success');
-                await fetchCopilotStatus(false);
-            } catch (err) {
-                showCopyToast(err.message || 'Could not switch Copilot model.', 'error');
-                // Revert selection in UI
-                select.value = previousModel || '';
-            } finally {
-                select.disabled = false;
-            }
-        }
-
-        async function fetchCopilotStatus(showToast = false) {
-            if (!isCopilotEnabled()) {
-                copilotStatusState = {
-                    checked: true,
-                    enabled: false,
-                    available: false,
-                    authenticated: false,
-                    model: null,
-                    supports_vision: null,
-                    error: null,
-                    models: [],
-                };
-                updateCopilotStatusBanner();
-                return copilotStatusState;
-            }
-
-            copilotStatusState = {
-                ...copilotStatusState,
-                checked: false,
-                enabled: true,
-                error: null,
-            };
-            updateCopilotStatusBanner();
-
-            try {
-                const response = await fetch('/api/copilot/status');
-                const data = await response.json();
-                if (!response.ok) {
-                    throw new Error(data.detail || 'Failed to load Copilot status.');
-                }
-
-                copilotStatusState = {
-                    checked: true,
-                    enabled: data.enabled !== false,
-                    available: Boolean(data.available),
-                    authenticated: Boolean(data.authenticated),
-                    model: data.model || null,
-                    supports_vision: data.supports_vision,
-                    error: data.error || null,
-                    models: copilotStatusState.models || [],
-                };
-            } catch (err) {
-                copilotStatusState = {
-                    checked: true,
-                    enabled: true,
-                    available: false,
-                    authenticated: false,
-                    model: null,
-                    supports_vision: null,
-                    error: err.message || 'Unable to contact Copilot status endpoint.',
-                    models: [],
-                };
-            }
-
-            if (copilotStatusState.authenticated) {
-                copilotStatusState.models = await fetchCopilotModels();
-            } else {
-                copilotStatusState.models = [];
-            }
-
-            updateCopilotStatusBanner();
-
-            if (showToast) {
-                showCopyToast(
-                    copilotStatusState.authenticated
-                        ? 'Copilot status refreshed.'
-                        : 'Copilot is still not signed in.',
-                    copilotStatusState.authenticated ? 'success' : 'info'
-                );
-            }
-
-            return copilotStatusState;
-        }
-
-        async function refreshCopilotStatus() {
-            return fetchCopilotStatus(true);
-        }
-
-        function updateCopilotSummaryActionState() {
-            document.querySelectorAll('[data-summary-action]').forEach(button => {
-                button.disabled = copilotSummaryInFlight || !isCopilotEnabled();
-            });
-        }
-
-        function renderMarkdown(md) {
-            // Lightweight markdown-to-HTML (handles the subset LLMs typically produce)
-            function esc(s) {
-                return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-            }
-            const lines = md.split('\n');
-            const out = [];
-            let inUl = false, inOl = false;
-            for (let i = 0; i < lines.length; i++) {
-                let line = lines[i];
-                // Headings
-                const hMatch = line.match(/^(#{1,3})\s+(.*)/);
-                if (hMatch) { closeLists(); out.push(`<h${hMatch[1].length}>${inline(esc(hMatch[2]))}</h${hMatch[1].length}>`); continue; }
-                // Horizontal rule
-                if (/^[-*_]{3,}\s*$/.test(line)) { closeLists(); out.push('<hr>'); continue; }
-                // Unordered list
-                const ulMatch = line.match(/^\s*[-*+]\s+(.*)/);
-                if (ulMatch) { if (!inUl) { closeLists(); out.push('<ul>'); inUl = true; } out.push(`<li>${inline(esc(ulMatch[1]))}</li>`); continue; }
-                // Ordered list
-                const olMatch = line.match(/^\s*\d+[.)\s]\s*(.*)/);
-                if (olMatch) { if (!inOl) { closeLists(); out.push('<ol>'); inOl = true; } out.push(`<li>${inline(esc(olMatch[1]))}</li>`); continue; }
-                // Blank line
-                if (!line.trim()) { closeLists(); out.push(''); continue; }
-                // Paragraph text
-                closeLists(); out.push(`<p>${inline(esc(line))}</p>`);
-            }
-            closeLists();
-            function closeLists() { if (inUl) { out.push('</ul>'); inUl = false; } if (inOl) { out.push('</ol>'); inOl = false; } }
-            function inline(s) {
-                return s
-                    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-                    .replace(/\*(.+?)\*/g, '<em>$1</em>')
-                    .replace(/`(.+?)`/g, '<code>$1</code>');
-            }
-            return out.join('\n');
-        }
-
-        function setCopilotSummaryState(message, type = 'idle', summary = '') {
-            const statusEl = document.getElementById('copilot-summary-status');
-            const contentEl = document.getElementById('copilot-summary-content');
-            const copyBtn = document.getElementById('copilot-summary-copy-btn');
-            if (!statusEl || !contentEl || !copyBtn) return;
-
-            statusEl.textContent = message;
-            statusEl.classList.remove('error', 'loading');
-            if (type === 'error' || type === 'loading') {
-                statusEl.classList.add(type);
-            }
-
-            copilotSummaryLastText = summary || '';
-            if (summary) {
-                contentEl.innerHTML = renderMarkdown(summary);
-            } else {
-                contentEl.textContent = type === 'loading' ? 'Working…' : 'No summary yet.';
-            }
-            copyBtn.disabled = !copilotSummaryLastText;
-        }
-
-        async function copyCopilotSummary() {
-            if (!copilotSummaryLastText) {
-                showCopyToast('No summary available yet.', 'info');
-                return;
-            }
-
-            try {
-                await clipboardWriteText(copilotSummaryLastText);
-                showCopyToast('Summary copied!', 'success');
-            } catch (err) {
-                showCopyToast('Clipboard unavailable.', 'error');
-            }
-        }
-
-        async function requestCopilotSummary(endpoint, payload, loadingMessage) {
-            if (copilotSummaryInFlight) {
-                showCopyToast('A summary is already in progress.', 'info');
-                return;
-            }
-
-            if (!isCopilotEnabled()) {
-                showCopyToast('Copilot assistance is turned off.', 'info');
-                return;
-            }
-
-            if (!copilotStatusState.checked) {
-                await fetchCopilotStatus();
-            }
-
-            if (!copilotStatusState.authenticated) {
-                openCopilotHelpDialog();
-                showCopyToast('Sign in to Copilot on this machine first.', 'info');
-                return;
-            }
-
-            if (!copilotStatusState.available) {
-                toggleCopilotSummaryPanel(true);
-                setCopilotSummaryState(
-                    copilotStatusState.error
-                        || 'Copilot summaries are currently unavailable.',
-                    'error'
-                );
-                showCopyToast('Copilot summaries are unavailable.', 'error');
-                return;
-            }
-
-            copilotSummaryInFlight = true;
-            updateCopilotSummaryActionState();
-            toggleCopilotSummaryPanel(true);
-            setCopilotSummaryState(loadingMessage, 'loading');
-
-            try {
-                const response = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload),
-                });
-                const data = await response.json();
-                if (!response.ok) {
-                    throw new Error(data.detail || 'Summary request failed');
-                }
-                setCopilotSummaryState('Summary ready.', 'idle', data.summary || '');
-            } catch (err) {
-                await fetchCopilotStatus();
-                setCopilotSummaryState(
-                    err.message || 'Summary request failed.',
-                    'error'
-                );
-                showCopyToast('Summary failed.', 'error');
-            } finally {
-                copilotSummaryInFlight = false;
-                updateCopilotSummaryActionState();
-            }
-        }
-
-        async function summarizeSelectedText() {
-            const selection = window.getSelection();
-            const selectedText = selection.toString().trim();
-
-            if (!selectedText) {
-                showCopyToast('No text selected.', 'error');
-                return;
-            }
-
-            await requestCopilotSummary(
-                '/api/copilot/summarize/text',
-                {
-                    book_id: bookId,
-                    source: 'selection',
-                    selected_text: selectedText,
-                    chapter_index: currentPageIndex,
-                },
-                'Summarizing selected text…'
-            );
-        }
-
-        async function summarizeCurrentChapter() {
-            await requestCopilotSummary(
-                '/api/copilot/summarize/text',
-                {
-                    book_id: bookId,
-                    source: 'chapter',
-                    chapter_index: currentPageIndex,
-                },
-                'Summarizing the current chapter…'
-            );
-        }
-
-        async function summarizePdfPageImage(pageIndex) {
-            await requestCopilotSummary(
-                '/api/copilot/summarize/image',
-                {
-                    book_id: bookId,
-                    source: 'pdf',
-                    page_index: pageIndex,
-                },
-                `Summarizing page ${pageIndex + 1}…`
-            );
-        }
-
-        function extractInlineImageName(src) {
-            if (!src) return '';
-            try {
-                const url = new URL(src, window.location.href);
-                const parts = url.pathname.split('/').filter(Boolean);
-                return decodeURIComponent(parts[parts.length - 1] || '');
-            } catch (err) {
-                const parts = src.split('/').filter(Boolean);
-                return decodeURIComponent(parts[parts.length - 1] || '');
-            }
-        }
-
-        async function summarizeInlineImage(image) {
-            const imageName = extractInlineImageName(
-                image?.getAttribute('src') || image?.src
-            );
-            if (!imageName) {
-                showCopyToast('Unable to identify this image.', 'error');
-                return;
-            }
-
-            await requestCopilotSummary(
-                '/api/copilot/summarize/image',
-                {
-                    book_id: bookId,
-                    source: 'epub',
-                    image_name: imageName,
-                    chapter_index: currentPageIndex,
-                },
-                'Summarizing image…'
-            );
-        }
-
-        function enhanceInlineImageSummaryControls() {
-            if (isPDF) return;
-
-            const content = document.getElementById('book-content');
-            if (!content) return;
-
-            content.querySelectorAll('img').forEach(image => {
-                if (image.classList.contains('pdf-page-image')) return;
-                if (image.dataset.summaryEnhanced === 'true') return;
-
-                image.dataset.summaryEnhanced = 'true';
-                const wrapper = document.createElement('div');
-                wrapper.className = 'inline-image-summary-wrapper';
-                image.parentNode.insertBefore(wrapper, image);
-                wrapper.appendChild(image);
-
-                const button = document.createElement('button');
-                button.type = 'button';
-                button.className = 'inline-image-summary-btn';
-                button.setAttribute('data-summary-action', 'true');
-                button.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Summarize Image';
-                button.addEventListener('click', event => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    summarizeInlineImage(image);
-                });
-                wrapper.appendChild(button);
-            });
-
-            updateCopilotSummaryActionState();
-        }
-        
-        // Copy all loaded content (EPUB only - PDFs use image copy)
+\n\n        // Copy all loaded content (EPUB only - PDFs use image copy)
         async function copyAllLoaded() {
             if (isPDF) {
                 showCopyToast('Use "Copy Text" or "Copy Image" buttons on each page', 'info');
@@ -4144,16 +3523,10 @@
                 }
             });
 
-            document.getElementById('copilot-help-modal').addEventListener('click', (e) => {
-                if (e.target.id === 'copilot-help-modal') {
-                    closeCopilotHelpDialog();
-                }
-            });
-            
             // Load chapter progress and reading times
             loadChapterProgress();
             calculateReadingTimes();
-            fetchCopilotStatus();
+
             
             // Check for search query parameter from library search
             const urlParams = new URLSearchParams(window.location.search);
@@ -4168,7 +3541,7 @@
             // Inject copy buttons next to headings in EPUB content
             if (!isPDF) {
                 injectHeadingCopyButtons();
-                enhanceInlineImageSummaryControls();
+
             }
         });
         
@@ -5086,3 +4459,4 @@
     </script>
 </body>
 </html>
+

@@ -2334,29 +2334,9 @@ class TestReaderPreferencesAPI:
         assert data["font_size_px"] == 19
         assert data["line_height"] == 1.8
         assert data["page_width_px"] == 700
-        assert data["copilot_enabled"] is True
         assert data["pdf_copy_image_dpi"] == server._clamp_pdf_copy_image_dpi(
             server.PDF_COPY_IMAGE_DPI
         )
-
-    def test_update_reader_preferences_can_disable_copilot(self, client):
-        """Copilot assistance can be toggled through reader settings."""
-        try:
-            response = client.put(
-                "/api/reader/preferences",
-                json={"copilot_enabled": False},
-            )
-
-            assert response.status_code == 200
-            assert response.json()["copilot_enabled"] is False
-
-            follow_up = client.get("/api/reader/preferences")
-            assert follow_up.json()["copilot_enabled"] is False
-        finally:
-            client.put(
-                "/api/reader/preferences",
-                json={"copilot_enabled": True},
-            )
 
     def test_update_reader_preferences_round_trip(self, client):
         """Reader settings updates should persist and be returned on read."""

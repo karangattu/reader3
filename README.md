@@ -16,24 +16,6 @@ uv run python launcher.py
 
 The browser opens automatically. Upload a book and start reading!
 
-## Copilot Summaries
-
-Reader3 can now summarize:
-
-- the current chapter
-- selected text
-- PDF page images
-- inline EPUB images
-
-The reader keeps working if Copilot is unavailable. You can also turn Copilot assistance off or on from Reader Settings; when it is off, Reader3 skips Copilot status checks and hides summary controls.
-
-Setup notes:
-
-- Run `uv sync` so the Python Copilot SDK is installed.
-- The default Copilot model is `gpt-4.1`. Override it with `READER3_COPILOT_MODEL` if you want a different model.
-- Image summaries require a vision-capable model.
-- The current integration is single-user, local, and non-streaming.
-
 ## Keyboard Shortcuts
 
 | Shortcut | Action |
