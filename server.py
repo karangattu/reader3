@@ -11,10 +11,13 @@ import threading
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
+from dataclasses import replace
 from datetime import datetime
 from functools import lru_cache
 from typing import Dict, Optional
+from urllib.parse import quote, unquote
 
+from bs4 import BeautifulSoup
 from fastapi import BackgroundTasks, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import (
@@ -474,6 +477,61 @@ def _resolve_book_image_path(book_id: str, image_name: str) -> str:
     return os.path.join(BOOKS_DIR, safe_book_id, "images", safe_image_name)
 
 
+def _url_path_basename(value: str) -> str:
+    """Return the basename from a URL/path using EPUB-style separators."""
+    clean_value = unquote(value).split("#", 1)[0].split("?", 1)[0]
+    return clean_value.replace("\\", "/").rsplit("/", 1)[-1]
+
+
+def _book_image_url(book_id: str, image_path: str) -> str:
+    """Build an absolute reader URL for a stored book image."""
+    image_name = _url_path_basename(image_path)
+    return f"/read/{quote(book_id, safe='')}/images/{quote(image_name, safe='')}"
+
+
+def _book_image_exists(book_id: str, image_path: str) -> bool:
+    """Return whether a stored book image exists on disk."""
+    image_name = _url_path_basename(image_path)
+    return os.path.exists(_resolve_book_image_path(book_id, image_name))
+
+
+def _rewrite_reader_content_asset_paths(content: str, book_id: str, book: Book) -> str:
+    """Rewrite legacy relative image paths so reader pages resolve assets reliably."""
+    if not content or "<img" not in content.lower():
+        return content
+
+    soup = BeautifulSoup(content, "html.parser")
+    image_map = getattr(book, "images", {}) or {}
+
+    for img in soup.find_all("img"):
+        src = img.get("src") or ""
+        if not src or src.startswith(("/", "data:", "http://", "https://")):
+            continue
+
+        decoded_src = unquote(src).replace("\\", "/")
+        image_name = _url_path_basename(decoded_src)
+        mapped_path = (
+            image_map.get(decoded_src)
+            or image_map.get(image_name)
+        )
+
+        if not mapped_path and image_name:
+            mapped_path = f"images/{image_name}"
+
+        if mapped_path:
+            if not _book_image_exists(book_id, mapped_path):
+                cover_image = getattr(book, "cover_image", None)
+                if (
+                    cover_image
+                    and "cover" in image_name.lower()
+                    and _book_image_exists(book_id, cover_image)
+                ):
+                    mapped_path = cover_image
+            img["src"] = _book_image_url(book_id, mapped_path)
+
+    return str(soup)
+
+
 def _render_pdf_page_image_bytes(
     book_id: str,
     page_num: int,
@@ -875,7 +933,10 @@ async def list_upload_statuses():
 @app.get("/read/{book_id}", response_class=HTMLResponse)
 async def redirect_to_first_chapter(request: Request, book_id: str):
     """Helper to just go to chapter 0."""
-    return await read_chapter(request=request, book_id=book_id, chapter_index=0)
+    return RedirectResponse(
+        url=str(request.url_for("read_chapter", book_id=book_id, chapter_index=0)),
+        status_code=303,
+    )
 
 
 @app.get("/read/{book_id}/{chapter_index}", response_class=HTMLResponse)
@@ -889,6 +950,10 @@ async def read_chapter(request: Request, book_id: str, chapter_index: int):
         raise HTTPException(status_code=404, detail="Chapter not found")
 
     current_chapter = book.spine[chapter_index]
+    current_chapter = replace(
+        current_chapter,
+        content=_rewrite_reader_content_asset_paths(current_chapter.content, book_id, book),
+    )
 
     # Calculate Prev/Next links
     prev_idx = chapter_index - 1 if chapter_index > 0 else None
@@ -1034,7 +1099,7 @@ async def get_pages(book_id: str, start: int, count: int):
         pages.append({
             "index": i,
             "title": chapter.title,
-            "content": chapter.content
+            "content": _rewrite_reader_content_asset_paths(chapter.content, book_id, book),
         })
 
     return {"pages": pages, "total": total}

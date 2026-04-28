@@ -512,7 +512,7 @@
         /* Inline copy buttons next to headings */
         .heading-copy-btn { margin-left: 8px; display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border: 1px solid #ddd; border-radius: 6px; background: #f8f9fa; color: #444; font-size: 0.8em; cursor: pointer; transition: all 0.15s; }
         .heading-copy-btn:hover { background: #eef2ff; border-color: #d0d7ff; color: #2c3e50; }
-\n    </style>
+    </style>
 </head>
 <body class="{{ 'is-pdf ' if is_pdf else '' }}theme-{{ reader_preferences.theme }}{% if reader_preferences.high_contrast %} high-contrast{% endif %}{% if reader_preferences.reduced_motion %} reduced-motion{% endif %}" style="--reader-font-size: {{ reader_preferences.font_size_px }}px; --reader-line-height: {{ reader_preferences.line_height }}; --reader-page-width: {{ reader_preferences.page_width_px }}px; --reader-font-family: '{{ book_font or reader_preferences.font_family }}';">
 
@@ -813,7 +813,7 @@
                     </div>
                     <input id="reader-high-contrast" type="checkbox">
                 </label>
-\n                <div class="reader-settings-actions">
+                <div class="reader-settings-actions">
                     <button class="toolbar-btn" type="button" onclick="resetReaderPreferences()"><i class="fa-solid fa-rotate-left"></i> Reset</button>
                     <div id="reader-settings-status" class="reader-settings-status" aria-live="polite"></div>
                 </div>
@@ -897,15 +897,16 @@
                     -->
                     {% set is_active = current_chapter.href == item.file_href %}
 
-                    <a href="#" onclick="findAndGo('{{ item.file_href }}')"
-                       class="toc-link {% if is_active %}active{% endif %}"
-                       data-href="{{ item.file_href }}">
-                        <input type="checkbox" class="chapter-checkbox" data-href="{{ item.file_href }}" onclick="event.stopPropagation(); updateCopyButton();">
+                          <a href="#" onclick="findAndGo(this.dataset.navHref || this.dataset.href); return false;"
+                              class="toc-link {% if is_active %}active{% endif %}"
+                              data-nav-href="{{ item.href | e }}"
+                              data-href="{{ item.file_href | e }}">
+                        <input type="checkbox" class="chapter-checkbox" data-href="{{ item.file_href | e }}" onclick="event.stopPropagation(); updateCopyButton();">
                         <span class="toc-title">{{ item.title }}</span>
-                        <span class="toc-copied-badge" data-href="{{ item.file_href }}" title="Chapter has been copied"><i class="fa-solid fa-circle-check"></i> Copied</span>
-                        <span class="toc-chapter-percent" data-href="{{ item.file_href }}">0%</span>
+                        <span class="toc-copied-badge" data-href="{{ item.file_href | e }}" title="Chapter has been copied"><i class="fa-solid fa-circle-check"></i> Copied</span>
+                        <span class="toc-chapter-percent" data-href="{{ item.file_href | e }}">0%</span>
                     </a>
-                    <div class="chapter-progress" data-href="{{ item.file_href }}">
+                    <div class="chapter-progress" data-href="{{ item.file_href | e }}">
                         <div class="chapter-progress-bar">
                             <div class="chapter-progress-fill" style="width: 0%"></div>
                         </div>
@@ -1405,7 +1406,7 @@
         
         function updateCurrentChapterProgress(progress) {
             // Find the current chapter's progress bar in the sidebar
-            const currentHref = "{{ current_chapter.href }}";
+            const currentHref = {{ current_chapter.href | tojson }};
             const progressElem = document.querySelector(`.chapter-progress[data-href="${currentHref}"] .chapter-progress-fill`);
             if (progressElem) {
                 progressElem.style.width = `${Math.min(100, progress)}%`;
@@ -2989,7 +2990,8 @@
                 toast.classList.remove('visible');
             }, 2000);
         }
-\n\n        // Copy all loaded content (EPUB only - PDFs use image copy)
+
+        // Copy all loaded content (EPUB only - PDFs use image copy)
         async function copyAllLoaded() {
             if (isPDF) {
                 showCopyToast('Use "Copy Text" or "Copy Image" buttons on each page', 'info');
@@ -3306,7 +3308,7 @@
         // Pass the spine data from python to JS
         const spineMap = {
             {% for ch in book.spine %}
-            "{{ ch.href }}": {{ loop.index0 }},
+            {{ ch.href | tojson }}: {{ loop.index0 }},
             {% endfor %}
         };
 
@@ -3333,8 +3335,9 @@
             // The TOC usually has specific filenames e.g. "text/part001.html"
             // Sometimes it has anchors "text/part001.html#header"
             // We strip the anchor to find the page index
-            const cleanFile = filename.split('#')[0];
-            const anchor = filename.split('#')[1];
+            const targetHref = String(filename || '');
+            const cleanFile = targetHref.split('#')[0];
+            const anchor = targetHref.split('#')[1];
 
             // Try exact match first
             let idx = spineMap[cleanFile];
@@ -3353,6 +3356,9 @@
             if (idx !== undefined) {
                 saveScrollPosition();
                 let url = "/read/" + encodeURIComponent(bookId) + "/" + idx;
+                if (anchor) {
+                    url += "#" + encodeURIComponent(anchor);
+                }
                 // Fade out current content for a smooth transition
                 const content = document.querySelector('.content-container');
                 if (content) {
@@ -3705,7 +3711,7 @@
                 const minutes = Math.ceil(wordCount / wordsPerMinute);
                 
                 // Update reading time for current chapter
-                const currentHref = "{{ current_chapter.href }}";
+                const currentHref = {{ current_chapter.href | tojson }};
                 const timeElem = document.querySelector(`.chapter-progress[data-href="${currentHref}"] .chapter-reading-time`);
                 if (timeElem) {
                     timeElem.textContent = formatReadingTime(minutes);
@@ -3761,9 +3767,9 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         book_id: bookId,
-                        book_title: "{{ book.metadata.title | replace('\"', '\\\"') }}",
+                        book_title: {{ book.metadata.title | tojson }},
                         chapter_index: currentPageIndex,
-                        chapter_title: "{{ current_chapter.title | replace('\"', '\\\"') }}"
+                        chapter_title: {{ current_chapter.title | tojson }}
                     })
                 });
                 if (response.ok) {
@@ -4336,7 +4342,7 @@
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        book_id: '{{ book_id }}',
+                        book_id: {{ book_id | tojson }},
                         chapter_hrefs: selectedHrefs
                     })
                 });

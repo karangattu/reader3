@@ -1347,8 +1347,9 @@ def process_epub(epub_path: str, output_dir: str) -> Book:
 
         for item in book.get_items():
             if item.get_type() == ebooklib.ITEM_IMAGE:
+                item_name = (item.get_name() or "").replace("\\", "/")
                 # Normalize filename
-                original_fname = os.path.basename(item.get_name())
+                original_fname = posixpath.basename(item_name)
                 # Sanitize filename for OS
                 safe_fname = "".join(
                     [c for c in original_fname
@@ -1364,7 +1365,8 @@ def process_epub(epub_path: str, output_dir: str) -> Book:
                 # and just the basename to be robust against
                 # messy HTML src attributes
                 rel_path = f"images/{safe_fname}"
-                image_map[item.get_name()] = rel_path
+                image_map[item_name] = rel_path
+                image_map[posixpath.normpath(item_name)] = rel_path
                 image_map[original_fname] = rel_path
 
         # 4.5 Extract Cover Image
@@ -1402,12 +1404,15 @@ def process_epub(epub_path: str, output_dir: str) -> Book:
                         continue
 
                     # Decode URL (part01/image%201.jpg -> part01/image 1.jpg)
-                    src_decoded = unquote(src)
-                    filename = os.path.basename(src_decoded)
+                    src_decoded = unquote(src).replace("\\", "/")
+                    filename = posixpath.basename(src_decoded)
+                    normalized_src = posixpath.normpath(src_decoded)
 
                     # Try to find in map
                     if src_decoded in image_map:
                         img['src'] = image_map[src_decoded]
+                    elif normalized_src in image_map:
+                        img['src'] = image_map[normalized_src]
                     elif filename in image_map:
                         img['src'] = image_map[filename]
 
