@@ -4,6 +4,7 @@ import json
 import os
 import sqlite3
 import tempfile
+from contextlib import closing
 
 import pytest
 
@@ -843,7 +844,7 @@ class TestDataPersistence:
         assert os.path.exists(db_file)
         assert not os.path.exists(os.path.join(temp_data_dir, "user_data.json"))
 
-        with sqlite3.connect(db_file) as conn:
+        with closing(sqlite3.connect(db_file)) as conn:
             row = conn.execute(
                 "select title from bookmarks where id = ?",
                 ("bookmark_sqlite",),
