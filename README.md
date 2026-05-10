@@ -1,65 +1,44 @@
 # Reader3
 
-A lightweight, self-hosted EPUB & PDF reader for reading books alongside LLMs.
+A lightweight, self-hosted EPUB & PDF reader for reading books.
 
-![reader3](reader3.png)
+## Local setup
 
-## Quick Start
+Requirements:
+
+- Python 3.12+
+- `uv`
+
+Install dependencies:
 
 ```bash
-# Install dependencies
 uv sync
+```
 
-# Run the app
+Run locally:
+
+```bash
 uv run python launcher.py
 ```
 
-The browser opens automatically. Upload a book and start reading!
+The app opens in your browser. Upload a book to start reading.
 
-## Keyboard Shortcuts
+## Tests
 
-| Shortcut | Action |
-| -------- | ------ |
-| `Ctrl/⌘+F` | Search |
-| `Ctrl/⌘+B` | Bookmarks panel |
-| `Escape` | Close modals |
+```bash
+uv run python -m pytest -q
+```
 
-## Building Executable
+## Build
 
 ```bash
 uv run python build_executable.py
 ```
 
-Creates:
+## Notes
 
-- macOS: `dist/Reader3.app`
-- macOS installer: `dist/Reader3-macOS.dmg` (drag `Reader3.app` into `Applications`)
-- Windows (default): `dist/Reader3/Reader3.exe` and `dist/Reader3-windows-portable.zip`
-
-Windows notes:
-
-- Keep the entire `Reader3` folder together (do not move only the `.exe`).
-- For debugging startup issues on Windows, build with console logs:
-
-```bash
-uv run python build_executable.py --console
-```
-
-## CI Releases (on tags)
-
-Pushing a version tag triggers GitHub Actions to build and publish platform artifacts automatically.
-
-```bash
-git tag v1.7.0 && git push origin v1.7.0
-```
-
-Release assets include:
-
-- `Reader3-windows-portable.zip`
-- `Reader3.exe`
-- `Reader3-macOS.zip`
-- `Reader3-macOS.dmg`
-- SHA256 checksum files for each artifact
+- Local app data is stored in the book directory.
+- `launcher.py` is the simplest way to run the app in development.
 
 ## License
 

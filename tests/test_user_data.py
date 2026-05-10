@@ -2,6 +2,7 @@
 
 import json
 import os
+import sqlite3
 import tempfile
 
 import pytest
@@ -781,6 +782,62 @@ class TestExport:
 
 class TestDataPersistence:
     """Tests for data persistence across sessions."""
+
+    def test_data_is_persisted_to_sqlite(self, temp_data_dir):
+        """User state should be stored in SQLite instead of a JSON file."""
+        manager = UserDataManager(temp_data_dir)
+
+        bookmark = Bookmark(
+            id="bookmark_sqlite",
+            book_id="book1",
+            chapter_index=0,
+            scroll_position=0.5,
+            title="Stored in SQLite",
+        )
+        manager.add_bookmark(bookmark)
+
+        db_file = os.path.join(temp_data_dir, "reader3.sqlite3")
+        assert os.path.exists(db_file)
+        assert not os.path.exists(os.path.join(temp_data_dir, "user_data.json"))
+
+        with sqlite3.connect(db_file) as conn:
+            row = conn.execute(
+                "select title from bookmarks where id = ?",
+                ("bookmark_sqlite",),
+            ).fetchone()
+
+        assert row == ("Stored in SQLite",)
+
+    def test_existing_json_data_is_migrated_to_sqlite(self, temp_data_dir):
+        """Existing JSON user data should be imported once into SQLite."""
+        data_file = os.path.join(temp_data_dir, "user_data.json")
+        with open(data_file, "w", encoding="utf-8") as handle:
+            json.dump(
+                {
+                    "bookmarks": {
+                        "book1": [
+                            {
+                                "id": "legacy_bookmark",
+                                "book_id": "book1",
+                                "chapter_index": 2,
+                                "scroll_position": 0.25,
+                                "title": "Legacy bookmark",
+                                "note": None,
+                                "created_at": "2024-01-01T00:00:00",
+                            }
+                        ]
+                    },
+                    "version": "1.3",
+                },
+                handle,
+            )
+
+        manager = UserDataManager(temp_data_dir)
+        bookmarks = manager.get_bookmarks("book1")
+
+        assert len(bookmarks) == 1
+        assert bookmarks[0].id == "legacy_bookmark"
+        assert os.path.exists(os.path.join(temp_data_dir, "reader3.sqlite3"))
 
     def test_data_survives_reload(self, temp_data_dir):
         """Test that data persists across manager instances."""

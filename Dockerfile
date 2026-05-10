@@ -28,7 +28,8 @@ RUN apt-get update && \
 COPY --from=builder /install /usr/local
 
 # Copy application code
-COPY server.py reader3.py ai_service.py semantic_search.py user_data.py ./
+COPY server.py reader3.py semantic_search.py user_data.py ./
+COPY src/ src/
 COPY templates/ templates/
 
 # Create data volume mount point
@@ -51,7 +52,7 @@ EXPOSE 8123
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8123/health')" || exit 1
 
-CMD ["python", "-m", "uvicorn", "server:app", \
+CMD ["python", "-m", "uvicorn", "reader3.app:app", \
      "--host", "0.0.0.0", \
      "--port", "8123", \
      "--workers", "2", \

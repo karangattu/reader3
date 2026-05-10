@@ -55,6 +55,17 @@ def build(onefile: bool = False, console: bool = False):
         'pymupdf',
         'ebooklib',
         'bs4',
+        'reader3.app',
+        'reader3.api.routes.reader',
+        'reader3.api.routes.search',
+        'reader3.domain.models',
+        'reader3.domain.types',
+        'reader3.services.library',
+        'reader3.services.reader',
+        'reader3.services.search',
+        'reader3.storage.books',
+        'reader3.storage.indexes',
+        'reader3.storage.user_data',
     ]
 
     # Packages to collect all files from
@@ -75,6 +86,7 @@ def build(onefile: bool = False, console: bool = False):
         "PyInstaller",
         "--noconfirm",
         "--clean",
+        "--paths=src",
         "--specpath",
         "build",
         mode_flag,

@@ -31,14 +31,13 @@ dev = [
 ]
 
 [tool.setuptools]
-py-modules = [
-    "ai_service",
-    "build_executable",
-    "launcher",
-    "reader3",
-    "semantic_search",
-    "server",
-    "user_data",
+package-dir = {"" = "src"}
+packages = {find = {where = ["src"]}}
+
+[tool.setuptools.package-data]
+reader3 = [
+    "templates/*.html",
+    "static/**/*",
 ]
 
 [tool.pytest.ini_options]
