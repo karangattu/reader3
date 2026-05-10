@@ -7,6 +7,7 @@ import tempfile
 
 import pytest
 
+import user_data as user_data_module
 from user_data import (
     Annotation,
     Bookmark,
@@ -782,6 +783,48 @@ class TestExport:
 
 class TestDataPersistence:
     """Tests for data persistence across sessions."""
+
+    def test_sqlite_connections_are_closed_after_load(
+        self, temp_data_dir, monkeypatch
+    ):
+        """SQLite handles should be closed explicitly for Windows cleanup."""
+        original_connect = sqlite3.connect
+        connections = []
+
+        class TrackingConnection:
+            def __init__(self, connection):
+                object.__setattr__(self, "connection", connection)
+                object.__setattr__(self, "closed", False)
+
+            def __getattr__(self, name):
+                return getattr(self.connection, name)
+
+            def __setattr__(self, name, value):
+                setattr(self.connection, name, value)
+
+            def __enter__(self):
+                self.connection.__enter__()
+                return self
+
+            def __exit__(self, exc_type, exc, traceback):
+                return self.connection.__exit__(exc_type, exc, traceback)
+
+            def close(self):
+                object.__setattr__(self, "closed", True)
+                return self.connection.close()
+
+        def tracking_connect(*args, **kwargs):
+            connection = TrackingConnection(original_connect(*args, **kwargs))
+            connections.append(connection)
+            return connection
+
+        monkeypatch.setattr(user_data_module.sqlite3, "connect", tracking_connect)
+
+        manager = UserDataManager(temp_data_dir)
+        manager.load()
+
+        assert connections
+        assert all(connection.closed for connection in connections)
 
     def test_data_is_persisted_to_sqlite(self, temp_data_dir):
         """User state should be stored in SQLite instead of a JSON file."""

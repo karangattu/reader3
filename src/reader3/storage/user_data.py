@@ -10,6 +10,7 @@ import json
 import os
 import sqlite3
 import threading
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from typing import Dict, List, Optional, Protocol
@@ -248,10 +249,20 @@ class UserDataManager:
         conn.row_factory = sqlite3.Row
         return conn
 
+    @contextmanager
+    def _managed_connection(self):
+        """Open a transaction-aware SQLite connection and always close it."""
+        conn = self._connect()
+        try:
+            with conn:
+                yield conn
+        finally:
+            conn.close()
+
     def _ensure_schema(self):
         """Create the local app-state schema if needed."""
         self._ensure_dir()
-        with self._connect() as conn:
+        with self._managed_connection() as conn:
             conn.executescript(
                 """
                 create table if not exists app_meta (
@@ -406,7 +417,7 @@ class UserDataManager:
             "book_fonts",
             "copied_pages",
         )
-        with self._connect() as conn:
+        with self._managed_connection() as conn:
             for table in data_tables:
                 row = conn.execute(f"select count(*) from {table}").fetchone()
                 if row and row[0] > 0:
@@ -472,7 +483,7 @@ class UserDataManager:
     def _load_from_sqlite(self) -> UserData:
         """Load the full user-data aggregate from SQLite."""
         data = UserData()
-        with self._connect() as conn:
+        with self._managed_connection() as conn:
             for row in conn.execute("select * from highlights order by created_at"):
                 highlight = Highlight(**dict(row))
                 data.highlights.setdefault(highlight.book_id, []).append(highlight)
@@ -556,7 +567,7 @@ class UserDataManager:
     def _write_to_sqlite(self, data: UserData):
         """Persist the full user-data aggregate to SQLite atomically."""
         self._ensure_schema()
-        with self._connect() as conn:
+        with self._managed_connection() as conn:
             conn.execute("begin")
             for table in (
                 "highlights",
