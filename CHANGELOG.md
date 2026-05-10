@@ -2,6 +2,19 @@
 
 All notable changes to Reader3 will be documented in this file.
 
+## [1.8.3] - 2026-05-10
+
+### Fixed
+
+- **Windows CI SQLite cleanup** - Explicitly close internal SQLite connections in `UserDataManager` and close the SQLite connection used by the persistence test so Windows runners no longer fail during temporary-directory teardown with `WinError 32`.
+
+### Technical
+
+- Added a regression test to verify `UserDataManager.load()` closes every opened SQLite connection.
+- Tests: `pytest -q` (609 passed).
+
+---
+
 ## [1.8.2] - 2026-03-30
 
 ### Added
