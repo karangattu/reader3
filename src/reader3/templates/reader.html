@@ -3373,30 +3373,6 @@
             }
         }
 
-        async function copyChapterContent() {
-            const contentEl = document.querySelector('.book-content');
-            if (!contentEl) return;
-
-            const textToCopy = contentEl.innerText.trim();
-            if (!textToCopy) {
-                showCopyToast('Nothing to copy.', 'error');
-                return;
-            }
-
-            try {
-                await clipboardWriteText(textToCopy);
-                showCopyToast('Chapter copied to clipboard!', 'success');
-                // Mark the current chapter as copied in the TOC
-                const currentHref = document.querySelector('.toc-link.active')?.getAttribute('data-href');
-                if (currentHref) {
-                    markChaptersCopied([currentHref]);
-                }
-            } catch (err) {
-                console.error('Copy failed', err);
-                showCopyToast('Clipboard unavailable.', 'error');
-            }
-        }
-
         function toggleSidebar() {
             const body = document.body;
             const toggleBtn = document.getElementById('sidebar-toggle');
@@ -3563,19 +3539,19 @@
 
                 const btn = document.createElement('button');
                 btn.className = 'heading-copy-btn';
-                btn.title = 'Copy this section';
+                btn.title = 'Copy this heading';
                 btn.innerHTML = '<i class="fa-regular fa-copy"></i>';
                 btn.addEventListener('click', async (e) => {
                     e.stopPropagation();
-                    const sectionText = getSectionText(heading);
-                    if (!sectionText) {
-                        showCopyToast('No content in this section', 'info');
+                    const headingText = getHeadingText(heading);
+                    if (!headingText) {
+                        showCopyToast('No heading text to copy', 'info');
                         return;
                     }
                     try {
-                        await clipboardWriteText(sectionText);
+                        await clipboardWriteText(headingText);
                         btn.innerHTML = '<i class="fa-solid fa-check"></i>';
-                        showCopyToast('Section copied!', 'success');
+                        showCopyToast('Heading copied!', 'success');
                         setTimeout(() => { btn.innerHTML = '<i class="fa-regular fa-copy"></i>'; }, 2000);
                     } catch (err) {
                         showCopyToast('Clipboard unavailable', 'error');
@@ -3586,22 +3562,13 @@
             });
         }
 
-        // Get text from a heading until the next heading of equal or higher level
-        function getSectionText(heading) {
-            const level = parseInt(heading.tagName[1]); // 1, 2, or 3
-            const parts = [heading.textContent.trim()];
-            let el = heading.nextElementSibling;
-            while (el) {
-                const tag = el.tagName;
-                // Stop at same-level or higher heading
-                if (/^H[1-6]$/.test(tag) && parseInt(tag[1]) <= level) break;
-                // Skip copy buttons
-                if (!el.classList.contains('heading-copy-btn')) {
-                    parts.push(el.innerText?.trim() || '');
-                }
-                el = el.nextElementSibling;
-            }
-            return parts.filter(Boolean).join('\n\n');
+        function getHeadingText(heading) {
+            return Array.from(heading.childNodes)
+                .filter(node => !(node.nodeType === Node.ELEMENT_NODE && node.classList?.contains('heading-copy-btn')))
+                .map(node => node.textContent || '')
+                .join(' ')
+                .replace(/\s+/g, ' ')
+                .trim();
         }
 
         // ===== KEYBOARD NAVIGATION HELPERS =====
@@ -4465,4 +4432,3 @@
     </script>
 </body>
 </html>
-
