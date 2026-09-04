@@ -2,6 +2,14 @@
 
 A lightweight, self-hosted EPUB & PDF reader for reading books.
 
+## Features
+
+- **EPUB & PDF Reader**: Clean reading interface with progress persistence and Table of Contents navigation.
+- **Chapter & Section Copying**: Single-tap and batch chapter copying from EPUBs with markdown/heading formatting.
+- **PDF Image Copying**: Copy single pages or multi-page composites to clipboard and native share sheet.
+- **Library Shelf**: Automatic cover art extraction for EPUB and PDF documents.
+- **Android App**: Standalone mobile release with offline library ([download `reader3.apk`](reader3.apk)).
+
 ## Local setup
 
 Requirements:
