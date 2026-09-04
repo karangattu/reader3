@@ -960,6 +960,8 @@ class UserDataManager:
             data.chapter_progress[book_id] = {}
         # Only update if new progress is higher (don't lose progress)
         current = data.chapter_progress[book_id].get(chapter_index, 0)
+        if current == 0 and str(chapter_index) in data.chapter_progress[book_id]:
+            current = data.chapter_progress[book_id][str(chapter_index)]
         if progress_percent > current:
             data.chapter_progress[book_id][chapter_index] = min(100, progress_percent)
             self.save()
@@ -977,7 +979,7 @@ class UserDataManager:
         new_items = set(items)
         merged = existing | new_items
         data.copied_pages[book_id] = sorted(merged, key=lambda x: (isinstance(x, str), x))
-        self.save_deferred()
+        self.save()
 
     # Search History
     def add_search(self, query: SearchQuery):

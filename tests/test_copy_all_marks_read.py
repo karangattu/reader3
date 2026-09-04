@@ -31,7 +31,7 @@ class TestCopyAllMarksChapterAsRead:
         
         # Save 100% progress when copy all is called
         response = client.post(
-            f"/api/chapter-progress/{book_id}/{chapter_index}",
+            f"/api/v1/chapter-progress/{book_id}/{chapter_index}",
             json={"progress": 100.0}
         )
         assert response.status_code == 200
@@ -39,7 +39,7 @@ class TestCopyAllMarksChapterAsRead:
         
         # Verify the progress was saved
         # Note: JSON serialization converts int keys to strings
-        progress_response = client.get(f"/api/chapter-progress/{book_id}")
+        progress_response = client.get(f"/api/v1/chapter-progress/{book_id}")
         data = progress_response.json()
         assert str(chapter_index) in data["progress"]
         assert data["progress"][str(chapter_index)] == 100.0
@@ -54,23 +54,23 @@ class TestCopyAllMarksChapterAsRead:
         # Chapter 2: fully read (100%)
         
         client.post(
-            f"/api/chapter-progress/{book_id}/1",
+            f"/api/v1/chapter-progress/{book_id}/1",
             json={"progress": 50.0}
         )
         
         client.post(
-            f"/api/chapter-progress/{book_id}/2",
+            f"/api/v1/chapter-progress/{book_id}/2",
             json={"progress": 100.0}
         )
         
         # Now copy all for chapter 1, marking it as 100%
         client.post(
-            f"/api/chapter-progress/{book_id}/1",
+            f"/api/v1/chapter-progress/{book_id}/1",
             json={"progress": 100.0}
         )
         
         # Get all chapter progress
-        response = client.get(f"/api/chapter-progress/{book_id}")
+        response = client.get(f"/api/v1/chapter-progress/{book_id}")
         data = response.json()
         
         # JSON keys are strings
@@ -86,18 +86,18 @@ class TestCopyAllMarksChapterAsRead:
         
         # First copy all - save 100%
         client.post(
-            f"/api/chapter-progress/{book_id}/{chapter_index}",
+            f"/api/v1/chapter-progress/{book_id}/{chapter_index}",
             json={"progress": 100.0}
         )
         
         # Second copy all - should still be 100%
         client.post(
-            f"/api/chapter-progress/{book_id}/{chapter_index}",
+            f"/api/v1/chapter-progress/{book_id}/{chapter_index}",
             json={"progress": 100.0}
         )
         
         # Verify progress
-        progress_response = client.get(f"/api/chapter-progress/{book_id}")
+        progress_response = client.get(f"/api/v1/chapter-progress/{book_id}")
         data = progress_response.json()
         assert data["progress"][str(chapter_index)] == 100.0
 
@@ -108,12 +108,12 @@ class TestCopyAllMarksChapterAsRead:
         
         # Mark chapter 0 as fully read
         client.post(
-            f"/api/chapter-progress/{book_id}/0",
+            f"/api/v1/chapter-progress/{book_id}/0",
             json={"progress": 100.0}
         )
         
         # Get overall progress
-        response = client.get(f"/api/progress/{book_id}")
+        response = client.get(f"/api/v1/progress/{book_id}")
         data = response.json()
         
         # Should have some progress_percent > 0
@@ -129,13 +129,13 @@ class TestCopyAllMarksChapterAsRead:
         # Mark chapters 0, 2, 4 as read via copy-all
         for chapter_idx in [0, 2, 4]:
             response = client.post(
-                f"/api/chapter-progress/{book_id}/{chapter_idx}",
+                f"/api/v1/chapter-progress/{book_id}/{chapter_idx}",
                 json={"progress": 100.0}
             )
             assert response.status_code == 200
         
         # Verify all are marked
-        progress_response = client.get(f"/api/chapter-progress/{book_id}")
+        progress_response = client.get(f"/api/v1/chapter-progress/{book_id}")
         data = progress_response.json()
         
         for chapter_idx in [0, 2, 4]:
@@ -149,12 +149,12 @@ class TestCopyAllMarksChapterAsRead:
         
         # Mark as read via copy-all
         client.post(
-            f"/api/chapter-progress/{book_id}/{chapter_index}",
+            f"/api/v1/chapter-progress/{book_id}/{chapter_index}",
             json={"progress": 100.0}
         )
         
         # Simulate page reload - fetch progress again
-        response = client.get(f"/api/chapter-progress/{book_id}")
+        response = client.get(f"/api/v1/chapter-progress/{book_id}")
         data = response.json()
         
         # Should still show 100% after reload (JSON keys are strings)
@@ -168,7 +168,7 @@ class TestCopyAllMarksChapterAsRead:
         
         # Save some progress
         response = client.post(
-            f"/api/chapter-progress/{book_id}/{chapter_index}",
+            f"/api/v1/chapter-progress/{book_id}/{chapter_index}",
             json={"progress": 100.0}
         )
         
@@ -187,11 +187,11 @@ class TestChapterProgressBoundaries:
         book_id = f"test_progress_boundary_{uuid.uuid4().hex[:8]}"
         
         client.post(
-            f"/api/chapter-progress/{book_id}/0",
+            f"/api/v1/chapter-progress/{book_id}/0",
             json={"progress": 100.0}
         )
         
-        progress_response = client.get(f"/api/chapter-progress/{book_id}")
+        progress_response = client.get(f"/api/v1/chapter-progress/{book_id}")
         data = progress_response.json()
         
         # Should be exactly 100.0, not 99.9 or 100.1
@@ -204,11 +204,11 @@ class TestChapterProgressBoundaries:
         
         # Try to set over 100% (shouldn't happen in normal flow)
         client.post(
-            f"/api/chapter-progress/{book_id}/0",
+            f"/api/v1/chapter-progress/{book_id}/0",
             json={"progress": 100.0}
         )
         
-        progress_response = client.get(f"/api/chapter-progress/{book_id}")
+        progress_response = client.get(f"/api/v1/chapter-progress/{book_id}")
         data = progress_response.json()
         
         # Should not exceed 100%
@@ -222,7 +222,7 @@ class TestChapterProgressBoundaries:
         
         # Try to mark non-existent chapter
         response = client.post(
-            f"/api/chapter-progress/{book_id}/0",
+            f"/api/v1/chapter-progress/{book_id}/0",
             json={"progress": 100.0}
         )
         
@@ -236,7 +236,7 @@ class TestChapterProgressBoundaries:
         
         # Try negative index
         response = client.post(
-            f"/api/chapter-progress/{book_id}/-1",
+            f"/api/v1/chapter-progress/{book_id}/-1",
             json={"progress": 100.0}
         )
         

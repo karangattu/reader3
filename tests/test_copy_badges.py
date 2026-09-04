@@ -224,7 +224,7 @@ class TestPdfCopiedBadgeCSS:
 
         response = client.get(f"/read/{bid}/0")
         html = response.text
-        assert "/api/pdf/${encodeURIComponent(bookId)}/page-image/${pageIndex}" in html
+        assert "/api/v1/pdf/${encodeURIComponent(bookId)}/page-image/${pageIndex}" in html
 
     def test_pdf_copy_allows_selecting_export_dpi(self, client):
         """PDF copy should expose a DPI selector and avoid hardcoding 300 DPI."""
@@ -336,7 +336,7 @@ class TestEpubMultiChapterCopyAPI:
         create_test_book(bid, "Href EPUB", is_pdf=False, chapters=3)
 
         response = client.post(
-            "/api/chapters/text",
+            "/api/v1/chapters/text",
             json={
                 "book_id": bid,
                 "chapter_hrefs": ["chapter-0.html", "chapter-1.html"],
@@ -354,7 +354,7 @@ class TestEpubMultiChapterCopyAPI:
         create_test_book(bid, "Struct EPUB", is_pdf=False, chapters=2)
 
         response = client.post(
-            "/api/chapters/text",
+            "/api/v1/chapters/text",
             json={
                 "book_id": bid,
                 "chapter_hrefs": ["chapter-0.html"],
@@ -372,7 +372,7 @@ class TestEpubMultiChapterCopyAPI:
         create_test_book(bid, "Unknown EPUB", is_pdf=False, chapters=2)
 
         response = client.post(
-            "/api/chapters/text",
+            "/api/v1/chapters/text",
             json={
                 "book_id": bid,
                 "chapter_hrefs": ["nonexistent.html", "chapter-0.html"],
@@ -389,7 +389,7 @@ class TestEpubMultiChapterCopyAPI:
         create_test_book(bid, "Empty EPUB", is_pdf=False, chapters=2)
 
         response = client.post(
-            "/api/chapters/text",
+            "/api/v1/chapters/text",
             json={
                 "book_id": bid,
                 "chapter_hrefs": [],
@@ -404,7 +404,7 @@ class TestEpubMultiChapterCopyAPI:
         create_test_book(bid, "Order EPUB", is_pdf=False, chapters=4)
 
         response = client.post(
-            "/api/chapters/text",
+            "/api/v1/chapters/text",
             json={
                 "book_id": bid,
                 "chapter_hrefs": ["chapter-2.html", "chapter-0.html", "chapter-3.html"],
@@ -429,12 +429,12 @@ class TestCopyProgressTracking:
         bid = f"test_progress_{uuid.uuid4().hex[:8]}"
 
         response = client.post(
-            f"/api/chapter-progress/{bid}/0",
+            f"/api/v1/chapter-progress/{bid}/0",
             json={"progress": 100.0},
         )
         assert response.status_code == 200
 
-        response = client.get(f"/api/chapter-progress/{bid}")
+        response = client.get(f"/api/v1/chapter-progress/{bid}")
         data = response.json()
         assert data["progress"]["0"] == 100.0
 
@@ -444,12 +444,12 @@ class TestCopyProgressTracking:
 
         for i in range(3):
             resp = client.post(
-                f"/api/chapter-progress/{bid}/{i}",
+                f"/api/v1/chapter-progress/{bid}/{i}",
                 json={"progress": 100.0},
             )
             assert resp.status_code == 200
 
-        response = client.get(f"/api/chapter-progress/{bid}")
+        response = client.get(f"/api/v1/chapter-progress/{bid}")
         data = response.json()
         for i in range(3):
             assert data["progress"][str(i)] == 100.0
@@ -459,11 +459,11 @@ class TestCopyProgressTracking:
         bid = f"test_unmark_{uuid.uuid4().hex[:8]}"
 
         client.post(
-            f"/api/chapter-progress/{bid}/1",
+            f"/api/v1/chapter-progress/{bid}/1",
             json={"progress": 100.0},
         )
 
-        response = client.get(f"/api/chapter-progress/{bid}")
+        response = client.get(f"/api/v1/chapter-progress/{bid}")
         data = response.json()
         assert data["progress"].get("0", 0) == 0
         assert data["progress"]["1"] == 100.0
@@ -605,7 +605,7 @@ class TestCopiedPagesPersistence:
         """GET should return empty list for a book with no copied pages."""
         bid = f"test_cp_empty_{uuid.uuid4().hex[:8]}"
         create_test_book(bid, "Empty Copy", is_pdf=True, chapters=2)
-        resp = client.get(f"/api/copied-pages/{bid}")
+        resp = client.get(f"/api/v1/copied-pages/{bid}")
         assert resp.status_code == 200
         data = resp.json()
         assert data["items"] == []
@@ -615,13 +615,13 @@ class TestCopiedPagesPersistence:
         bid = f"test_cp_pdf_{uuid.uuid4().hex[:8]}"
         create_test_book(bid, "Save PDF", is_pdf=True, chapters=5)
         resp = client.post(
-            f"/api/copied-pages/{bid}",
+            f"/api/v1/copied-pages/{bid}",
             json={"items": [0, 2, 4]},
         )
         assert resp.status_code == 200
         assert resp.json()["status"] == "saved"
 
-        resp = client.get(f"/api/copied-pages/{bid}")
+        resp = client.get(f"/api/v1/copied-pages/{bid}")
         assert resp.status_code == 200
         assert sorted(resp.json()["items"]) == [0, 2, 4]
 
@@ -631,12 +631,12 @@ class TestCopiedPagesPersistence:
         create_test_book(bid, "Save EPUB", is_pdf=False, chapters=3)
         hrefs = ["chapter-0.html", "chapter-2.html"]
         resp = client.post(
-            f"/api/copied-pages/{bid}",
+            f"/api/v1/copied-pages/{bid}",
             json={"items": hrefs},
         )
         assert resp.status_code == 200
 
-        resp = client.get(f"/api/copied-pages/{bid}")
+        resp = client.get(f"/api/v1/copied-pages/{bid}")
         items = resp.json()["items"]
         assert "chapter-0.html" in items
         assert "chapter-2.html" in items
@@ -646,44 +646,44 @@ class TestCopiedPagesPersistence:
         bid = f"test_cp_merge_{uuid.uuid4().hex[:8]}"
         create_test_book(bid, "Merge", is_pdf=True, chapters=5)
 
-        client.post(f"/api/copied-pages/{bid}", json={"items": [0, 1]})
-        client.post(f"/api/copied-pages/{bid}", json={"items": [1, 2, 3]})
+        client.post(f"/api/v1/copied-pages/{bid}", json={"items": [0, 1]})
+        client.post(f"/api/v1/copied-pages/{bid}", json={"items": [1, 2, 3]})
 
-        resp = client.get(f"/api/copied-pages/{bid}")
+        resp = client.get(f"/api/v1/copied-pages/{bid}")
         assert sorted(resp.json()["items"]) == [0, 1, 2, 3]
 
     def test_persist_across_reload(self, client):
         """Data should survive a manager reload (simulating server restart)."""
         bid = f"test_cp_persist_{uuid.uuid4().hex[:8]}"
         create_test_book(bid, "Persist", is_pdf=True, chapters=3)
-        client.post(f"/api/copied-pages/{bid}", json={"items": [0, 2]})
+        client.post(f"/api/v1/copied-pages/{bid}", json={"items": [0, 2]})
 
         # Force flush and reload
         server.user_data_manager.flush()
         server.user_data_manager._data = None
 
-        resp = client.get(f"/api/copied-pages/{bid}")
+        resp = client.get(f"/api/v1/copied-pages/{bid}")
         assert sorted(resp.json()["items"]) == [0, 2]
 
     def test_empty_items_post(self, client):
         """Posting empty items should not break anything."""
         bid = f"test_cp_empty_post_{uuid.uuid4().hex[:8]}"
         create_test_book(bid, "EmptyPost", is_pdf=True, chapters=1)
-        resp = client.post(f"/api/copied-pages/{bid}", json={"items": []})
+        resp = client.post(f"/api/v1/copied-pages/{bid}", json={"items": []})
         assert resp.status_code == 200
 
     def test_delete_book_clears_copied(self, client):
         """Deleting a book should also remove its copied pages data."""
         bid = f"test_cp_delete_{uuid.uuid4().hex[:8]}"
         create_test_book(bid, "DeleteBook", is_pdf=True, chapters=2)
-        client.post(f"/api/copied-pages/{bid}", json={"items": [0, 1]})
+        client.post(f"/api/v1/copied-pages/{bid}", json={"items": [0, 1]})
         server.user_data_manager.flush()
 
         # Verify data exists
-        resp = client.get(f"/api/copied-pages/{bid}")
+        resp = client.get(f"/api/v1/copied-pages/{bid}")
         assert len(resp.json()["items"]) == 2
 
         # Delete book data
         server.user_data_manager.cleanup_book_data(bid)
-        resp = client.get(f"/api/copied-pages/{bid}")
+        resp = client.get(f"/api/v1/copied-pages/{bid}")
         assert resp.json()["items"] == []

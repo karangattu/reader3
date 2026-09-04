@@ -11,10 +11,15 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Dict, List, Optional
 from urllib.parse import unquote
-
 import ebooklib
 from bs4 import BeautifulSoup, Comment
 from ebooklib import epub
+
+import logging
+from dataclasses import asdict
+from reader3.storage.schema import migrate_book_data
+
+logger = logging.getLogger(__name__)
 
 # --- Data structures ---
 
@@ -1477,6 +1482,7 @@ def process_epub(epub_path: str, output_dir: str) -> Book:
 
 
 def save_to_pickle(book: Book, output_dir: str):
+    logger.warning("save_to_pickle is deprecated; use save_to_json instead")
     p_path = os.path.join(output_dir, 'book.pkl')
     with open(p_path, 'wb') as f:
         pickle.dump(book, f)
@@ -1501,6 +1507,86 @@ def save_to_pickle(book: Book, output_dir: str):
     except Exception as e:
         print(f"Error saving metadata to {meta_path}: {e}")
 
+def save_to_json(book: Book, output_dir: str):
+    json_path = os.path.join(output_dir, 'book.json')
+    data = asdict(book)
+    data['_schema_version'] = 1
+    
+    # Exclude text_blocks from PDFPageData as they are generated on demand
+    for page_data in data.get('pdf_page_data', {}).values():
+        if 'text_blocks' in page_data:
+            del page_data['text_blocks']
+            
+    with open(json_path, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False)
+    print(f"Saved structured JSON data to {json_path}")
+
+    meta_path = os.path.join(output_dir, 'book_meta.json')
+    metadata = {
+        "title": book.metadata.title,
+        "authors": book.metadata.authors,
+        "chapters": len(book.spine),
+        "added_at": book.added_at or book.processed_at,
+        "processed_at": book.processed_at,
+        "cover_image": book.cover_image,
+        "is_pdf": book.is_pdf,
+        "language": book.metadata.language,
+        "source_file": book.source_file,
+    }
+    try:
+        with open(meta_path, 'w', encoding='utf-8') as f:
+            json.dump(metadata, f, ensure_ascii=False)
+        print(f"Saved metadata to {meta_path}")
+    except Exception as e:
+        print(f"Error saving metadata to {meta_path}: {e}")
+
+def load_from_json(json_path: str) -> Book:
+    with open(json_path, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+        
+    data = migrate_book_data(data)
+    
+    metadata = BookMetadata(**data['metadata'])
+    spine = [ChapterContent(**ch) for ch in data['spine']]
+    
+    def dict_to_toc(toc_list):
+        result = []
+        for entry in toc_list:
+            children = dict_to_toc(entry.get('children', []))
+            entry_copy = dict(entry)
+            entry_copy['children'] = children
+            result.append(TOCEntry(**entry_copy))
+        return result
+        
+    toc = dict_to_toc(data.get('toc', []))
+    
+    pdf_page_data = {}
+    for k, v in data.get('pdf_page_data', {}).items():
+        page_num = int(k)
+        annotations = [PDFAnnotation(**ann) for ann in v.get('annotations', [])]
+        v_copy = dict(v)
+        v_copy['annotations'] = annotations
+        if 'text_blocks' in v_copy:
+            del v_copy['text_blocks']
+        pdf_page_data[page_num] = PDFPageData(**v_copy)
+        
+    return Book(
+        metadata=metadata,
+        spine=spine,
+        toc=toc,
+        images=data.get('images', {}),
+        source_file=data.get('source_file'),
+        processed_at=data.get('processed_at'),
+        added_at=data.get('added_at', ""),
+        version=data.get('version', "3.0"),
+        is_pdf=data.get('is_pdf', False),
+        cover_image=data.get('cover_image'),
+        pdf_page_data=pdf_page_data,
+        pdf_total_pages=data.get('pdf_total_pages', 0),
+        pdf_has_toc=data.get('pdf_has_toc', False),
+        pdf_thumbnails_generated=data.get('pdf_thumbnails_generated', False),
+        pdf_source_path=data.get('pdf_source_path')
+    )
 
 class DocumentService:
     """Service boundary for ingesting and opening EPUB/PDF documents."""

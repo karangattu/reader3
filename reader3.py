@@ -51,6 +51,8 @@ from reader3.services.library import (  # noqa: E402,F401
     sanitize_text,
     sanitize_toc_entries,
     save_to_pickle,
+    save_to_json,
+    load_from_json,
     search_pdf_text_positions,
     validate_pdf,
 )

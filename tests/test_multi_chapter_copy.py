@@ -26,7 +26,7 @@ class TestMultiChapterCopyAPI:
     def test_get_chapters_text_endpoint_exists(self, client):
         """Test that the chapters/text endpoint exists."""
         response = client.post(
-            "/api/chapters/text",
+            "/api/v1/chapters/text",
             json={"book_id": "nonexistent", "chapter_hrefs": []}
         )
         # Should return 404 for nonexistent book, not 404 for missing endpoint
@@ -35,7 +35,7 @@ class TestMultiChapterCopyAPI:
     def test_get_chapters_text_requires_book_id(self, client):
         """Test that book_id is required."""
         response = client.post(
-            "/api/chapters/text",
+            "/api/v1/chapters/text",
             json={"chapter_hrefs": ["ch1.html"]}
         )
         assert response.status_code == 400
@@ -44,7 +44,7 @@ class TestMultiChapterCopyAPI:
     def test_get_chapters_text_empty_chapter_list(self, client):
         """Test API with empty chapter list."""
         response = client.post(
-            "/api/chapters/text",
+            "/api/v1/chapters/text",
             json={
                 "book_id": "test_book_123",
                 "chapter_hrefs": []
@@ -56,7 +56,7 @@ class TestMultiChapterCopyAPI:
     def test_get_chapters_text_returns_chapters_array(self, client):
         """Test that response contains chapters array."""
         response = client.post(
-            "/api/chapters/text",
+            "/api/v1/chapters/text",
             json={
                 "book_id": "nonexistent",
                 "chapter_hrefs": []
@@ -70,7 +70,7 @@ class TestMultiChapterCopyAPI:
         # This would require a real book to be loaded
         # We'll test the API contract rather than full integration
         response = client.post(
-            "/api/chapters/text",
+            "/api/v1/chapters/text",
             json={
                 "book_id": "fake_book",
                 "chapter_hrefs": ["part1.html", "part2.html"]

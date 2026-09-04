@@ -848,6 +848,7 @@
         
         <!-- Quick actions toolbar -->
         <div style="display: flex; gap: 8px; padding: 10px 15px; border-bottom: 1px solid #eee; flex-wrap: wrap;">
+            <button onclick="toggleReaderSettingsPanel(true)" style="flex: 1; padding: 8px; border: 1px solid #ddd; background: #fff; border-radius: 4px; cursor: pointer; font-size: 0.85em;" title="Reader Settings (Font, Theme, Spacing)"><i class="fa-solid fa-sliders"></i> Settings</button>
             <button onclick="openSearch()" style="flex: 1; padding: 8px; border: 1px solid #ddd; background: #fff; border-radius: 4px; cursor: pointer; font-size: 0.85em;" title="Search (Ctrl/⌘+F)"><i class="fa-solid fa-magnifying-glass"></i> Search</button>
             <button onclick="toggleBookmarksPanel()" style="flex: 1; padding: 8px; border: 1px solid #ddd; background: #fff; border-radius: 4px; cursor: pointer; font-size: 0.85em;" title="Bookmarks & Highlights"><i class="fa-solid fa-book-bookmark"></i> Notes</button>
         </div>
@@ -963,6 +964,7 @@
                 <button class="toolbar-btn pdf-clear-btn" type="button" onclick="clearPdfSelection()" id="pdf-clear-btn" title="Clear selection"><i class="fa-solid fa-xmark"></i> Clear</button>
                 </div>
                 {% else %}
+                <button class="toolbar-btn" type="button" onclick="toggleReaderSettingsPanel(true)" title="Adjust theme, font size, spacing, and font settings"><i class="fa-solid fa-sliders"></i> Reader Settings</button>
                 <button class="toolbar-btn" type="button" onclick="copyAllLoaded()" id="copy-all-btn" title="Copy all loaded content"><i class="fa-regular fa-copy"></i> Copy All</button>
                 <button class="toolbar-btn" type="button" onclick="showBatchClipboard()" id="batch-clipboard-btn" style="display: none;"><i class="fa-regular fa-folder-open"></i> Batch (<span id="batch-count">0</span>)</button>
                 {% endif %}
@@ -1119,7 +1121,7 @@
         async function persistReaderPreferences() {
             try {
                 updateReaderSettingsStatus('Saving…');
-                const response = await fetch('/api/reader/preferences', {
+                const response = await fetch('/api/v1/reader/preferences', {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(readerPreferences),
@@ -1167,7 +1169,7 @@
         function resetReaderPreferences() {
             readerPreferences = { ...defaultReaderPreferences };
             bookFont = null;
-            fetch(`/api/book-font/${encodeURIComponent(bookId)}`, { method: 'DELETE' }).catch(() => {});
+            fetch(`/api/v1/book-font/${encodeURIComponent(bookId)}`, { method: 'DELETE' }).catch(() => {});
             queueReaderPreferencesSave();
         }
 
@@ -1221,7 +1223,7 @@
                 const font = event.target.value;
                 if (bookFontCheckbox.checked) {
                     bookFont = font;
-                    fetch(`/api/book-font/${encodeURIComponent(bookId)}`, {
+                    fetch(`/api/v1/book-font/${encodeURIComponent(bookId)}`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ font_family: font }),
@@ -1240,14 +1242,14 @@
                 const font = fontFamilySelect.value;
                 if (event.target.checked) {
                     bookFont = font;
-                    fetch(`/api/book-font/${encodeURIComponent(bookId)}`, {
+                    fetch(`/api/v1/book-font/${encodeURIComponent(bookId)}`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ font_family: font }),
                     }).catch(console.error);
                 } else {
                     bookFont = null;
-                    fetch(`/api/book-font/${encodeURIComponent(bookId)}`, { method: 'DELETE' }).catch(console.error);
+                    fetch(`/api/v1/book-font/${encodeURIComponent(bookId)}`, { method: 'DELETE' }).catch(console.error);
                 }
                 applyReaderPreferences();
                 updateReaderSettingsStatus('Saved');
@@ -1271,7 +1273,7 @@
             }
             
             try {
-                const response = await fetch(`/api/reprocess/${encodeURIComponent(bookId)}`, {
+                const response = await fetch(`/api/v1/reprocess/${encodeURIComponent(bookId)}`, {
                     method: 'POST'
                 });
                 
@@ -1305,14 +1307,14 @@
         async function loadUserData() {
             try {
                 // Load bookmarks
-                const bookmarksRes = await fetch(`/api/bookmarks/${encodeURIComponent(bookId)}`);
+                const bookmarksRes = await fetch(`/api/v1/bookmarks/${encodeURIComponent(bookId)}`);
                 if (bookmarksRes.ok) {
                     const bookmarksData = await bookmarksRes.json();
                     userBookmarks = bookmarksData.bookmarks || [];
                 }
                 
                 // Load highlights
-                const highlightsRes = await fetch(`/api/highlights/${encodeURIComponent(bookId)}`);
+                const highlightsRes = await fetch(`/api/v1/highlights/${encodeURIComponent(bookId)}`);
                 if (highlightsRes.ok) {
                     const highlightsData = await highlightsRes.json();
                     userHighlights = highlightsData.highlights || [];
@@ -1320,35 +1322,35 @@
                 }
                 
                 // Load reading progress
-                const progressRes = await fetch(`/api/progress/${encodeURIComponent(bookId)}`);
+                const progressRes = await fetch(`/api/v1/progress/${encodeURIComponent(bookId)}`);
                 if (progressRes.ok) {
                     savedProgress = await progressRes.json();
                     checkShowResumeBanner();
                 }
                 
                 // Load search history
-                const historyRes = await fetch('/api/search/history');
+                const historyRes = await fetch('/api/v1/search/history');
                 if (historyRes.ok) {
                     const historyData = await historyRes.json();
                     searchHistory = (historyData.history || []).slice(0, 10);
                 }
                 
                 // Load vocabulary
-                const vocabRes = await fetch(`/api/vocabulary/${encodeURIComponent(bookId)}`);
+                const vocabRes = await fetch(`/api/v1/vocabulary/${encodeURIComponent(bookId)}`);
                 if (vocabRes.ok) {
                     const vocabData = await vocabRes.json();
                     userVocabulary = vocabData.words || [];
                 }
                 
                 // Load annotations
-                const annotRes = await fetch(`/api/annotations/${encodeURIComponent(bookId)}`);
+                const annotRes = await fetch(`/api/v1/annotations/${encodeURIComponent(bookId)}`);
                 if (annotRes.ok) {
                     const annotData = await annotRes.json();
                     userAnnotations = annotData.annotations || [];
                 }
                 
                 // Load reading sessions
-                const sessionsRes = await fetch('/api/sessions');
+                const sessionsRes = await fetch('/api/v1/sessions');
                 if (sessionsRes.ok) {
                     const sessionsData = await sessionsRes.json();
                     readingSessions = sessionsData.sessions || [];
@@ -1366,7 +1368,7 @@
                 startReadingSession();
 
                 // Load copied pages/chapters for badge persistence
-                const copiedRes = await fetch(`/api/copied-pages/${encodeURIComponent(bookId)}`);
+                const copiedRes = await fetch(`/api/v1/copied-pages/${encodeURIComponent(bookId)}`);
                 if (copiedRes.ok) {
                     const copiedData = await copiedRes.json();
                     const items = copiedData.items || [];
@@ -1432,7 +1434,7 @@
                 
                 try {
                     // Save overall reading progress
-                    await fetch(`/api/progress/${encodeURIComponent(bookId)}`, {
+                    await fetch(`/api/v1/progress/${encodeURIComponent(bookId)}`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -1443,7 +1445,7 @@
                     });
                     
                     // Also save chapter-specific progress
-                    await fetch(`/api/chapter-progress/${encodeURIComponent(bookId)}/${currentPageIndex}`, {
+                    await fetch(`/api/v1/chapter-progress/${encodeURIComponent(bookId)}/${currentPageIndex}`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ progress: progress })
@@ -1496,7 +1498,7 @@
             try {
                 const mainEl = document.getElementById('main');
                 const scrollPos = mainEl ? mainEl.scrollTop / mainEl.scrollHeight : 0;
-                const response = await fetch(`/api/bookmarks/${encodeURIComponent(bookId)}`, {
+                const response = await fetch(`/api/v1/bookmarks/${encodeURIComponent(bookId)}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -1525,7 +1527,7 @@
         
         async function loadBookmarksFromServer() {
             try {
-                const response = await fetch(`/api/bookmarks/${encodeURIComponent(bookId)}`);
+                const response = await fetch(`/api/v1/bookmarks/${encodeURIComponent(bookId)}`);
                 if (response.ok) {
                     const data = await response.json();
                     userBookmarks = data.bookmarks || [];
@@ -1537,7 +1539,7 @@
         
         async function deleteBookmark(id) {
             try {
-                await fetch(`/api/bookmarks/${encodeURIComponent(bookId)}/${id}`, {
+                await fetch(`/api/v1/bookmarks/${encodeURIComponent(bookId)}/${id}`, {
                     method: 'DELETE'
                 });
                 userBookmarks = userBookmarks.filter(b => b.id !== id);
@@ -1602,7 +1604,7 @@
             const endContainer = getXPath(range.endContainer);
             
             try {
-                const response = await fetch(`/api/highlights/${encodeURIComponent(bookId)}`, {
+                const response = await fetch(`/api/v1/highlights/${encodeURIComponent(bookId)}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -1638,7 +1640,7 @@
         
         async function loadHighlightsFromServer() {
             try {
-                const response = await fetch(`/api/highlights/${encodeURIComponent(bookId)}`);
+                const response = await fetch(`/api/v1/highlights/${encodeURIComponent(bookId)}`);
                 if (response.ok) {
                     const data = await response.json();
                     userHighlights = data.highlights || [];
@@ -1769,7 +1771,7 @@
             
             try {
                 // Update on server
-                await fetch(`/api/highlights/${encodeURIComponent(bookId)}/${currentHighlightId}/color`, {
+                await fetch(`/api/v1/highlights/${encodeURIComponent(bookId)}/${currentHighlightId}/color`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ color: newColor })
@@ -1794,7 +1796,7 @@
         
         async function deleteHighlight(id) {
             try {
-                await fetch(`/api/highlights/${encodeURIComponent(bookId)}/${id}`, {
+                await fetch(`/api/v1/highlights/${encodeURIComponent(bookId)}/${id}`, {
                     method: 'DELETE'
                 });
                 
@@ -1868,7 +1870,7 @@
         
         async function exportNotes(format) {
             try {
-                const response = await fetch(`/api/export/${encodeURIComponent(bookId)}?format=${format}`);
+                const response = await fetch(`/api/v1/export/${encodeURIComponent(bookId)}?format=${format}`);
                 if (response.ok) {
                     const content = await response.text();
                     const filename = `${bookId}_notes.${format === 'markdown' ? 'md' : 'json'}`;
@@ -1917,7 +1919,7 @@
             resultsContainer.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">Searching...</p>';
             
             try {
-                const response = await fetch(`/api/search?q=${encodeURIComponent(query)}&book_id=${encodeURIComponent(bookId)}`);
+                const response = await fetch(`/api/v1/search?q=${encodeURIComponent(query)}&book_id=${encodeURIComponent(bookId)}`);
                 if (response.ok) {
                     const data = await response.json();
                     
@@ -2310,7 +2312,7 @@
 
         function getPdfPageExportImageUrl(pageIndex) {
             const dpi = getSelectedPdfCopyImageDpi();
-            return `/api/pdf/${encodeURIComponent(bookId)}/page-image/${pageIndex}?dpi=${encodeURIComponent(dpi)}`;
+            return `/api/v1/pdf/${encodeURIComponent(bookId)}/page-image/${pageIndex}?dpi=${encodeURIComponent(dpi)}`;
         }
 
         async function fetchPdfPageImageBlob(pageIndex, fallbackSrc = null) {
@@ -2498,7 +2500,7 @@
             // If no text found in DOM, fetch from text-layer API
             if (!textToCopy) {
                 try {
-                    const resp = await fetch(`/api/pdf/${encodeURIComponent(bookId)}/text-layer/${pageIndex}`);
+                    const resp = await fetch(`/api/v1/pdf/${encodeURIComponent(bookId)}/text-layer/${pageIndex}`);
                     if (resp.ok) {
                         const data = await resp.json();
                         if (data.blocks && data.blocks.length > 0) {
@@ -2576,7 +2578,20 @@
             for (const href of hrefs) {
                 if (!copiedEpubChapters.has(href)) newHrefs.push(href);
                 copiedEpubChapters.add(href);
-                const badges = document.querySelectorAll(`.toc-copied-badge[data-href="${href}"]`);
+
+                const cleanHref = (href || '').split('#')[0];
+                const basename = cleanHref.split('/').pop();
+
+                let badges = Array.from(document.querySelectorAll(`.toc-copied-badge[data-href="${href}"]`));
+                if (badges.length === 0 && cleanHref !== href) {
+                    badges = Array.from(document.querySelectorAll(`.toc-copied-badge[data-href="${cleanHref}"]`));
+                }
+                if (badges.length === 0) {
+                    badges = Array.from(document.querySelectorAll('.toc-copied-badge')).filter(b => {
+                        const bHref = (b.getAttribute('data-href') || '').split('#')[0].split('/').pop();
+                        return bHref === basename;
+                    });
+                }
                 badges.forEach(badge => badge.classList.add('visible'));
             }
             if (newHrefs.length > 0) persistCopiedItems(newHrefs);
@@ -2598,7 +2613,7 @@
 
         // Persist copied items to the server
         function persistCopiedItems(items) {
-            fetch(`/api/copied-pages/${encodeURIComponent(bookId)}`, {
+            fetch(`/api/v1/copied-pages/${encodeURIComponent(bookId)}`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({items: items})
@@ -3024,18 +3039,27 @@
         // Mark the current chapter as fully read (100% progress)
         async function markChapterAsRead() {
             try {
-                await fetch(`/api/chapter-progress/${encodeURIComponent(bookId)}/${currentPageIndex}`, {
+                await fetch(`/api/v1/chapter-progress/${encodeURIComponent(bookId)}/${currentPageIndex}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ progress: 100.0 })
                 });
                 
-                // Update the progress bar in the sidebar
+                // Update the progress bar, percent and read state in the sidebar
                 const currentHref = document.querySelector('.toc-link.active')?.getAttribute('data-href');
                 if (currentHref) {
+                    const activeLink = document.querySelector('.toc-link.active');
+                    if (activeLink) {
+                        activeLink.classList.add('read');
+                        activeLink.classList.remove('unread');
+                    }
                     const progressElem = document.querySelector(`.chapter-progress[data-href="${currentHref}"] .chapter-progress-fill`);
                     if (progressElem) {
                         progressElem.style.width = '100%';
+                    }
+                    const percentElem = document.querySelector(`.toc-chapter-percent[data-href="${currentHref}"]`);
+                    if (percentElem) {
+                        percentElem.textContent = '100%';
                     }
                 }
             } catch (error) {
@@ -3637,7 +3661,7 @@
         
         async function loadChapterProgress() {
             try {
-                const response = await fetch(`/api/chapter-progress/${encodeURIComponent(bookId)}`);
+                const response = await fetch(`/api/v1/chapter-progress/${encodeURIComponent(bookId)}`);
                 if (response.ok) {
                     const data = await response.json();
                     applyChapterProgress(data.progress || {});
@@ -3651,35 +3675,52 @@
             // Apply progress to each chapter in the sidebar
             Object.keys(spineMap).forEach(href => {
                 const chapterIndex = spineMap[href];
-                const progress = progressData[chapterIndex] || 0;
+                const progress = progressData[chapterIndex] !== undefined ? progressData[chapterIndex] : (progressData[String(chapterIndex)] || 0);
                 
+                const cleanHref = href.split('#')[0];
+                const basename = cleanHref.split('/').pop();
+
+                const findElements = (selector) => {
+                    let elems = Array.from(document.querySelectorAll(`${selector}[data-href="${href}"]`));
+                    if (elems.length === 0 && cleanHref !== href) {
+                        elems = Array.from(document.querySelectorAll(`${selector}[data-href="${cleanHref}"]`));
+                    }
+                    if (elems.length === 0) {
+                        elems = Array.from(document.querySelectorAll(selector)).filter(el => {
+                            const dHref = (el.getAttribute('data-href') || '').split('#')[0].split('/').pop();
+                            return dHref === basename;
+                        });
+                    }
+                    return elems;
+                };
+
                 // Find the progress bar for this chapter
-                const progressElem = document.querySelector(`.chapter-progress[data-href="${href}"] .chapter-progress-fill`);
-                if (progressElem) {
-                    progressElem.style.width = `${progress}%`;
-                }
+                const progressElems = findElements('.chapter-progress');
+                progressElems.forEach(el => {
+                    const fill = el.querySelector('.chapter-progress-fill');
+                    if (fill) fill.style.width = `${progress}%`;
+                });
 
                 // Set percent text next to chapter title
-                const percentEl = document.querySelector(`.toc-chapter-percent[data-href="${href}"]`);
-                if (percentEl) {
-                    percentEl.textContent = `${Math.round(progress)}%`;
-                }
+                const percentElems = findElements('.toc-chapter-percent');
+                percentElems.forEach(el => {
+                    el.textContent = `${Math.round(progress)}%`;
+                });
 
                 // Mark as read if 90%+
-                const link = document.querySelector(`.toc-link[data-href="${href}"]`);
-                if (progress >= 90) {
-                    if (link) link.classList.add('read');
-                    if (link) link.classList.remove('unread');
-                } else {
-                    if (link) link.classList.remove('read');
-                }
-
-                // Mark unread chapters (0% progress) with subtle background
-                if (progress === 0) {
-                    if (link) link.classList.add('unread');
-                } else {
-                    if (link) link.classList.remove('unread');
-                }
+                const links = findElements('.toc-link');
+                links.forEach(link => {
+                    if (progress >= 90) {
+                        link.classList.add('read');
+                        link.classList.remove('unread');
+                    } else if (progress === 0) {
+                        link.classList.remove('read');
+                        link.classList.add('unread');
+                    } else {
+                        link.classList.remove('read');
+                        link.classList.remove('unread');
+                    }
+                });
             });
         }
         
@@ -3692,7 +3733,7 @@
             
             // sendBeacon doesn't support JSON content-type easily, so we use a query param approach
             navigator.sendBeacon(
-                `/api/chapter-progress/${encodeURIComponent(bookId)}/${currentPageIndex}?progress=${encodeURIComponent(progress)}`,
+                `/api/v1/chapter-progress/${encodeURIComponent(bookId)}/${currentPageIndex}?progress=${encodeURIComponent(progress)}`,
                 ''
             );
         });
@@ -3724,7 +3765,7 @@
         
         async function fetchAllReadingTimes() {
             try {
-                const response = await fetch(`/api/reading-times/${encodeURIComponent(bookId)}`);
+                const response = await fetch(`/api/v1/reading-times/${encodeURIComponent(bookId)}`);
                 if (response.ok) {
                     const data = await response.json();
                     applyReadingTimes(data.reading_times || {});
@@ -3762,7 +3803,7 @@
         async function startReadingSession() {
             sessionStartTime = Date.now();
             try {
-                const response = await fetch('/api/sessions/start', {
+                const response = await fetch('/api/v1/sessions/start', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -3789,7 +3830,7 @@
                              document.getElementById('main')?.scrollHeight || 0;
             
             try {
-                await fetch(`/api/sessions/${currentSessionId}/end`, {
+                await fetch(`/api/v1/sessions/${currentSessionId}/end`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -3808,7 +3849,7 @@
             if (currentSessionId && sessionStartTime) {
                 const duration = Math.floor((Date.now() - sessionStartTime) / 1000);
                 navigator.sendBeacon(
-                    `/api/sessions/${currentSessionId}/end`,
+                    `/api/v1/sessions/${currentSessionId}/end`,
                     JSON.stringify({
                         duration_seconds: duration,
                         pages_read: isPDF ? 1 : 0,
@@ -3830,7 +3871,7 @@
         
         async function loadSessionStats() {
             try {
-                const response = await fetch('/api/sessions/stats');
+                const response = await fetch('/api/v1/sessions/stats');
                 if (response.ok) {
                     const stats = await response.json();
                     
@@ -4012,7 +4053,7 @@
             }
             
             try {
-                const response = await fetch(`/api/vocabulary/${encodeURIComponent(bookId)}`, {
+                const response = await fetch(`/api/v1/vocabulary/${encodeURIComponent(bookId)}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -4031,7 +4072,7 @@
                     closeDictionary();
                     
                     // Reload vocabulary
-                    const vocabRes = await fetch(`/api/vocabulary/${encodeURIComponent(bookId)}`);
+                    const vocabRes = await fetch(`/api/v1/vocabulary/${encodeURIComponent(bookId)}`);
                     if (vocabRes.ok) {
                         const vocabData = await vocabRes.json();
                         userVocabulary = vocabData.words || [];
@@ -4097,7 +4138,7 @@
         
         async function deleteVocabWord(wordId) {
             try {
-                await fetch(`/api/vocabulary/${encodeURIComponent(bookId)}/${wordId}`, {
+                await fetch(`/api/v1/vocabulary/${encodeURIComponent(bookId)}/${wordId}`, {
                     method: 'DELETE'
                 });
                 userVocabulary = userVocabulary.filter(w => w.id !== wordId);
@@ -4200,7 +4241,7 @@
             }
             
             try {
-                const response = await fetch(`/api/annotations/${encodeURIComponent(bookId)}`, {
+                const response = await fetch(`/api/v1/annotations/${encodeURIComponent(bookId)}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -4217,7 +4258,7 @@
                     closeNoteModal();
                     
                     // Reload annotations
-                    const annotRes = await fetch(`/api/annotations/${encodeURIComponent(bookId)}`);
+                    const annotRes = await fetch(`/api/v1/annotations/${encodeURIComponent(bookId)}`);
                     if (annotRes.ok) {
                         const annotData = await annotRes.json();
                         userAnnotations = annotData.annotations || [];
@@ -4232,7 +4273,7 @@
         
         async function deleteAnnotation(annotationId) {
             try {
-                await fetch(`/api/annotations/${encodeURIComponent(bookId)}/${annotationId}`, {
+                await fetch(`/api/v1/annotations/${encodeURIComponent(bookId)}/${annotationId}`, {
                     method: 'DELETE'
                 });
                 userAnnotations = userAnnotations.filter(a => a.id !== annotationId);
@@ -4256,7 +4297,7 @@
         
         async function exportAnnotations() {
             try {
-                const response = await fetch(`/api/annotations/${encodeURIComponent(bookId)}/export?format=markdown`);
+                const response = await fetch(`/api/v1/annotations/${encodeURIComponent(bookId)}/export?format=markdown`);
                 if (response.ok) {
                     const content = await response.text();
                     const blob = new Blob([content], { type: 'text/markdown' });
@@ -4336,7 +4377,7 @@
                 // Fetch chapter text content from backend
                 copyBtn.textContent = `Fetching chapters... (0/${totalCount})`;
                 
-                const response = await fetch('/api/chapters/text', {
+                const response = await fetch('/api/v1/chapters/text', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -4372,34 +4413,55 @@
                 copyBtn.textContent = `Marking chapters as read... (0/${chapters.length})`;
                 for (let i = 0; i < chapters.length; i++) {
                     const chapter = chapters[i];
-                    const spineIndex = Object.keys(spineMap).findIndex(
-                        key => key.endsWith(chapter.href.split('/').pop())
-                    );
+                    let spineIndex = spineMap[chapter.href];
+                    if (spineIndex === undefined) {
+                        const cleanHref = (chapter.href || '').split('#')[0];
+                        spineIndex = spineMap[cleanHref];
+                    }
+                    if (spineIndex === undefined) {
+                        const base = (chapter.href || '').split('#')[0].split('/').pop();
+                        for (const key in spineMap) {
+                            if (key.split('#')[0].split('/').pop() === base) {
+                                spineIndex = spineMap[key];
+                                break;
+                            }
+                        }
+                    }
                     
-                    if (spineIndex !== -1) {
+                    if (spineIndex !== undefined && spineIndex !== -1) {
                         await fetch(
-                            `/api/chapter-progress/${encodeURIComponent(bookId)}/${spineIndex}`,
+                            `/api/v1/chapter-progress/${encodeURIComponent(bookId)}/${spineIndex}`,
                             {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ progress: 100.0 })
                             }
                         );
-                        
-                        // Update progress bar for this chapter
-                        const link = document.querySelector(
-                            `.toc-link[data-href="${chapter.href}"]`
-                        );
-                        if (link) {
-                            link.classList.add('read');
-                            const progressBar = link.parentElement.querySelector(
-                                '.chapter-progress-fill'
-                            );
+                    }
+                    
+                    // Update progress UI for this chapter in TOC
+                    const targetHrefs = [chapter.href, (chapter.href || '').split('#')[0]];
+                    const base = (chapter.href || '').split('#')[0].split('/').pop();
+                    
+                    document.querySelectorAll('.toc-item-wrapper').forEach(wrapper => {
+                        const link = wrapper.querySelector('.toc-link');
+                        const linkHref = link ? (link.getAttribute('data-href') || '') : '';
+                        const linkBase = linkHref.split('#')[0].split('/').pop();
+                        if (targetHrefs.includes(linkHref) || linkBase === base) {
+                            if (link) {
+                                link.classList.add('read');
+                                link.classList.remove('unread');
+                            }
+                            const progressBar = wrapper.querySelector('.chapter-progress-fill');
                             if (progressBar) {
                                 progressBar.style.width = '100%';
                             }
+                            const percentEl = wrapper.querySelector('.toc-chapter-percent');
+                            if (percentEl) {
+                                percentEl.textContent = '100%';
+                            }
                         }
-                    }
+                    });
                     
                     // Update progress display
                     copyBtn.textContent = `Marking chapters as read... (${i + 1}/${chapters.length})`;

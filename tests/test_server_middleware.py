@@ -63,7 +63,7 @@ class TestSecurityHeadersMiddleware:
 
     def test_security_headers_on_all_routes(self, client):
         """Test that security headers are on all routes."""
-        routes = ["/", "/api/progress/test_book"]
+        routes = ["/", "/api/v1/progress/test_book"]
 
         for route in routes:
             response = client.get(route)
@@ -105,7 +105,7 @@ class TestCacheControlMiddleware:
 
     def test_no_cache_for_api_endpoints(self, client):
         """Test that API endpoints don't get aggressive caching."""
-        client.get("/api/progress/test_book")
+        client.get("/api/v1/progress/test_book")
 
         # API responses should not have the immutable cache control
         # unless explicitly set elsewhere
@@ -258,7 +258,7 @@ class TestAppConfiguration:
         assert default_response_class.value is JSONResponse
 
         # Keep an API call here so the test still exercises JSON serialization.
-        response = client.get("/api/progress/test_book")
+        response = client.get("/api/v1/progress/test_book")
         try:
             response.json()
         except ValueError:

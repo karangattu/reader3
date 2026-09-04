@@ -39,6 +39,8 @@ from .services.library import (
     sanitize_text,
     sanitize_toc_entries,
     save_to_pickle,
+    save_to_json,
+    load_from_json,
     search_pdf_text_positions,
     validate_pdf,
 )
@@ -80,6 +82,8 @@ __all__ = [
     "sanitize_text",
     "sanitize_toc_entries",
     "save_to_pickle",
+    "save_to_json",
+    "load_from_json",
     "search_pdf_text_positions",
     "validate_pdf",
 ]

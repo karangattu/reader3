@@ -241,7 +241,7 @@ class TestReadingProgressAPI:
 
     def test_get_progress_nonexistent_book(self, client):
         """Test getting progress for a book with no saved progress."""
-        response = client.get("/api/progress/nonexistent_test_book")
+        response = client.get("/api/v1/progress/nonexistent_test_book")
         # Should return default progress
         assert response.status_code == 200
         data = response.json()
@@ -259,14 +259,14 @@ class TestReadingProgressAPI:
             "total_chapters": 10
         }
         save_response = client.post(
-            f"/api/progress/{book_id}",
+            f"/api/v1/progress/{book_id}",
             json=progress_data
         )
         assert save_response.status_code == 200
         assert save_response.json()["status"] == "saved"
 
         # Get progress
-        get_response = client.get(f"/api/progress/{book_id}")
+        get_response = client.get(f"/api/v1/progress/{book_id}")
         assert get_response.status_code == 200
 
         data = get_response.json()
@@ -277,7 +277,7 @@ class TestReadingProgressAPI:
         import uuid
         book_id = f"test_book_percent_{uuid.uuid4().hex[:8]}"
         
-        response = client.get(f"/api/progress/{book_id}")
+        response = client.get(f"/api/v1/progress/{book_id}")
         assert response.status_code == 200
         data = response.json()
         assert "progress_percent" in data
@@ -289,16 +289,16 @@ class TestReadingProgressAPI:
         
         # Save chapter progress for multiple chapters
         client.post(
-            f"/api/chapter-progress/{book_id}/0",
+            f"/api/v1/chapter-progress/{book_id}/0",
             json={"progress": 100.0}
         )
         client.post(
-            f"/api/chapter-progress/{book_id}/1",
+            f"/api/v1/chapter-progress/{book_id}/1",
             json={"progress": 50.0}
         )
         
         # Get overall progress
-        response = client.get(f"/api/progress/{book_id}")
+        response = client.get(f"/api/v1/progress/{book_id}")
         data = response.json()
         
         # Should have some progress_percent > 0
@@ -310,7 +310,7 @@ class TestBookmarksAPI:
 
     def test_get_bookmarks_empty(self, client):
         """Test getting bookmarks for a book with none."""
-        response = client.get("/api/bookmarks/test_book_no_bookmarks")
+        response = client.get("/api/v1/bookmarks/test_book_no_bookmarks")
         assert response.status_code == 200
         data = response.json()
         assert "bookmarks" in data
@@ -327,7 +327,7 @@ class TestBookmarksAPI:
             "note": "Test note"
         }
         response = client.post(
-            f"/api/bookmarks/{book_id}",
+            f"/api/v1/bookmarks/{book_id}",
             json=bookmark_data
         )
         assert response.status_code == 200
@@ -342,7 +342,7 @@ class TestBookmarksAPI:
 
         # Create a bookmark first
         client.post(
-            f"/api/bookmarks/{book_id}",
+            f"/api/v1/bookmarks/{book_id}",
             json={
                 "chapter_index": 0,
                 "scroll_position": 0.1,
@@ -351,7 +351,7 @@ class TestBookmarksAPI:
             }
         )
 
-        response = client.get(f"/api/bookmarks/{book_id}")
+        response = client.get(f"/api/v1/bookmarks/{book_id}")
         assert response.status_code == 200
 
         data = response.json()
@@ -364,7 +364,7 @@ class TestBookmarksAPI:
 
         # Create a bookmark
         create_response = client.post(
-            f"/api/bookmarks/{book_id}",
+            f"/api/v1/bookmarks/{book_id}",
             json={
                 "chapter_index": 0,
                 "scroll_position": 0.1,
@@ -375,7 +375,7 @@ class TestBookmarksAPI:
         bookmark_id = create_response.json()["id"]
 
         # Delete it
-        del_url = f"/api/bookmarks/{book_id}/{bookmark_id}"
+        del_url = f"/api/v1/bookmarks/{book_id}/{bookmark_id}"
         delete_response = client.delete(del_url)
         assert delete_response.status_code == 200
 
@@ -385,7 +385,7 @@ class TestHighlightsAPI:
 
     def test_get_highlights_empty(self, client):
         """Test getting highlights for a book with none."""
-        response = client.get("/api/highlights/test_book_no_highlights")
+        response = client.get("/api/v1/highlights/test_book_no_highlights")
         assert response.status_code == 200
         data = response.json()
         assert "highlights" in data
@@ -403,7 +403,7 @@ class TestHighlightsAPI:
             "end_offset": 25
         }
         response = client.post(
-            f"/api/highlights/{book_id}",
+            f"/api/v1/highlights/{book_id}",
             json=highlight_data
         )
         assert response.status_code == 200
@@ -419,7 +419,7 @@ class TestHighlightsAPI:
 
         for color in colors:
             response = client.post(
-                f"/api/highlights/{book_id}",
+                f"/api/v1/highlights/{book_id}",
                 json={
                     "chapter_index": 0,
                     "text": f"Text with {color}",
@@ -435,7 +435,7 @@ class TestHighlightsAPI:
 
         # Create a highlight
         create_response = client.post(
-            f"/api/highlights/{book_id}",
+            f"/api/v1/highlights/{book_id}",
             json={
                 "chapter_index": 0,
                 "text": "To be deleted",
@@ -445,7 +445,7 @@ class TestHighlightsAPI:
         highlight_id = create_response.json()["id"]
 
         # Delete it
-        del_url = f"/api/highlights/{book_id}/{highlight_id}"
+        del_url = f"/api/v1/highlights/{book_id}/{highlight_id}"
         delete_response = client.delete(del_url)
         assert delete_response.status_code == 200
 
@@ -453,7 +453,7 @@ class TestHighlightsAPI:
         """Test deleting a non-existent highlight returns 404."""
         book_id = "test_book_delete_nonexistent"
         delete_response = client.delete(
-            f"/api/highlights/{book_id}/nonexistent_id"
+            f"/api/v1/highlights/{book_id}/nonexistent_id"
         )
         assert delete_response.status_code == 404
 
@@ -464,26 +464,26 @@ class TestHighlightsAPI:
 
         # Create two highlights
         resp1 = client.post(
-            f"/api/highlights/{book_id}",
+            f"/api/v1/highlights/{book_id}",
             json={"chapter_index": 0, "text": "Text 1", "color": "yellow"}
         )
         id1 = resp1.json()["id"]
 
         resp2 = client.post(
-            f"/api/highlights/{book_id}",
+            f"/api/v1/highlights/{book_id}",
             json={"chapter_index": 0, "text": "Text 2", "color": "green"}
         )
         id2 = resp2.json()["id"]
 
         # Verify both exist
-        list_resp = client.get(f"/api/highlights/{book_id}")
+        list_resp = client.get(f"/api/v1/highlights/{book_id}")
         assert len(list_resp.json()["highlights"]) == 2
 
         # Delete first highlight
-        client.delete(f"/api/highlights/{book_id}/{id1}")
+        client.delete(f"/api/v1/highlights/{book_id}/{id1}")
 
         # Verify only one remains
-        list_resp = client.get(f"/api/highlights/{book_id}")
+        list_resp = client.get(f"/api/v1/highlights/{book_id}")
         highlights = list_resp.json()["highlights"]
         assert len(highlights) == 1
         assert highlights[0]["id"] == id2
@@ -495,7 +495,7 @@ class TestHighlightsAPI:
 
         # Create a highlight
         create_response = client.post(
-            f"/api/highlights/{book_id}",
+            f"/api/v1/highlights/{book_id}",
             json={
                 "chapter_index": 0,
                 "text": "Color change test",
@@ -506,14 +506,14 @@ class TestHighlightsAPI:
 
         # Update color to green
         update_response = client.put(
-            f"/api/highlights/{book_id}/{highlight_id}/color",
+            f"/api/v1/highlights/{book_id}/{highlight_id}/color",
             json={"color": "green"}
         )
         assert update_response.status_code == 200
         assert update_response.json()["status"] == "updated"
 
         # Verify color changed
-        get_response = client.get(f"/api/highlights/{book_id}")
+        get_response = client.get(f"/api/v1/highlights/{book_id}")
         highlights = get_response.json()["highlights"]
         assert len(highlights) == 1
         assert highlights[0]["color"] == "green"
@@ -525,7 +525,7 @@ class TestHighlightsAPI:
 
         # Create a highlight
         create_response = client.post(
-            f"/api/highlights/{book_id}",
+            f"/api/v1/highlights/{book_id}",
             json={
                 "chapter_index": 0,
                 "text": "Multi color test",
@@ -537,20 +537,20 @@ class TestHighlightsAPI:
         # Test all colors
         for color in ["green", "blue", "pink", "purple", "yellow"]:
             update_response = client.put(
-                f"/api/highlights/{book_id}/{highlight_id}/color",
+                f"/api/v1/highlights/{book_id}/{highlight_id}/color",
                 json={"color": color}
             )
             assert update_response.status_code == 200
 
             # Verify
-            get_response = client.get(f"/api/highlights/{book_id}")
+            get_response = client.get(f"/api/v1/highlights/{book_id}")
             assert get_response.json()["highlights"][0]["color"] == color
 
     def test_update_highlight_color_not_found(self, client):
         """Test updating color of non-existent highlight returns 404."""
         book_id = "test_book_color_notfound"
         update_response = client.put(
-            f"/api/highlights/{book_id}/nonexistent_id/color",
+            f"/api/v1/highlights/{book_id}/nonexistent_id/color",
             json={"color": "green"}
         )
         assert update_response.status_code == 404
@@ -561,7 +561,7 @@ class TestHighlightsAPI:
 
         # Create a highlight
         create_response = client.post(
-            f"/api/highlights/{book_id}",
+            f"/api/v1/highlights/{book_id}",
             json={
                 "chapter_index": 0,
                 "text": "Invalid color test",
@@ -572,14 +572,14 @@ class TestHighlightsAPI:
 
         # Try invalid color
         update_response = client.put(
-            f"/api/highlights/{book_id}/{highlight_id}/color",
+            f"/api/v1/highlights/{book_id}/{highlight_id}/color",
             json={"color": "red"}
         )
         # Should return 404 since update_highlight_color returns False
         assert update_response.status_code == 404
 
         # Verify original color unchanged
-        get_response = client.get(f"/api/highlights/{book_id}")
+        get_response = client.get(f"/api/v1/highlights/{book_id}")
         assert get_response.json()["highlights"][0]["color"] == "yellow"
 
 
@@ -588,7 +588,7 @@ class TestSearchAPI:
 
     def test_search_short_query(self, client):
         """Test search with very short query."""
-        response = client.get("/api/search?q=a")
+        response = client.get("/api/v1/search?q=a")
         assert response.status_code == 200
         data = response.json()
         assert "results" in data
@@ -597,14 +597,14 @@ class TestSearchAPI:
 
     def test_search_with_book_filter(self, client):
         """Test search with book filter."""
-        response = client.get("/api/search?q=test&book_id=test_book")
+        response = client.get("/api/v1/search?q=test&book_id=test_book")
         assert response.status_code == 200
         assert "results" in response.json()
 
     def test_search_semantic_mode(self, client):
         """Test semantic search mode response structure."""
         response = client.get(
-            "/api/search?q=test&book_id=nonexistent_book&mode=semantic"
+            "/api/v1/search?q=test&book_id=nonexistent_book&mode=semantic"
         )
         assert response.status_code == 200
         data = response.json()
@@ -613,7 +613,7 @@ class TestSearchAPI:
 
     def test_search_history(self, client):
         """Test search history endpoint."""
-        response = client.get("/api/search/history")
+        response = client.get("/api/v1/search/history")
         assert response.status_code == 200
         data = response.json()
         assert "history" in data
@@ -621,7 +621,7 @@ class TestSearchAPI:
 
     def test_clear_search_history(self, client):
         """Test clearing search history."""
-        response = client.delete("/api/search/history")
+        response = client.delete("/api/v1/search/history")
         assert response.status_code == 200
 
 
@@ -634,7 +634,7 @@ class TestExportAPI:
 
         # Add some data first
         client.post(
-            f"/api/bookmarks/{book_id}",
+            f"/api/v1/bookmarks/{book_id}",
             json={
                 "chapter_index": 0,
                 "scroll_position": 0.5,
@@ -643,7 +643,7 @@ class TestExportAPI:
             }
         )
 
-        response = client.get(f"/api/export/{book_id}?format=json")
+        response = client.get(f"/api/v1/export/{book_id}?format=json")
         assert response.status_code == 200
         # Response is PlainTextResponse, so parse content
         assert "bookmarks" in response.text
@@ -652,13 +652,13 @@ class TestExportAPI:
         """Test exporting book data as Markdown."""
         book_id = "test_book_export_md"
 
-        response = client.get(f"/api/export/{book_id}?format=markdown")
+        response = client.get(f"/api/v1/export/{book_id}?format=markdown")
         assert response.status_code == 200
         assert "Notes and Highlights" in response.text
 
     def test_export_all(self, client):
         """Test exporting all data."""
-        response = client.get("/api/export")
+        response = client.get("/api/v1/export")
         assert response.status_code == 200
         # Should be valid JSON
         assert "exported_at" in response.text
@@ -671,7 +671,7 @@ class TestExportAPI:
 
         # Create highlights
         client.post(
-            f"/api/highlights/{book_id}",
+            f"/api/v1/highlights/{book_id}",
             json={
                 "chapter_index": 0,
                 "text": "First highlighted text",
@@ -679,7 +679,7 @@ class TestExportAPI:
             }
         )
         client.post(
-            f"/api/highlights/{book_id}",
+            f"/api/v1/highlights/{book_id}",
             json={
                 "chapter_index": 1,
                 "text": "Second highlighted text",
@@ -687,7 +687,7 @@ class TestExportAPI:
             }
         )
 
-        response = client.get(f"/api/export/{book_id}?format=json")
+        response = client.get(f"/api/v1/export/{book_id}?format=json")
         assert response.status_code == 200
 
         # Verify it's valid JSON
@@ -706,7 +706,7 @@ class TestExportAPI:
 
         # Create highlights with different colors
         client.post(
-            f"/api/highlights/{book_id}",
+            f"/api/v1/highlights/{book_id}",
             json={
                 "chapter_index": 0,
                 "text": "Yellow highlight text",
@@ -714,7 +714,7 @@ class TestExportAPI:
             }
         )
         client.post(
-            f"/api/highlights/{book_id}",
+            f"/api/v1/highlights/{book_id}",
             json={
                 "chapter_index": 1,
                 "text": "Green highlight text",
@@ -723,7 +723,7 @@ class TestExportAPI:
             }
         )
 
-        response = client.get(f"/api/export/{book_id}?format=markdown")
+        response = client.get(f"/api/v1/export/{book_id}?format=markdown")
         assert response.status_code == 200
 
         content = response.text
@@ -747,7 +747,7 @@ class TestExportAPI:
 
         # Create bookmark
         client.post(
-            f"/api/bookmarks/{book_id}",
+            f"/api/v1/bookmarks/{book_id}",
             json={
                 "chapter_index": 0,
                 "scroll_position": 0.5,
@@ -758,7 +758,7 @@ class TestExportAPI:
 
         # Create highlight
         client.post(
-            f"/api/highlights/{book_id}",
+            f"/api/v1/highlights/{book_id}",
             json={
                 "chapter_index": 1,
                 "text": "Important passage",
@@ -766,7 +766,7 @@ class TestExportAPI:
             }
         )
 
-        response = client.get(f"/api/export/{book_id}?format=json")
+        response = client.get(f"/api/v1/export/{book_id}?format=json")
         assert response.status_code == 200
 
         data = json.loads(response.text)
@@ -782,7 +782,7 @@ class TestExportAPI:
 
         # Create bookmark
         client.post(
-            f"/api/bookmarks/{book_id}",
+            f"/api/v1/bookmarks/{book_id}",
             json={
                 "chapter_index": 2,
                 "scroll_position": 0.75,
@@ -793,7 +793,7 @@ class TestExportAPI:
 
         # Create highlight
         client.post(
-            f"/api/highlights/{book_id}",
+            f"/api/v1/highlights/{book_id}",
             json={
                 "chapter_index": 3,
                 "text": "Key concept here",
@@ -801,7 +801,7 @@ class TestExportAPI:
             }
         )
 
-        response = client.get(f"/api/export/{book_id}?format=markdown")
+        response = client.get(f"/api/v1/export/{book_id}?format=markdown")
         assert response.status_code == 200
 
         content = response.text
@@ -822,32 +822,32 @@ class TestExportAPI:
         book_id = f"test_export_empty_{uuid.uuid4().hex[:8]}"
 
         # Export JSON
-        response = client.get(f"/api/export/{book_id}?format=json")
+        response = client.get(f"/api/v1/export/{book_id}?format=json")
         assert response.status_code == 200
         data = json.loads(response.text)
         assert data["highlights"] == []
         assert data["bookmarks"] == []
 
         # Export Markdown
-        response = client.get(f"/api/export/{book_id}?format=markdown")
+        response = client.get(f"/api/v1/export/{book_id}?format=markdown")
         assert response.status_code == 200
         assert "Notes and Highlights" in response.text
 
     def test_export_invalid_format(self, client):
         """Test that invalid format returns 400 error."""
-        response = client.get("/api/export/test_book?format=pdf")
+        response = client.get("/api/v1/export/test_book?format=pdf")
         assert response.status_code == 400
         assert "Format must be" in response.json()["detail"]
 
     def test_export_json_content_type(self, client):
         """Test that JSON export returns correct content type."""
-        response = client.get("/api/export/test_book?format=json")
+        response = client.get("/api/v1/export/test_book?format=json")
         assert response.status_code == 200
         assert "application/json" in response.headers["content-type"]
 
     def test_export_markdown_content_type(self, client):
         """Test that Markdown export returns correct content type."""
-        response = client.get("/api/export/test_book?format=markdown")
+        response = client.get("/api/v1/export/test_book?format=markdown")
         assert response.status_code == 200
         assert "text/markdown" in response.headers["content-type"]
 
@@ -857,7 +857,7 @@ class TestExportAPI:
         import uuid
         book_id = f"test_export_metadata_{uuid.uuid4().hex[:8]}"
 
-        response = client.get(f"/api/export/{book_id}?format=json")
+        response = client.get(f"/api/v1/export/{book_id}?format=json")
         data = json.loads(response.text)
 
         assert "book_id" in data
@@ -874,7 +874,7 @@ class TestExportAPI:
 
         for color in colors:
             client.post(
-                f"/api/highlights/{book_id}",
+                f"/api/v1/highlights/{book_id}",
                 json={
                     "chapter_index": 0,
                     "text": f"Text with {color}",
@@ -882,7 +882,7 @@ class TestExportAPI:
                 }
             )
 
-        response = client.get(f"/api/export/{book_id}?format=markdown")
+        response = client.get(f"/api/v1/export/{book_id}?format=markdown")
         content = response.text
 
         for emoji in expected_emojis:
@@ -894,7 +894,7 @@ class TestChapterProgressAPI:
 
     def test_get_chapter_progress_empty(self, client):
         """Test getting chapter progress when none exists."""
-        response = client.get("/api/chapter-progress/nonexistent_book")
+        response = client.get("/api/v1/chapter-progress/nonexistent_book")
         assert response.status_code == 200
         data = response.json()
         assert "progress" in data
@@ -905,14 +905,14 @@ class TestChapterProgressAPI:
         book_id = "test_book_chapter_progress"
         
         response = client.post(
-            f"/api/chapter-progress/{book_id}/0",
+            f"/api/v1/chapter-progress/{book_id}/0",
             json={"progress": 50.0}
         )
         assert response.status_code == 200
         assert response.json()["status"] == "saved"
         
         # Verify it was saved
-        get_response = client.get(f"/api/chapter-progress/{book_id}")
+        get_response = client.get(f"/api/v1/chapter-progress/{book_id}")
         assert get_response.status_code == 200
         progress = get_response.json()["progress"]
         assert progress.get("0") == 50.0 or progress.get(0) == 50.0
@@ -922,7 +922,7 @@ class TestChapterProgressAPI:
         book_id = "test_book_chapter_progress_query"
         
         response = client.post(
-            f"/api/chapter-progress/{book_id}/1?progress=75.0"
+            f"/api/v1/chapter-progress/{book_id}/1?progress=75.0"
         )
         assert response.status_code == 200
         assert response.json()["status"] == "saved"
@@ -934,11 +934,11 @@ class TestChapterProgressAPI:
         
         for i in range(3):
             client.post(
-                f"/api/chapter-progress/{book_id}/{i}",
+                f"/api/v1/chapter-progress/{book_id}/{i}",
                 json={"progress": (i + 1) * 25.0}
             )
         
-        response = client.get(f"/api/chapter-progress/{book_id}")
+        response = client.get(f"/api/v1/chapter-progress/{book_id}")
         progress = response.json()["progress"]
         
         # Progress should have 3 entries
@@ -951,18 +951,18 @@ class TestChapterProgressAPI:
         
         # Set initial progress
         client.post(
-            f"/api/chapter-progress/{book_id}/0",
+            f"/api/v1/chapter-progress/{book_id}/0",
             json={"progress": 80.0}
         )
         
         # Try to set lower progress
         client.post(
-            f"/api/chapter-progress/{book_id}/0",
+            f"/api/v1/chapter-progress/{book_id}/0",
             json={"progress": 50.0}
         )
         
         # Should still be 80
-        response = client.get(f"/api/chapter-progress/{book_id}")
+        response = client.get(f"/api/v1/chapter-progress/{book_id}")
         progress = response.json()["progress"]
         assert progress.get("0") == 80.0 or progress.get(0) == 80.0
 
@@ -972,7 +972,7 @@ class TestReadingTimesAPI:
 
     def test_get_reading_times_nonexistent_book(self, client):
         """Test getting reading times for a book that doesn't exist."""
-        response = client.get("/api/reading-times/nonexistent_book_xyz")
+        response = client.get("/api/v1/reading-times/nonexistent_book_xyz")
         # Should return 404 since book doesn't exist
         assert response.status_code == 404
 
@@ -987,13 +987,13 @@ class TestPDFStatsAPI:
 
     def test_get_stats_nonexistent_book(self, client):
         """Test getting PDF stats for non-existent book."""
-        response = client.get("/api/pdf/nonexistent_book/stats")
+        response = client.get("/api/v1/pdf/nonexistent_book/stats")
         assert response.status_code == 404
 
     def test_stats_endpoint_exists(self, client):
         """Test that the stats endpoint is accessible."""
         # Even for non-existent book, endpoint should respond
-        response = client.get("/api/pdf/test_book/stats")
+        response = client.get("/api/v1/pdf/test_book/stats")
         # Will be 404 (book not found) but endpoint exists
         assert response.status_code in [200, 400, 404]
 
@@ -1003,7 +1003,7 @@ class TestPDFThumbnailsAPI:
 
     def test_list_thumbnails_nonexistent_book(self, client):
         """Test listing thumbnails for non-existent book."""
-        response = client.get("/api/pdf/nonexistent_book/thumbnails")
+        response = client.get("/api/v1/pdf/nonexistent_book/thumbnails")
         assert response.status_code == 404
 
     def test_serve_thumbnail_nonexistent(self, client):
@@ -1013,7 +1013,7 @@ class TestPDFThumbnailsAPI:
 
     def test_thumbnails_endpoint_exists(self, client):
         """Test that thumbnails list endpoint is accessible."""
-        response = client.get("/api/pdf/test_book/thumbnails")
+        response = client.get("/api/v1/pdf/test_book/thumbnails")
         assert response.status_code in [200, 400, 404]
 
 
@@ -1022,17 +1022,17 @@ class TestPDFAnnotationsAPI:
 
     def test_get_annotations_nonexistent_book(self, client):
         """Test getting annotations for non-existent book."""
-        response = client.get("/api/pdf/nonexistent_book/annotations")
+        response = client.get("/api/v1/pdf/nonexistent_book/annotations")
         assert response.status_code == 404
 
     def test_annotations_endpoint_exists(self, client):
         """Test that annotations endpoint is accessible."""
-        response = client.get("/api/pdf/test_book/annotations")
+        response = client.get("/api/v1/pdf/test_book/annotations")
         assert response.status_code in [200, 400, 404]
 
     def test_annotations_with_page_filter(self, client):
         """Test annotations endpoint accepts page parameter."""
-        response = client.get("/api/pdf/test_book/annotations?page=0")
+        response = client.get("/api/v1/pdf/test_book/annotations?page=0")
         # Endpoint should accept the parameter
         assert response.status_code in [200, 400, 404]
 
@@ -1043,26 +1043,26 @@ class TestPDFSearchPositionsAPI:
     def test_search_positions_nonexistent_book(self, client):
         """Test search positions for non-existent book."""
         response = client.get(
-            "/api/pdf/nonexistent_book/search-positions?q=test"
+            "/api/v1/pdf/nonexistent_book/search-positions?q=test"
         )
         assert response.status_code == 404
 
     def test_search_positions_no_query(self, client):
         """Test search positions without query parameter."""
-        response = client.get("/api/pdf/test_book/search-positions")
+        response = client.get("/api/v1/pdf/test_book/search-positions")
         # Missing required parameter
         assert response.status_code == 422
 
     def test_search_positions_short_query(self, client):
         """Test search positions with query too short."""
-        response = client.get("/api/pdf/test_book/search-positions?q=a")
+        response = client.get("/api/v1/pdf/test_book/search-positions?q=a")
         # Should handle short queries
         assert response.status_code in [200, 400, 404]
 
     def test_search_positions_with_page(self, client):
         """Test search positions with page filter."""
         response = client.get(
-            "/api/pdf/test_book/search-positions?q=test&page=0"
+            "/api/v1/pdf/test_book/search-positions?q=test&page=0"
         )
         assert response.status_code in [200, 400, 404]
 
@@ -1072,17 +1072,17 @@ class TestPDFPageInfoAPI:
 
     def test_get_page_info_nonexistent_book(self, client):
         """Test getting page info for non-existent book."""
-        response = client.get("/api/pdf/nonexistent_book/page/0")
+        response = client.get("/api/v1/pdf/nonexistent_book/page/0")
         assert response.status_code == 404
 
     def test_page_info_endpoint_exists(self, client):
         """Test that page info endpoint is accessible."""
-        response = client.get("/api/pdf/test_book/page/0")
+        response = client.get("/api/v1/pdf/test_book/page/0")
         assert response.status_code in [200, 400, 404]
 
     def test_page_info_negative_page(self, client):
         """Test page info with negative page number."""
-        response = client.get("/api/pdf/test_book/page/-1")
+        response = client.get("/api/v1/pdf/test_book/page/-1")
         # Should be handled appropriately
         assert response.status_code in [200, 400, 404]
 
@@ -1092,12 +1092,12 @@ class TestPDFOutlineAPI:
 
     def test_get_outline_nonexistent_book(self, client):
         """Test getting outline for non-existent book."""
-        response = client.get("/api/pdf/nonexistent_book/outline")
+        response = client.get("/api/v1/pdf/nonexistent_book/outline")
         assert response.status_code == 404
 
     def test_outline_endpoint_exists(self, client):
         """Test that outline endpoint is accessible."""
-        response = client.get("/api/pdf/test_book/outline")
+        response = client.get("/api/v1/pdf/test_book/outline")
         assert response.status_code in [200, 400, 404]
 
 
@@ -1107,7 +1107,7 @@ class TestPDFExportAPI:
     def test_export_nonexistent_book(self, client):
         """Test exporting from non-existent book."""
         response = client.post(
-            "/api/pdf/nonexistent_book/export",
+            "/api/v1/pdf/nonexistent_book/export",
             json={"start_page": 0, "end_page": 5}
         )
         assert response.status_code == 404
@@ -1115,7 +1115,7 @@ class TestPDFExportAPI:
     def test_export_endpoint_exists(self, client):
         """Test that export endpoint is accessible."""
         response = client.post(
-            "/api/pdf/test_book/export",
+            "/api/v1/pdf/test_book/export",
             json={"start_page": 0, "end_page": 1}
         )
         # Will fail for non-PDF or non-existent, but endpoint exists
@@ -1124,7 +1124,7 @@ class TestPDFExportAPI:
     def test_export_invalid_json(self, client):
         """Test export with invalid JSON."""
         response = client.post(
-            "/api/pdf/test_book/export",
+            "/api/v1/pdf/test_book/export",
             content="not valid json",
             headers={"Content-Type": "application/json"}
         )
@@ -1136,12 +1136,12 @@ class TestPDFTextLayerAPI:
 
     def test_get_text_layer_nonexistent_book(self, client):
         """Test getting text layer for non-existent book."""
-        response = client.get("/api/pdf/nonexistent_book/text-layer/0")
+        response = client.get("/api/v1/pdf/nonexistent_book/text-layer/0")
         assert response.status_code == 404
 
     def test_text_layer_endpoint_exists(self, client):
         """Test that text layer endpoint is accessible."""
-        response = client.get("/api/pdf/test_book/text-layer/0")
+        response = client.get("/api/v1/pdf/test_book/text-layer/0")
         assert response.status_code in [200, 400, 404]
 
 
@@ -1225,7 +1225,7 @@ class TestCollectionsAPI:
 
     def test_get_collections_empty(self, client):
         """Test getting collections when none exist (may already have some)."""
-        response = client.get("/api/collections")
+        response = client.get("/api/v1/collections")
         assert response.status_code == 200
         data = response.json()
         assert "collections" in data
@@ -1237,7 +1237,7 @@ class TestCollectionsAPI:
         name = f"Test Collection {uuid.uuid4().hex[:8]}"
         
         response = client.post(
-            "/api/collections",
+            "/api/v1/collections",
             json={
                 "name": name,
                 "description": "A test collection",
@@ -1261,7 +1261,7 @@ class TestCollectionsAPI:
         name = f"Minimal Collection {uuid.uuid4().hex[:8]}"
         
         response = client.post(
-            "/api/collections",
+            "/api/v1/collections",
             json={"name": name}
         )
         assert response.status_code == 200
@@ -1273,7 +1273,7 @@ class TestCollectionsAPI:
     def test_create_collection_empty_name(self, client):
         """Test that creating a collection with empty name fails."""
         response = client.post(
-            "/api/collections",
+            "/api/v1/collections",
             json={"name": ""}
         )
         assert response.status_code == 400
@@ -1281,7 +1281,7 @@ class TestCollectionsAPI:
     def test_create_collection_whitespace_name(self, client):
         """Test that creating a collection with whitespace-only name fails."""
         response = client.post(
-            "/api/collections",
+            "/api/v1/collections",
             json={"name": "   "}
         )
         assert response.status_code == 400
@@ -1293,13 +1293,13 @@ class TestCollectionsAPI:
         
         # Create collection
         create_response = client.post(
-            "/api/collections",
+            "/api/v1/collections",
             json={"name": name}
         )
         collection_id = create_response.json()["id"]
         
         # Get by ID
-        get_response = client.get(f"/api/collections/{collection_id}")
+        get_response = client.get(f"/api/v1/collections/{collection_id}")
         assert get_response.status_code == 200
         
         data = get_response.json()
@@ -1308,7 +1308,7 @@ class TestCollectionsAPI:
 
     def test_get_collection_not_found(self, client):
         """Test getting a non-existent collection."""
-        response = client.get("/api/collections/nonexistent_id_12345")
+        response = client.get("/api/v1/collections/nonexistent_id_12345")
         assert response.status_code == 404
 
     def test_update_collection(self, client):
@@ -1318,14 +1318,14 @@ class TestCollectionsAPI:
         
         # Create collection
         create_response = client.post(
-            "/api/collections",
+            "/api/v1/collections",
             json={"name": name}
         )
         collection_id = create_response.json()["id"]
         
         # Update collection
         update_response = client.put(
-            f"/api/collections/{collection_id}",
+            f"/api/v1/collections/{collection_id}",
             json={
                 "name": "Updated Name",
                 "description": "Updated description",
@@ -1348,7 +1348,7 @@ class TestCollectionsAPI:
         
         # Create collection
         create_response = client.post(
-            "/api/collections",
+            "/api/v1/collections",
             json={
                 "name": name,
                 "description": "Original",
@@ -1360,13 +1360,13 @@ class TestCollectionsAPI:
         
         # Update only name
         update_response = client.put(
-            f"/api/collections/{collection_id}",
+            f"/api/v1/collections/{collection_id}",
             json={"name": "New Name Only"}
         )
         assert update_response.status_code == 200
         
         # Verify other fields unchanged
-        get_response = client.get(f"/api/collections/{collection_id}")
+        get_response = client.get(f"/api/v1/collections/{collection_id}")
         data = get_response.json()
         assert data["name"] == "New Name Only"
         assert data["description"] == "Original"
@@ -1375,7 +1375,7 @@ class TestCollectionsAPI:
     def test_update_collection_not_found(self, client):
         """Test updating a non-existent collection."""
         response = client.put(
-            "/api/collections/nonexistent_id_12345",
+            "/api/v1/collections/nonexistent_id_12345",
             json={"name": "Test"}
         )
         assert response.status_code == 404
@@ -1387,23 +1387,23 @@ class TestCollectionsAPI:
         
         # Create collection
         create_response = client.post(
-            "/api/collections",
+            "/api/v1/collections",
             json={"name": name}
         )
         collection_id = create_response.json()["id"]
         
         # Delete collection
-        delete_response = client.delete(f"/api/collections/{collection_id}")
+        delete_response = client.delete(f"/api/v1/collections/{collection_id}")
         assert delete_response.status_code == 200
         assert delete_response.json()["status"] == "deleted"
         
         # Verify deleted
-        get_response = client.get(f"/api/collections/{collection_id}")
+        get_response = client.get(f"/api/v1/collections/{collection_id}")
         assert get_response.status_code == 404
 
     def test_delete_collection_not_found(self, client):
         """Test deleting a non-existent collection."""
-        response = client.delete("/api/collections/nonexistent_id_12345")
+        response = client.delete("/api/v1/collections/nonexistent_id_12345")
         assert response.status_code == 404
 
     def test_add_book_to_collection(self, client):
@@ -1414,20 +1414,20 @@ class TestCollectionsAPI:
         
         # Create collection
         create_response = client.post(
-            "/api/collections",
+            "/api/v1/collections",
             json={"name": name}
         )
         collection_id = create_response.json()["id"]
         
         # Add book
         add_response = client.post(
-            f"/api/collections/{collection_id}/books/{book_id}"
+            f"/api/v1/collections/{collection_id}/books/{book_id}"
         )
         assert add_response.status_code == 200
         assert add_response.json()["status"] == "added"
         
         # Verify book is in collection
-        get_response = client.get(f"/api/collections/{collection_id}")
+        get_response = client.get(f"/api/v1/collections/{collection_id}")
         data = get_response.json()
         assert book_id in data["book_ids"]
         assert data["book_count"] == 1
@@ -1435,7 +1435,7 @@ class TestCollectionsAPI:
     def test_add_book_to_nonexistent_collection(self, client):
         """Test adding a book to a non-existent collection."""
         response = client.post(
-            "/api/collections/nonexistent_id/books/some_book"
+            "/api/v1/collections/nonexistent_id/books/some_book"
         )
         assert response.status_code == 404
 
@@ -1447,21 +1447,21 @@ class TestCollectionsAPI:
         
         # Create collection and add book
         create_response = client.post(
-            "/api/collections",
+            "/api/v1/collections",
             json={"name": name}
         )
         collection_id = create_response.json()["id"]
-        client.post(f"/api/collections/{collection_id}/books/{book_id}")
+        client.post(f"/api/v1/collections/{collection_id}/books/{book_id}")
         
         # Remove book
         remove_response = client.delete(
-            f"/api/collections/{collection_id}/books/{book_id}"
+            f"/api/v1/collections/{collection_id}/books/{book_id}"
         )
         assert remove_response.status_code == 200
         assert remove_response.json()["status"] == "removed"
         
         # Verify book is removed
-        get_response = client.get(f"/api/collections/{collection_id}")
+        get_response = client.get(f"/api/v1/collections/{collection_id}")
         data = get_response.json()
         assert book_id not in data["book_ids"]
 
@@ -1472,22 +1472,22 @@ class TestCollectionsAPI:
         
         # Create two collections and add the book to both
         col1_response = client.post(
-            "/api/collections",
+            "/api/v1/collections",
             json={"name": f"Col1 {uuid.uuid4().hex[:8]}"}
         )
         col1_id = col1_response.json()["id"]
         
         col2_response = client.post(
-            "/api/collections",
+            "/api/v1/collections",
             json={"name": f"Col2 {uuid.uuid4().hex[:8]}"}
         )
         col2_id = col2_response.json()["id"]
         
-        client.post(f"/api/collections/{col1_id}/books/{book_id}")
-        client.post(f"/api/collections/{col2_id}/books/{book_id}")
+        client.post(f"/api/v1/collections/{col1_id}/books/{book_id}")
+        client.post(f"/api/v1/collections/{col2_id}/books/{book_id}")
         
         # Get book's collections
-        response = client.get(f"/api/books/{book_id}/collections")
+        response = client.get(f"/api/v1/books/{book_id}/collections")
         assert response.status_code == 200
         
         data = response.json()
@@ -1504,29 +1504,29 @@ class TestCollectionsAPI:
         
         # Create three collections
         col1_response = client.post(
-            "/api/collections",
+            "/api/v1/collections",
             json={"name": f"Set1 {uuid.uuid4().hex[:8]}"}
         )
         col1_id = col1_response.json()["id"]
         
         col2_response = client.post(
-            "/api/collections",
+            "/api/v1/collections",
             json={"name": f"Set2 {uuid.uuid4().hex[:8]}"}
         )
         col2_id = col2_response.json()["id"]
         
         col3_response = client.post(
-            "/api/collections",
+            "/api/v1/collections",
             json={"name": f"Set3 {uuid.uuid4().hex[:8]}"}
         )
         col3_id = col3_response.json()["id"]
         
         # Add book to col1 initially
-        client.post(f"/api/collections/{col1_id}/books/{book_id}")
+        client.post(f"/api/v1/collections/{col1_id}/books/{book_id}")
         
         # Set book to col2 and col3 (should remove from col1)
         set_response = client.put(
-            f"/api/books/{book_id}/collections",
+            f"/api/v1/books/{book_id}/collections",
             json={"collection_ids": [col2_id, col3_id]}
         )
         assert set_response.status_code == 200
@@ -1544,26 +1544,26 @@ class TestCollectionsAPI:
         
         # Create three collections
         col1_response = client.post(
-            "/api/collections",
+            "/api/v1/collections",
             json={"name": f"Order1 {uuid.uuid4().hex[:8]}"}
         )
         col1_id = col1_response.json()["id"]
         
         col2_response = client.post(
-            "/api/collections",
+            "/api/v1/collections",
             json={"name": f"Order2 {uuid.uuid4().hex[:8]}"}
         )
         col2_id = col2_response.json()["id"]
         
         col3_response = client.post(
-            "/api/collections",
+            "/api/v1/collections",
             json={"name": f"Order3 {uuid.uuid4().hex[:8]}"}
         )
         col3_id = col3_response.json()["id"]
         
         # Reorder: col3, col1, col2
         reorder_response = client.put(
-            "/api/collections/reorder",
+            "/api/v1/collections/reorder",
             json={"collection_ids": [col3_id, col1_id, col2_id]}
         )
         assert reorder_response.status_code == 200
@@ -1575,7 +1575,7 @@ class TestCollectionsAPI:
         name = f"Book IDs Test {uuid.uuid4().hex[:8]}"
         
         response = client.post(
-            "/api/collections",
+            "/api/v1/collections",
             json={"name": name}
         )
         data = response.json()
@@ -1589,12 +1589,12 @@ class TestCollectionsAPI:
         name = f"Timestamps Test {uuid.uuid4().hex[:8]}"
         
         create_response = client.post(
-            "/api/collections",
+            "/api/v1/collections",
             json={"name": name}
         )
         collection_id = create_response.json()["id"]
         
-        get_response = client.get(f"/api/collections/{collection_id}")
+        get_response = client.get(f"/api/v1/collections/{collection_id}")
         data = get_response.json()
         
         assert "created_at" in data
@@ -1615,7 +1615,7 @@ class TestReadingSessionsAPI:
         book_id = f"test_book_{uuid.uuid4().hex[:8]}"
         
         response = client.post(
-            "/api/sessions/start",
+            "/api/v1/sessions/start",
             json={
                 "book_id": book_id,
                 "book_title": "Test Book",
@@ -1636,7 +1636,7 @@ class TestReadingSessionsAPI:
         
         # Start session
         start_response = client.post(
-            "/api/sessions/start",
+            "/api/v1/sessions/start",
             json={
                 "book_id": book_id,
                 "book_title": "Test Book",
@@ -1648,7 +1648,7 @@ class TestReadingSessionsAPI:
         
         # End session
         end_response = client.post(
-            f"/api/sessions/{session_id}/end",
+            f"/api/v1/sessions/{session_id}/end",
             json={
                 "duration_seconds": 600,
                 "pages_read": 10,
@@ -1661,7 +1661,7 @@ class TestReadingSessionsAPI:
     def test_end_nonexistent_session(self, client):
         """Test ending a session that doesn't exist."""
         response = client.post(
-            "/api/sessions/nonexistent_session_id/end",
+            "/api/v1/sessions/nonexistent_session_id/end",
             json={
                 "duration_seconds": 100,
                 "pages_read": 5,
@@ -1672,7 +1672,7 @@ class TestReadingSessionsAPI:
 
     def test_get_sessions(self, client):
         """Test getting reading sessions."""
-        response = client.get("/api/sessions")
+        response = client.get("/api/v1/sessions")
         assert response.status_code == 200
         
         data = response.json()
@@ -1686,7 +1686,7 @@ class TestReadingSessionsAPI:
         
         # Create a session for this book
         client.post(
-            "/api/sessions/start",
+            "/api/v1/sessions/start",
             json={
                 "book_id": book_id,
                 "book_title": "Test Book",
@@ -1695,7 +1695,7 @@ class TestReadingSessionsAPI:
             }
         )
         
-        response = client.get(f"/api/sessions?book_id={book_id}")
+        response = client.get(f"/api/v1/sessions?book_id={book_id}")
         assert response.status_code == 200
         
         data = response.json()
@@ -1703,7 +1703,7 @@ class TestReadingSessionsAPI:
 
     def test_get_sessions_with_limit(self, client):
         """Test getting sessions with limit parameter."""
-        response = client.get("/api/sessions?limit=5")
+        response = client.get("/api/v1/sessions?limit=5")
         assert response.status_code == 200
         
         data = response.json()
@@ -1711,7 +1711,7 @@ class TestReadingSessionsAPI:
 
     def test_get_reading_stats(self, client):
         """Test getting reading statistics."""
-        response = client.get("/api/sessions/stats")
+        response = client.get("/api/v1/sessions/stats")
         assert response.status_code == 200
         
         data = response.json()
@@ -1725,7 +1725,7 @@ class TestReadingSessionsAPI:
         import uuid
         book_id = f"test_book_{uuid.uuid4().hex[:8]}"
         
-        response = client.get(f"/api/sessions/stats?book_id={book_id}")
+        response = client.get(f"/api/v1/sessions/stats?book_id={book_id}")
         assert response.status_code == 200
         
         data = response.json()
@@ -1746,7 +1746,7 @@ class TestVocabularyAPI:
         book_id = f"test_book_{uuid.uuid4().hex[:8]}"
         
         response = client.post(
-            f"/api/vocabulary/{book_id}",
+            f"/api/v1/vocabulary/{book_id}",
             json={
                 "word": "ephemeral",
                 "definition": "lasting for a very short time",
@@ -1767,7 +1767,7 @@ class TestVocabularyAPI:
         book_id = f"test_book_{uuid.uuid4().hex[:8]}"
         
         response = client.post(
-            f"/api/vocabulary/{book_id}",
+            f"/api/v1/vocabulary/{book_id}",
             json={
                 "word": "serendipity",
                 "definition": "the occurrence of events by chance in a happy way"
@@ -1786,14 +1786,14 @@ class TestVocabularyAPI:
         
         # Add a word first
         client.post(
-            f"/api/vocabulary/{book_id}",
+            f"/api/v1/vocabulary/{book_id}",
             json={
                 "word": "test_word",
                 "definition": "a test definition"
             }
         )
         
-        response = client.get(f"/api/vocabulary/{book_id}")
+        response = client.get(f"/api/v1/vocabulary/{book_id}")
         assert response.status_code == 200
         
         data = response.json()
@@ -1805,7 +1805,7 @@ class TestVocabularyAPI:
         import uuid
         book_id = f"test_book_empty_{uuid.uuid4().hex[:8]}"
         
-        response = client.get(f"/api/vocabulary/{book_id}")
+        response = client.get(f"/api/v1/vocabulary/{book_id}")
         assert response.status_code == 200
         
         data = response.json()
@@ -1813,7 +1813,7 @@ class TestVocabularyAPI:
 
     def test_get_all_vocabulary(self, client):
         """Test getting all vocabulary across books."""
-        response = client.get("/api/vocabulary")
+        response = client.get("/api/v1/vocabulary")
         assert response.status_code == 200
         
         data = response.json()
@@ -1827,7 +1827,7 @@ class TestVocabularyAPI:
         
         # Add a word
         add_response = client.post(
-            f"/api/vocabulary/{book_id}",
+            f"/api/v1/vocabulary/{book_id}",
             json={
                 "word": "to_delete",
                 "definition": "will be deleted"
@@ -1836,13 +1836,13 @@ class TestVocabularyAPI:
         word_id = add_response.json()["id"]
         
         # Delete the word
-        delete_response = client.delete(f"/api/vocabulary/{book_id}/{word_id}")
+        delete_response = client.delete(f"/api/v1/vocabulary/{book_id}/{word_id}")
         assert delete_response.status_code == 200
         assert delete_response.json()["status"] == "deleted"
 
     def test_delete_nonexistent_vocabulary(self, client):
         """Test deleting a word that doesn't exist."""
-        response = client.delete("/api/vocabulary/some_book/nonexistent_id")
+        response = client.delete("/api/v1/vocabulary/some_book/nonexistent_id")
         assert response.status_code == 404
 
     def test_search_vocabulary(self, client):
@@ -1852,7 +1852,7 @@ class TestVocabularyAPI:
         
         # Add a word
         client.post(
-            f"/api/vocabulary/{book_id}",
+            f"/api/v1/vocabulary/{book_id}",
             json={
                 "word": "ubiquitous",
                 "definition": "present everywhere"
@@ -1860,7 +1860,7 @@ class TestVocabularyAPI:
         )
         
         # Search for it
-        response = client.get("/api/vocabulary/search?q=ubiquitous")
+        response = client.get("/api/v1/vocabulary/search?q=ubiquitous")
         assert response.status_code == 200
         
         data = response.json()
@@ -1868,7 +1868,7 @@ class TestVocabularyAPI:
 
     def test_search_vocabulary_short_query(self, client):
         """Test that short queries return empty results."""
-        response = client.get("/api/vocabulary/search?q=a")
+        response = client.get("/api/v1/vocabulary/search?q=a")
         assert response.status_code == 200
         
         data = response.json()
@@ -1889,7 +1889,7 @@ class TestUserAnnotationsAPI:
         book_id = f"test_book_{uuid.uuid4().hex[:8]}"
         
         response = client.post(
-            f"/api/annotations/{book_id}",
+            f"/api/v1/annotations/{book_id}",
             json={
                 "chapter_index": 0,
                 "note_text": "This is an important point!",
@@ -1908,7 +1908,7 @@ class TestUserAnnotationsAPI:
         book_id = f"test_book_{uuid.uuid4().hex[:8]}"
         
         response = client.post(
-            f"/api/annotations/{book_id}",
+            f"/api/v1/annotations/{book_id}",
             json={
                 "chapter_index": 0,
                 "note_text": "A simple note"
@@ -1923,14 +1923,14 @@ class TestUserAnnotationsAPI:
         
         # Create an annotation
         client.post(
-            f"/api/annotations/{book_id}",
+            f"/api/v1/annotations/{book_id}",
             json={
                 "chapter_index": 0,
                 "note_text": "Test note"
             }
         )
         
-        response = client.get(f"/api/annotations/{book_id}")
+        response = client.get(f"/api/v1/annotations/{book_id}")
         assert response.status_code == 200
         
         data = response.json()
@@ -1944,15 +1944,15 @@ class TestUserAnnotationsAPI:
         
         # Create annotations in different chapters
         client.post(
-            f"/api/annotations/{book_id}",
+            f"/api/v1/annotations/{book_id}",
             json={"chapter_index": 0, "note_text": "Chapter 0 note"}
         )
         client.post(
-            f"/api/annotations/{book_id}",
+            f"/api/v1/annotations/{book_id}",
             json={"chapter_index": 1, "note_text": "Chapter 1 note"}
         )
         
-        response = client.get(f"/api/annotations/{book_id}?chapter=0")
+        response = client.get(f"/api/v1/annotations/{book_id}?chapter=0")
         assert response.status_code == 200
 
     def test_get_annotations_empty(self, client):
@@ -1960,7 +1960,7 @@ class TestUserAnnotationsAPI:
         import uuid
         book_id = f"test_book_empty_{uuid.uuid4().hex[:8]}"
         
-        response = client.get(f"/api/annotations/{book_id}")
+        response = client.get(f"/api/v1/annotations/{book_id}")
         assert response.status_code == 200
         
         data = response.json()
@@ -1973,7 +1973,7 @@ class TestUserAnnotationsAPI:
         
         # Create annotation
         create_response = client.post(
-            f"/api/annotations/{book_id}",
+            f"/api/v1/annotations/{book_id}",
             json={
                 "chapter_index": 0,
                 "note_text": "Original note",
@@ -1984,7 +1984,7 @@ class TestUserAnnotationsAPI:
         
         # Update it
         update_response = client.put(
-            f"/api/annotations/{book_id}/{annotation_id}",
+            f"/api/v1/annotations/{book_id}/{annotation_id}",
             json={
                 "note_text": "Updated note",
                 "tags": ["updated", "modified"]
@@ -1996,7 +1996,7 @@ class TestUserAnnotationsAPI:
     def test_update_nonexistent_annotation(self, client):
         """Test updating an annotation that doesn't exist."""
         response = client.put(
-            "/api/annotations/some_book/nonexistent_id",
+            "/api/v1/annotations/some_book/nonexistent_id",
             json={"note_text": "Test"}
         )
         assert response.status_code == 404
@@ -2008,7 +2008,7 @@ class TestUserAnnotationsAPI:
         
         # Create annotation
         create_response = client.post(
-            f"/api/annotations/{book_id}",
+            f"/api/v1/annotations/{book_id}",
             json={
                 "chapter_index": 0,
                 "note_text": "To be deleted"
@@ -2018,14 +2018,14 @@ class TestUserAnnotationsAPI:
         
         # Delete it
         delete_response = client.delete(
-            f"/api/annotations/{book_id}/{annotation_id}"
+            f"/api/v1/annotations/{book_id}/{annotation_id}"
         )
         assert delete_response.status_code == 200
         assert delete_response.json()["status"] == "deleted"
 
     def test_delete_nonexistent_annotation(self, client):
         """Test deleting an annotation that doesn't exist."""
-        response = client.delete("/api/annotations/some_book/nonexistent_id")
+        response = client.delete("/api/v1/annotations/some_book/nonexistent_id")
         assert response.status_code == 404
 
     def test_search_annotations(self, client):
@@ -2035,7 +2035,7 @@ class TestUserAnnotationsAPI:
         
         # Create annotation with searchable text
         client.post(
-            f"/api/annotations/{book_id}",
+            f"/api/v1/annotations/{book_id}",
             json={
                 "chapter_index": 0,
                 "note_text": "This is about quantum mechanics",
@@ -2044,7 +2044,7 @@ class TestUserAnnotationsAPI:
         )
         
         # Search by text
-        response = client.get(f"/api/annotations/{book_id}/search?q=quantum")
+        response = client.get(f"/api/v1/annotations/{book_id}/search?q=quantum")
         assert response.status_code == 200
         
         data = response.json()
@@ -2055,7 +2055,7 @@ class TestUserAnnotationsAPI:
         import uuid
         book_id = f"test_book_{uuid.uuid4().hex[:8]}"
         
-        response = client.get(f"/api/annotations/{book_id}/search?q=a")
+        response = client.get(f"/api/v1/annotations/{book_id}/search?q=a")
         assert response.status_code == 200
         
         data = response.json()
@@ -2068,14 +2068,14 @@ class TestUserAnnotationsAPI:
         
         # Create an annotation
         client.post(
-            f"/api/annotations/{book_id}",
+            f"/api/v1/annotations/{book_id}",
             json={
                 "chapter_index": 0,
                 "note_text": "Export test note"
             }
         )
         
-        response = client.get(f"/api/annotations/{book_id}/export?format=markdown")
+        response = client.get(f"/api/v1/annotations/{book_id}/export?format=markdown")
         assert response.status_code == 200
         assert "markdown" in response.headers["content-type"] or "text" in response.headers["content-type"]
 
@@ -2084,7 +2084,7 @@ class TestUserAnnotationsAPI:
         import uuid
         book_id = f"test_book_{uuid.uuid4().hex[:8]}"
         
-        response = client.get(f"/api/annotations/{book_id}/export?format=json")
+        response = client.get(f"/api/v1/annotations/{book_id}/export?format=json")
         assert response.status_code == 200
         assert "json" in response.headers["content-type"]
 
@@ -2099,12 +2099,12 @@ class TestMetadataRebuildAPI:
 
     def test_rebuild_metadata_endpoint_exists(self, client):
         """Test that the rebuild metadata endpoint exists."""
-        response = client.post("/api/metadata/rebuild")
+        response = client.post("/api/v1/metadata/rebuild")
         assert response.status_code == 200
 
     def test_rebuild_metadata_returns_stats(self, client):
         """Test that rebuild returns update statistics."""
-        response = client.post("/api/metadata/rebuild")
+        response = client.post("/api/v1/metadata/rebuild")
         assert response.status_code == 200
         data = response.json()
         assert "status" in data
@@ -2114,7 +2114,7 @@ class TestMetadataRebuildAPI:
 
     def test_rebuild_metadata_force_param(self, client):
         """Test rebuild with force parameter."""
-        response = client.post("/api/metadata/rebuild?force=true")
+        response = client.post("/api/v1/metadata/rebuild?force=true")
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "ok"
@@ -2125,12 +2125,12 @@ class TestBackgroundUploadAPI:
 
     def test_upload_status_not_found(self, client):
         """Test getting status for non-existent upload."""
-        response = client.get("/api/upload/status/nonexistent-upload-id")
+        response = client.get("/api/v1/upload/status/nonexistent-upload-id")
         assert response.status_code == 404
 
     def test_list_upload_statuses(self, client):
         """Test listing all upload statuses."""
-        response = client.get("/api/upload/status")
+        response = client.get("/api/v1/upload/status")
         assert response.status_code == 200
         data = response.json()
         assert "uploads" in data
@@ -2237,7 +2237,7 @@ class TestConsolidatedProgressSaving:
         
         # Save progress with progress_percent
         save_response = client.post(
-            f"/api/progress/{book_id}",
+            f"/api/v1/progress/{book_id}",
             json={
                 "chapter_index": 3,
                 "scroll_position": 0.75,
@@ -2247,7 +2247,7 @@ class TestConsolidatedProgressSaving:
         assert save_response.status_code == 200
         
         # Verify chapter progress was also saved
-        chapter_response = client.get(f"/api/chapter-progress/{book_id}")
+        chapter_response = client.get(f"/api/v1/chapter-progress/{book_id}")
         assert chapter_response.status_code == 200
         progress = chapter_response.json()["progress"]
         # Chapter 3 should have 85% progress
@@ -2260,7 +2260,7 @@ class TestConsolidatedProgressSaving:
         
         # Save progress without progress_percent
         client.post(
-            f"/api/progress/{book_id}",
+            f"/api/v1/progress/{book_id}",
             json={
                 "chapter_index": 2,
                 "scroll_position": 0.5
@@ -2268,7 +2268,7 @@ class TestConsolidatedProgressSaving:
         )
         
         # Chapter progress should be empty (unless previously set)
-        chapter_response = client.get(f"/api/chapter-progress/{book_id}")
+        chapter_response = client.get(f"/api/v1/chapter-progress/{book_id}")
         progress = chapter_response.json()["progress"]
         # Should not have chapter 2 entry
         assert progress.get("2") is None and progress.get(2) is None
@@ -2279,13 +2279,13 @@ class TestCachedReadingTimesAPI:
 
     def test_reading_times_nonexistent_returns_404(self, client):
         """Test that non-existent book returns 404."""
-        response = client.get("/api/reading-times/nonexistent_book_xyz")
+        response = client.get("/api/v1/reading-times/nonexistent_book_xyz")
         assert response.status_code == 404
 
     def test_reading_times_response_format(self, client):
         """Test the expected response format for reading times."""
         # For non-existent book, should return 404
-        response = client.get("/api/reading-times/some_book")
+        response = client.get("/api/v1/reading-times/some_book")
         assert response.status_code in [200, 404]
         
         # If book exists, check format
@@ -2307,7 +2307,7 @@ class TestLibraryMetadataOptimization:
 
     def test_recently_read_endpoint_works(self, client):
         """Test that recently-read endpoint works with metadata."""
-        response = client.get("/api/recently-read")
+        response = client.get("/api/v1/recently-read")
         assert response.status_code == 200
         data = response.json()
         assert "books" in data
@@ -2315,7 +2315,7 @@ class TestLibraryMetadataOptimization:
 
     def test_recently_read_limit_param(self, client):
         """Test recently-read with limit parameter."""
-        response = client.get("/api/recently-read?limit=3")
+        response = client.get("/api/v1/recently-read?limit=3")
         assert response.status_code == 200
         data = response.json()
         assert len(data["books"]) <= 3
@@ -2326,7 +2326,7 @@ class TestReaderPreferencesAPI:
 
     def test_get_reader_preferences_defaults(self, client):
         """The reader settings endpoint should return defaults."""
-        response = client.get("/api/reader/preferences")
+        response = client.get("/api/v1/reader/preferences")
 
         assert response.status_code == 200
         data = response.json()
@@ -2341,7 +2341,7 @@ class TestReaderPreferencesAPI:
     def test_update_reader_preferences_round_trip(self, client):
         """Reader settings updates should persist and be returned on read."""
         response = client.put(
-            "/api/reader/preferences",
+            "/api/v1/reader/preferences",
             json={
                 "theme": "sepia",
                 "font_size_px": 23,
@@ -2357,7 +2357,7 @@ class TestReaderPreferencesAPI:
         assert response.json()["theme"] == "sepia"
         assert response.json()["pdf_copy_image_dpi"] == 450
 
-        follow_up = client.get("/api/reader/preferences")
+        follow_up = client.get("/api/v1/reader/preferences")
         data = follow_up.json()
         assert data["theme"] == "sepia"
         assert data["font_size_px"] == 23
@@ -2372,7 +2372,7 @@ class TestReaderPreferencesAPI:
         create_test_book("reader_pdf_copy_dpi_data", "Reader PDF Copy DPI", is_pdf=True)
 
         update_response = client.put(
-            "/api/reader/preferences",
+            "/api/v1/reader/preferences",
             json={"pdf_copy_image_dpi": 450},
         )
         assert update_response.status_code == 200
@@ -2458,7 +2458,7 @@ class TestPdfPageImageExport:
             ),
         )
 
-        response = client.get(f"/api/pdf/{bid}/page-image/0")
+        response = client.get(f"/api/v1/pdf/{bid}/page-image/0")
 
         assert response.status_code == 200
         assert response.headers["content-type"] == "image/png"

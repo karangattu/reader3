@@ -1895,7 +1895,7 @@
                 attempts++;
                 
                 try {
-                    const response = await fetch(`/api/upload/status/${uploadId}`);
+                    const response = await fetch(`/api/v1/upload/status/${uploadId}`);
                     if (!response.ok) {
                         throw new Error(`Status ${response.status}`);
                     }
@@ -1995,7 +1995,7 @@
             container.innerHTML = '<div class="search-results"><div class="no-results">Searching...</div></div>';
             
             try {
-                const response = await fetch(`/api/search?q=${encodeURIComponent(query)}&mode=${encodeURIComponent(mode)}`);
+                const response = await fetch(`/api/v1/search?q=${encodeURIComponent(query)}&mode=${encodeURIComponent(mode)}`);
                 if (response.ok) {
                     const data = await response.json();
                     renderGlobalSearchResults(data.results, query);
@@ -2098,7 +2098,7 @@
                 
                 const bookId = progressBar.id.replace('progress-', '');
                 try {
-                    const response = await fetch(`/api/progress/${encodeURIComponent(bookId)}`);
+                    const response = await fetch(`/api/v1/progress/${encodeURIComponent(bookId)}`);
                     if (response.ok) {
                         const progress = await response.json();
                         if (progress && progress.progress_percent > 0) {
@@ -2134,7 +2134,7 @@
         // Load and display recently read books
         async function loadRecentlyRead() {
             try {
-                const response = await fetch('/api/recently-read?limit=5');
+                const response = await fetch('/api/v1/recently-read?limit=5');
                 if (!response.ok) return;
                 
                 const data = await response.json();
@@ -2224,7 +2224,7 @@
 
         async function loadCollections() {
             try {
-                const response = await fetch('/api/collections');
+                const response = await fetch('/api/v1/collections');
                 if (!response.ok) return;
                 
                 const data = await response.json();
@@ -2391,7 +2391,7 @@
             if (!name) return;
             
             try {
-                const url = id ? `/api/collections/${id}` : '/api/collections';
+                const url = id ? `/api/v1/collections/${id}` : '/api/v1/collections';
                 const method = id ? 'PUT' : 'POST';
                 
                 const response = await fetch(url, {
@@ -2422,7 +2422,7 @@
             }
             
             try {
-                const response = await fetch(`/api/collections/${collectionId}`, { method: 'DELETE' });
+                const response = await fetch(`/api/v1/collections/${collectionId}`, { method: 'DELETE' });
                 if (response.ok) {
                     if (currentCollectionFilter === collectionId) {
                         filterByCollection('all');
@@ -2495,7 +2495,7 @@
             const collectionIds = Array.from(checkboxes).map(cb => cb.value);
             
             try {
-                const response = await fetch(`/api/books/${encodeURIComponent(currentEditingBookId)}/collections`, {
+                const response = await fetch(`/api/v1/books/${encodeURIComponent(currentEditingBookId)}/collections`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ collection_ids: collectionIds })
@@ -2563,7 +2563,7 @@
             }
             
             try {
-                const response = await fetch(`/api/collections/${collectionId}`, { method: 'DELETE' });
+                const response = await fetch(`/api/v1/collections/${collectionId}`, { method: 'DELETE' });
                 if (response.ok) {
                     await loadCollections();
                     openManageCollectionsModal(); // Refresh the modal

@@ -13,6 +13,7 @@ wheels/
 *_data/
 *.epub
 user_data.json
+*.sqlite3
 /reader3_android
 /node_modules
 /android
