@@ -2,6 +2,20 @@
 
 All notable changes to Reader3 will be documented in this file.
 
+## [1.9.0] - 2026-09-05
+
+### Added
+
+- **Reader3 Android App**: Full-featured standalone Android app built with React Native and Expo, featuring offline library shelf with cover art, EPUB chapter reader and batch markdown copier, high-resolution (300 DPI) PDF reader with text/image copy and multi-page composite sharing.
+- **Auto-tagging & Release Automation**: GitHub Actions workflow for automated version tagging and release creation on main/master pushes.
+- **GitHub Actions Modernization**: Upgraded all GitHub Actions workflows to latest action versions (`actions/checkout@v4`, `actions/setup-python@v5`, `actions/upload-artifact@v4`, `softprops/action-gh-release@v2`).
+
+### Fixed
+
+- **High-Resolution PDF Image Export**: PDF pages exported to clipboard or composite image now render at crisp 300 DPI instead of downscaled screen resolution.
+
+---
+
 ## [1.8.3] - 2026-05-10
 
 ### Fixed
