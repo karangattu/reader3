@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all
 
-datas = [('templates', 'templates')]
+datas = [('templates', 'templates'), ('src/reader3/static', 'static')]
 binaries = []
 hiddenimports = ['fastapi', 'fastapi.responses', 'fastapi.staticfiles', 'fastapi.templating', 'python_multipart', 'starlette', 'starlette.routing', 'starlette.responses', 'starlette.requests', 'starlette.middleware', 'starlette.middleware.cors', 'starlette.staticfiles', 'starlette.templating', 'jinja2', 'uvicorn', 'uvicorn.logging', 'uvicorn.loops', 'uvicorn.loops.auto', 'uvicorn.protocols', 'uvicorn.protocols.http', 'uvicorn.protocols.http.auto', 'uvicorn.protocols.websockets', 'uvicorn.protocols.websockets.auto', 'uvicorn.lifespan', 'uvicorn.lifespan.on', 'uvicorn.lifespan.off', 'orjson', 'fitz', 'pymupdf', 'ebooklib', 'bs4']
 tmp_ret = collect_all('fastapi')

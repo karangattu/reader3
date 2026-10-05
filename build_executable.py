@@ -78,6 +78,7 @@ def build(onefile: bool = False, console: bool = False):
 
     mode_flag = '--onefile' if onefile else '--onedir'
     templates_src = os.path.join(os.getcwd(), "templates")
+    static_src = os.path.join(os.getcwd(), "src", "reader3", "static")
 
     # Define the command
     cmd = [
@@ -92,6 +93,7 @@ def build(onefile: bool = False, console: bool = False):
         mode_flag,
         "--console" if console else "--windowed",
         f"--add-data={templates_src}{sep}templates",
+        f"--add-data={static_src}{sep}static",
         "--name=Reader3",
     ]
 

@@ -181,6 +181,20 @@ else:
 
 templates = Jinja2Templates(directory=templates_dir)
 
+# Static assets (fonts, etc.). Resolve like templates: prefer the repo-root
+# static/ dir in a source checkout, else the packaged copy, else the bundle.
+if getattr(sys, "frozen", False):
+    static_dir = os.path.join(base_resource_path, "static")
+else:
+    _repo_static = os.path.join(
+        os.path.dirname(os.path.dirname(base_resource_path)), "static"
+    )
+    static_dir = (
+        _repo_static
+        if os.path.isdir(_repo_static)
+        else os.path.join(base_resource_path, "static")
+    )
+
 # Where are the book folders located?
 if os.environ.get("READER3_BOOKS_DIR"):
     BOOKS_DIR = os.environ["READER3_BOOKS_DIR"]

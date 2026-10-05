@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 
 # ---------------------------------------------------------------------------
@@ -28,6 +29,7 @@ from .api.deps import (  # noqa: E402
     user_data_manager,
     templates,
     templates_dir,
+    static_dir,
     # Re-export commonly used names so backward-compat shims keep working
     load_book_cached,
     load_book_metadata,
@@ -96,8 +98,8 @@ class CacheControlMiddleware(BaseHTTPMiddleware):
     """Adds Cache-Control headers for images, thumbnails, and stable API data."""
 
     # Paths that benefit from aggressive caching (immutable book assets)
-    STATIC_PREFIXES = ("/read/",)
-    STATIC_SUFFIXES = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg")
+    STATIC_PREFIXES = ("/read/", "/static/")
+    STATIC_SUFFIXES = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".woff2", ".woff", ".ttf", ".css")
 
     # API responses for data that is immutable once a book is processed
     IMMUTABLE_API_PREFIXES = (
@@ -160,6 +162,10 @@ app = FastAPI(
 app.add_middleware(CacheControlMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(GZipMiddleware, minimum_size=500, compresslevel=6)
+
+# Serve bundled static assets (self-hosted reading fonts, etc.).
+if os.path.isdir(static_dir):
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 logger.info("Current working directory: %s", os.getcwd())
 
