@@ -164,11 +164,21 @@ def cleanup_old_statuses():
 if getattr(sys, "frozen", False):
     # If run as an executable (PyInstaller)
     base_resource_path = sys._MEIPASS
+    templates_dir = os.path.join(base_resource_path, "templates")
 else:
     # If run as a script — go up one level from api/ to reader3/
     base_resource_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    # The canonical templates live in the repo-root templates/ directory.
+    # Fall back to a packaged copy (e.g. installed wheel) if absent.
+    _repo_templates = os.path.join(
+        os.path.dirname(os.path.dirname(base_resource_path)), "templates"
+    )
+    templates_dir = (
+        _repo_templates
+        if os.path.isdir(_repo_templates)
+        else os.path.join(base_resource_path, "templates")
+    )
 
-templates_dir = os.path.join(base_resource_path, "templates")
 templates = Jinja2Templates(directory=templates_dir)
 
 # Where are the book folders located?
