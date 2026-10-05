@@ -2,6 +2,30 @@
 
 All notable changes to Reader3 will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- **Library theming** — The library shelf now follows the reader theme (Paper/Sepia/Night), and an **Auto (system)** theme option follows `prefers-color-scheme`.
+- **Text alignment setting** — Justified vs. left-aligned text with automatic hyphenation to avoid wide word gaps.
+- **Self-hosted fonts** — Reading typefaces are bundled locally (no Google Fonts request), working fully offline.
+- **Responsive reader** — On small screens the chapter sidebar becomes an overlay drawer (with scrim) and panels become full-screen sheets.
+- **Accessibility** — Visible `:focus-visible` indicators, dialog `role`/`aria` semantics, and focus trapping in reader modals.
+- **Next-chapter prefetch** — Forward navigation renders instantly.
+
+### Fixed
+
+- **Night/Sepia chrome** — Panels, modals, popovers, and the chapter footer now theme correctly instead of staying white.
+- **Library media query** — The misplaced `@media` block nested inside `body {}` now applies on narrow viewports.
+- **Cover cropping** — Book covers use a 2:3 aspect ratio instead of being decapitated.
+
+### Technical
+
+- Consolidated the duplicate `templates/` and `src/reader3/templates/` directories into the repo-root `templates/`.
+- Unified the reader accent color (was a pink/blue mix) onto the blue/purple scale.
+
+---
+
 ## [1.9.0] - 2026-09-05
 
 ### Added
