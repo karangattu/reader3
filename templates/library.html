@@ -7,36 +7,85 @@
     <title>My Library</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <style>
+        :root {
+            --lib-bg: #f4f4f9;
+            --lib-surface: #fff;
+            --lib-text: #1a1a1a;
+            --lib-muted: #666;
+            --lib-faint: #999;
+            --lib-border: #e5e5e5;
+            --lib-item-bg: #f5f5f5;
+            --lib-item-hover: #ececec;
+            --lib-input-bg: #fff;
+            --lib-accent: #3498db;
+            --lib-accent-2: #9b59b6;
+            --lib-accent-hover: #2980b9;
+            --lib-on-accent: #fff;
+            --lib-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+        }
+
+        body.theme-sepia {
+            --lib-bg: #efe4cf;
+            --lib-surface: #fbf3e4;
+            --lib-text: #43362c;
+            --lib-muted: #65584b;
+            --lib-faint: #8a7a68;
+            --lib-border: #d8c7ac;
+            --lib-item-bg: #f6ebd7;
+            --lib-item-hover: #efdfc2;
+            --lib-input-bg: #fbf3e4;
+            --lib-shadow: 0 1px 3px rgba(67, 54, 44, 0.12);
+        }
+
+        body.theme-dark {
+            --lib-bg: #11161c;
+            --lib-surface: #18212b;
+            --lib-text: #edf2f7;
+            --lib-muted: #b4c0cf;
+            --lib-faint: #8fa1b5;
+            --lib-border: #283444;
+            --lib-item-bg: #1c2733;
+            --lib-item-hover: #243341;
+            --lib-input-bg: #11161c;
+            --lib-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+        }
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background: #f4f4f9;
+            background: var(--lib-bg);
+            color: var(--lib-text);
             margin: 0;
             padding: 40px;
             position: relative;
-                @media (max-width: 900px) {
-                    .library-header {
-                        flex-direction: column;
-                        align-items: flex-start;
-                        gap: 16px;
-                    }
+        }
 
-                    .sort-controls {
-                        flex-wrap: wrap;
-                    }
+        @media (max-width: 900px) {
+            body {
+                padding: 20px;
+            }
 
-                    .library-filter-form {
-                        grid-template-columns: 1fr;
-                    }
+            .library-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 16px;
+            }
 
-                    .library-filter-actions {
-                        justify-content: stretch;
-                    }
+            .sort-controls {
+                flex-wrap: wrap;
+            }
 
-                    .library-filter-actions .btn,
-                    .library-filter-actions .btn-ghost {
-                        flex: 1;
-                    }
-                }
+            .library-filter-form {
+                grid-template-columns: 1fr;
+            }
+
+            .library-filter-actions {
+                justify-content: stretch;
+            }
+
+            .library-filter-actions .btn,
+            .library-filter-actions .btn-ghost {
+                flex: 1;
+            }
         }
 
         .container {
@@ -45,7 +94,7 @@
         }
 
         h1 {
-            color: #1a1a1a;
+            color: var(--lib-text);
             font-size: 2.5em;
             margin-bottom: 10px;
             font-weight: 300;
@@ -53,7 +102,7 @@
         }
 
         .library-header {
-            border-bottom: 1px solid #e5e5e5;
+            border-bottom: 1px solid var(--lib-border);
             padding-bottom: 20px;
             margin-bottom: 30px;
             display: flex;
@@ -68,12 +117,12 @@
         }
 
         .library-filters {
-            background: white;
-            border: 1px solid #e5e5e5;
+            background: var(--lib-surface);
+            border: 1px solid var(--lib-border);
             border-radius: 12px;
             padding: 18px 20px;
             margin-bottom: 20px;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+            box-shadow: var(--lib-shadow);
         }
 
         .library-filter-form {
@@ -90,7 +139,7 @@
         }
 
         .library-filter-label {
-            color: #666;
+            color: var(--lib-muted);
             font-size: 0.85em;
             font-weight: 600;
         }
@@ -105,9 +154,9 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            border: 1px solid #d7dce2;
-            background: #fff;
-            color: #4c5967;
+            border: 1px solid var(--lib-border);
+            background: var(--lib-surface);
+            color: var(--lib-muted);
             text-decoration: none;
             padding: 11px 16px;
             border-radius: 8px;
@@ -118,37 +167,37 @@
         }
 
         .btn-ghost:hover {
-            border-color: #3498db;
-            color: #3498db;
+            border-color: var(--lib-accent);
+            color: var(--lib-accent);
         }
 
         .sort-label {
-            color: #666;
+            color: var(--lib-muted);
             font-size: 0.9em;
             font-weight: 500;
         }
 
         .sort-btn {
             padding: 8px 16px;
-            border: 2px solid #ddd;
-            background: white;
+            border: 2px solid var(--lib-border);
+            background: var(--lib-surface);
             border-radius: 6px;
             cursor: pointer;
             font-size: 0.9em;
             transition: all 0.2s;
             text-decoration: none;
-            color: #333;
+            color: var(--lib-text);
         }
 
         .sort-btn:hover {
-            border-color: #3498db;
-            color: #3498db;
+            border-color: var(--lib-accent);
+            color: var(--lib-accent);
         }
 
         .sort-btn.active {
-            background: #3498db;
-            color: white;
-            border-color: #3498db;
+            background: var(--lib-accent);
+            color: var(--lib-on-accent);
+            border-color: var(--lib-accent);
         }
 
         /* View Toggle */
@@ -157,29 +206,29 @@
             gap: 4px;
             margin-left: 15px;
             padding-left: 15px;
-            border-left: 1px solid #e5e5e5;
+            border-left: 1px solid var(--lib-border);
         }
 
         .view-btn {
             padding: 8px 12px;
-            border: 2px solid #ddd;
-            background: white;
+            border: 2px solid var(--lib-border);
+            background: var(--lib-surface);
             border-radius: 6px;
             cursor: pointer;
             font-size: 0.9em;
             transition: all 0.2s;
-            color: #888;
+            color: var(--lib-faint);
         }
 
         .view-btn:hover {
-            border-color: #3498db;
-            color: #3498db;
+            border-color: var(--lib-accent);
+            color: var(--lib-accent);
         }
 
         .view-btn.active {
-            background: #3498db;
-            color: white;
-            border-color: #3498db;
+            background: var(--lib-accent);
+            color: var(--lib-on-accent);
+            border-color: var(--lib-accent);
         }
 
         .book-grid {
@@ -251,11 +300,11 @@
         }
 
         .book-card {
-            background: white;
+            background: var(--lib-surface);
             padding: 20px;
             border-radius: 8px;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-            border: 1px solid #f0f0f0;
+            box-shadow: var(--lib-shadow);
+            border: 1px solid var(--lib-border);
             transition: all 0.3s ease;
             display: flex;
             flex-direction: column;
@@ -272,16 +321,18 @@
 
         .book-cover {
             width: 100%;
-            height: 200px;
+            aspect-ratio: 2 / 3;
+            height: auto;
             object-fit: cover;
             border-radius: 4px;
             margin-bottom: 15px;
-            background: #f0f0f0;
+            background: var(--lib-item-bg);
         }
 
         .book-cover-placeholder {
             width: 100%;
-            height: 200px;
+            aspect-ratio: 2 / 3;
+            height: auto;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             border-radius: 4px;
             margin-bottom: 15px;
@@ -295,7 +346,7 @@
         .book-title {
             font-size: 1.2em;
             font-weight: bold;
-            color: #2c3e50;
+            color: var(--lib-text);
             margin-bottom: 10px;
             display: flex;
             align-items: center;
@@ -316,7 +367,7 @@
         }
 
         .book-meta {
-            color: #666;
+            color: var(--lib-muted);
             font-size: 0.9em;
             margin-bottom: 15px;
         }
@@ -326,7 +377,7 @@
             align-items: center;
             gap: 8px;
             margin-top: 8px;
-            color: #5f6b78;
+            color: var(--lib-muted);
             font-size: 0.85em;
             font-weight: 500;
             flex-wrap: wrap;
@@ -344,18 +395,18 @@
         }
 
         .reading-status-pill.unread {
-            background: #eef2f6;
-            color: #55606d;
+            background: rgba(128, 128, 128, 0.15);
+            color: var(--lib-muted);
         }
 
         .reading-status-pill.in-progress {
-            background: #e7f3ff;
-            color: #1765ad;
+            background: rgba(52, 152, 219, 0.15);
+            color: var(--lib-accent);
         }
 
         .reading-status-pill.completed {
-            background: #e8f8ef;
-            color: #1f8a52;
+            background: rgba(46, 204, 113, 0.15);
+            color: #27ae60;
         }
 
         .book-actions {
@@ -366,8 +417,8 @@
 
         .btn {
             display: inline-block;
-            background: #3498db;
-            color: white;
+            background: var(--lib-accent);
+            color: var(--lib-on-accent);
             text-decoration: none;
             padding: 10px 16px;
             border-radius: 5px;
@@ -381,7 +432,7 @@
         }
 
         .btn:hover {
-            background: #2980b9;
+            background: var(--lib-accent-hover);
             box-shadow: 0 4px 8px rgba(52, 152, 219, 0.3);
         }
 
@@ -409,30 +460,32 @@
         .search-input {
             flex: 1;
             padding: 12px 16px;
-            border: 2px solid #ddd;
+            border: 2px solid var(--lib-border);
             border-radius: 8px;
             font-size: 1em;
             outline: none;
             transition: border-color 0.2s;
+            background: var(--lib-input-bg);
+            color: var(--lib-text);
         }
         .search-input:focus {
-            border-color: #3498db;
+            border-color: var(--lib-accent);
         }
         .search-mode {
-            border: 2px solid #ddd;
+            border: 2px solid var(--lib-border);
             border-radius: 8px;
             padding: 10px 12px;
             font-size: 0.95em;
-            background: #fff;
-            color: #333;
+            background: var(--lib-input-bg);
+            color: var(--lib-text);
         }
         .search-mode:focus {
             outline: none;
-            border-color: #3498db;
+            border-color: var(--lib-accent);
         }
         .search-btn {
-            background: #3498db;
-            color: white;
+            background: var(--lib-accent);
+            color: var(--lib-on-accent);
             border: none;
             padding: 12px 24px;
             border-radius: 8px;
@@ -440,10 +493,10 @@
             font-weight: 500;
         }
         .search-btn:hover {
-            background: #2980b9;
+            background: var(--lib-accent-hover);
         }
         .search-results {
-            background: white;
+            background: var(--lib-surface);
             border-radius: 8px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.1);
             margin-bottom: 20px;
@@ -451,19 +504,19 @@
         }
         .search-result {
             padding: 15px 20px;
-            border-bottom: 1px solid #eee;
+            border-bottom: 1px solid var(--lib-border);
             cursor: pointer;
             transition: background 0.2s;
         }
         .search-result:last-child { border-bottom: none; }
-        .search-result:hover { background: #f5f5f5; }
-        .search-result-book { font-weight: 600; color: #333; margin-bottom: 4px; }
-        .search-result-chapter { font-size: 0.85em; color: #888; margin-bottom: 6px; }
-        .search-result-context { font-size: 0.9em; color: #555; }
-        .search-result-context mark { background: #ffeb3b; padding: 0 2px; border-radius: 2px; }
-        .no-results { text-align: center; padding: 30px; color: #999; }
-        .reading-progress-bar { height: 4px; background: #e0e0e0; border-radius: 2px; margin-top: 10px; overflow: hidden; }
-        .reading-progress-fill { height: 100%; background: linear-gradient(90deg, #3498db, #9b59b6); transition: width 0.3s; }
+        .search-result:hover { background: var(--lib-item-hover); }
+        .search-result-book { font-weight: 600; color: var(--lib-text); margin-bottom: 4px; }
+        .search-result-chapter { font-size: 0.85em; color: var(--lib-faint); margin-bottom: 6px; }
+        .search-result-context { font-size: 0.9em; color: var(--lib-muted); }
+        .search-result-context mark { background: #ffeb3b; color: #000; padding: 0 2px; border-radius: 2px; }
+        .no-results { text-align: center; padding: 30px; color: var(--lib-faint); }
+        .reading-progress-bar { height: 4px; background: var(--lib-border); border-radius: 2px; margin-top: 10px; overflow: hidden; }
+        .reading-progress-fill { height: 100%; background: linear-gradient(90deg, var(--lib-accent), var(--lib-accent-2)); transition: width 0.3s; }
         
         /* Recently Read Section */
         .recently-read-section {
@@ -482,13 +535,13 @@
         .recently-read-title {
             font-size: 1.1em;
             font-weight: 600;
-            color: #333;
+            color: var(--lib-text);
             display: flex;
             align-items: center;
             gap: 8px;
         }
         .recently-read-title i {
-            color: #3498db;
+            color: var(--lib-accent);
         }
         .recently-read-scroll {
             display: flex;
@@ -498,7 +551,7 @@
             margin: 0 -5px;
             scroll-behavior: smooth;
             scrollbar-width: thin;
-            scrollbar-color: #ddd transparent;
+            scrollbar-color: var(--lib-border) transparent;
         }
         .recently-read-scroll::-webkit-scrollbar {
             height: 6px;
@@ -507,19 +560,19 @@
             background: transparent;
         }
         .recently-read-scroll::-webkit-scrollbar-thumb {
-            background: #ddd;
+            background: var(--lib-border);
             border-radius: 3px;
         }
         .recently-read-scroll::-webkit-scrollbar-thumb:hover {
-            background: #ccc;
+            background: var(--lib-faint);
         }
         .recent-book-card {
             flex: 0 0 180px;
-            background: white;
+            background: var(--lib-surface);
             border-radius: 10px;
             padding: 12px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-            border: 1px solid #f0f0f0;
+            box-shadow: var(--lib-shadow);
+            border: 1px solid var(--lib-border);
             transition: all 0.2s ease;
             cursor: pointer;
             text-decoration: none;
@@ -528,14 +581,14 @@
         .recent-book-card:hover {
             transform: translateY(-3px);
             box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
-            border-color: #3498db;
+            border-color: var(--lib-accent);
         }
         .recent-book-cover {
             width: 100%;
             height: 120px;
             object-fit: cover;
             border-radius: 6px;
-            background: #f0f0f0;
+            background: var(--lib-item-bg);
         }
         .recent-book-cover-placeholder {
             width: 100%;
@@ -554,7 +607,7 @@
         .recent-book-title {
             font-size: 0.9em;
             font-weight: 600;
-            color: #333;
+            color: var(--lib-text);
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -562,7 +615,7 @@
         }
         .recent-book-author {
             font-size: 0.75em;
-            color: #888;
+            color: var(--lib-faint);
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -570,14 +623,14 @@
         }
         .recent-book-progress {
             height: 4px;
-            background: #e0e0e0;
+            background: var(--lib-border);
             border-radius: 2px;
             overflow: hidden;
             margin-bottom: 6px;
         }
         .recent-book-progress-fill {
             height: 100%;
-            background: linear-gradient(90deg, #3498db, #9b59b6);
+            background: linear-gradient(90deg, var(--lib-accent), var(--lib-accent-2));
             transition: width 0.3s;
         }
         .recent-book-meta {
@@ -585,7 +638,7 @@
             justify-content: space-between;
             align-items: center;
             font-size: 0.7em;
-            color: #999;
+            color: var(--lib-faint);
         }
         .recent-book-time {
             display: flex;
@@ -596,8 +649,8 @@
             display: inline-flex;
             align-items: center;
             gap: 4px;
-            background: #e8f4fc;
-            color: #3498db;
+            background: rgba(52, 152, 219, 0.15);
+            color: var(--lib-accent);
             font-size: 0.7em;
             font-weight: 500;
             padding: 2px 6px;
@@ -607,20 +660,20 @@
         /* Empty state */
         .empty-state { text-align: center; padding: 60px 20px; }
         .empty-state-illustration { margin-bottom: 20px; }
-        .empty-state-title { font-size: 1.4em; color: #444; margin-bottom: 8px; font-weight: 500; }
-        .empty-state-subtitle { color: #888; font-size: 1em; }
+        .empty-state-title { font-size: 1.4em; color: var(--lib-text); margin-bottom: 8px; font-weight: 500; }
+        .empty-state-subtitle { color: var(--lib-faint); font-size: 1em; }
 
         /* Skeleton Loader for book cards */
         .skeleton-card {
-            background: white;
+            background: var(--lib-surface);
             padding: 20px;
             border-radius: 8px;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-            border: 1px solid #f0f0f0;
+            box-shadow: var(--lib-shadow);
+            border: 1px solid var(--lib-border);
         }
 
         .skeleton {
-            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background: linear-gradient(90deg, var(--lib-item-bg) 25%, var(--lib-border) 50%, var(--lib-item-bg) 75%);
             background-size: 200% 100%;
             animation: loading 1.5s infinite;
             border-radius: 4px;
@@ -633,7 +686,8 @@
 
         .skeleton-cover {
             width: 100%;
-            height: 200px;
+            aspect-ratio: 2 / 3;
+            height: auto;
             margin-bottom: 15px;
         }
 
@@ -721,7 +775,7 @@
         }
 
         .upload-progress-content {
-            background: white;
+            background: var(--lib-surface);
             padding: 40px;
             border-radius: 12px;
             min-width: 400px;
@@ -739,8 +793,8 @@
         .upload-spinner {
             width: 40px;
             height: 40px;
-            border: 4px solid #f0f0f0;
-            border-top: 4px solid #3498db;
+            border: 4px solid var(--lib-item-bg);
+            border-top: 4px solid var(--lib-accent);
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
@@ -753,11 +807,11 @@
         .upload-progress-title {
             font-size: 1.3em;
             font-weight: 600;
-            color: #333;
+            color: var(--lib-text);
         }
 
         .upload-file-name {
-            color: #666;
+            color: var(--lib-muted);
             margin-bottom: 20px;
             font-size: 0.95em;
             word-break: break-all;
@@ -766,7 +820,7 @@
         .upload-progress-bar {
             width: 100%;
             height: 8px;
-            background: #f0f0f0;
+            background: var(--lib-item-bg);
             border-radius: 4px;
             overflow: hidden;
             margin-bottom: 10px;
@@ -774,14 +828,14 @@
 
         .upload-progress-fill {
             height: 100%;
-            background: linear-gradient(90deg, #3498db, #9b59b6);
+            background: linear-gradient(90deg, var(--lib-accent), var(--lib-accent-2));
             width: 0%;
             transition: width 0.3s ease;
         }
 
         .upload-progress-text {
             text-align: center;
-            color: #888;
+            color: var(--lib-faint);
             font-size: 0.9em;
         }
 
@@ -793,44 +847,44 @@
         }
 
         .upload-status-message.processing {
-            background: #e3f2fd;
-            color: #1976d2;
-            border-left: 4px solid #1976d2;
+            background: rgba(52, 152, 219, 0.12);
+            color: var(--lib-accent);
+            border-left: 4px solid var(--lib-accent);
         }
 
         .upload-status-message.success {
-            background: #e8f5e9;
-            color: #388e3c;
-            border-left: 4px solid #388e3c;
+            background: rgba(46, 204, 113, 0.12);
+            color: #27ae60;
+            border-left: 4px solid #27ae60;
         }
 
         .upload-status-message.error {
-            background: #ffebee;
-            color: #c62828;
-            border-left: 4px solid #c62828;
+            background: rgba(231, 76, 60, 0.12);
+            color: #e74c3c;
+            border-left: 4px solid #e74c3c;
         }
 
         /* Enhanced upload section */
         .upload-section {
-            background: white;
+            background: var(--lib-surface);
             padding: 20px;
             border-radius: 8px;
             margin-bottom: 30px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-            border: 1px solid #f0f0f0;
+            box-shadow: var(--lib-shadow);
+            border: 1px solid var(--lib-border);
             transition: all 0.3s ease;
         }
 
         .upload-section.drag-over {
-            border-color: #3498db;
-            background: #f0f8ff;
+            border-color: var(--lib-accent);
+            background: rgba(52, 152, 219, 0.08);
             box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
         }
 
         .upload-drop-hint {
             display: none;
             text-align: center;
-            color: #3498db;
+            color: var(--lib-accent);
             font-size: 0.9em;
             margin-top: 10px;
             animation: fadeIn 0.3s;
@@ -847,12 +901,12 @@
 
         /* Collections Styles */
         .collections-section {
-            background: white;
+            background: var(--lib-surface);
             padding: 15px;
             border-radius: 8px;
             margin-bottom: 20px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-            border: 1px solid #f0f0f0;
+            box-shadow: var(--lib-shadow);
+            border: 1px solid var(--lib-border);
         }
 
         .collections-header {
@@ -865,31 +919,31 @@
         .collections-title {
             font-size: 1em;
             font-weight: 600;
-            color: #333;
+            color: var(--lib-text);
             display: flex;
             align-items: center;
             gap: 8px;
         }
 
         .collections-title i {
-            color: #3498db;
+            color: var(--lib-accent);
         }
 
         .add-collection-btn {
             padding: 6px 12px;
-            background: #f5f5f5;
-            border: 1px solid #ddd;
+            background: var(--lib-item-bg);
+            border: 1px solid var(--lib-border);
             border-radius: 5px;
             cursor: pointer;
             font-size: 0.85em;
-            color: #666;
+            color: var(--lib-muted);
             transition: all 0.2s;
         }
 
         .add-collection-btn:hover {
-            background: #3498db;
-            color: white;
-            border-color: #3498db;
+            background: var(--lib-accent);
+            color: var(--lib-on-accent);
+            border-color: var(--lib-accent);
         }
 
         .collections-list {
@@ -903,17 +957,17 @@
             align-items: center;
             gap: 6px;
             padding: 6px 12px;
-            background: #f5f5f5;
+            background: var(--lib-item-bg);
             border: 2px solid transparent;
             border-radius: 20px;
             cursor: pointer;
             font-size: 0.85em;
-            color: #555;
+            color: var(--lib-muted);
             transition: all 0.2s;
         }
 
         .collection-chip:hover {
-            background: #e8e8e8;
+            background: var(--lib-item-hover);
         }
 
         .collection-chip.active {
@@ -923,13 +977,13 @@
         }
 
         .collection-chip.all-books {
-            background: #f0f0f0;
+            background: var(--lib-item-bg);
             font-weight: 500;
         }
 
         .collection-chip.all-books.active {
-            background: #333;
-            color: white;
+            background: var(--lib-text);
+            color: var(--lib-bg);
         }
 
         .collection-chip .count {
@@ -962,7 +1016,8 @@
         }
 
         .modal-content {
-            background: white;
+            background: var(--lib-surface);
+            color: var(--lib-text);
             padding: 30px;
             border-radius: 12px;
             min-width: 400px;
@@ -982,20 +1037,20 @@
         .modal-title {
             font-size: 1.3em;
             font-weight: 600;
-            color: #333;
+            color: var(--lib-text);
         }
 
         .modal-close {
             background: none;
             border: none;
             font-size: 1.5em;
-            color: #999;
+            color: var(--lib-faint);
             cursor: pointer;
             padding: 5px;
         }
 
         .modal-close:hover {
-            color: #333;
+            color: var(--lib-text);
         }
 
         .form-group {
@@ -1006,23 +1061,25 @@
             display: block;
             font-size: 0.9em;
             font-weight: 500;
-            color: #555;
+            color: var(--lib-muted);
             margin-bottom: 8px;
         }
 
         .form-input {
             width: 100%;
             padding: 10px 12px;
-            border: 2px solid #ddd;
+            border: 2px solid var(--lib-border);
             border-radius: 6px;
             font-size: 1em;
             transition: border-color 0.2s;
             box-sizing: border-box;
+            background: var(--lib-input-bg);
+            color: var(--lib-text);
         }
 
         .form-input:focus {
             outline: none;
-            border-color: #3498db;
+            border-color: var(--lib-accent);
         }
 
         .icon-picker {
@@ -1037,23 +1094,23 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            border: 2px solid #ddd;
+            border: 2px solid var(--lib-border);
             border-radius: 8px;
             cursor: pointer;
             transition: all 0.2s;
             font-size: 1.1em;
-            color: #666;
+            color: var(--lib-muted);
         }
 
         .icon-option:hover {
-            border-color: #3498db;
-            color: #3498db;
+            border-color: var(--lib-accent);
+            color: var(--lib-accent);
         }
 
         .icon-option.selected {
-            border-color: #3498db;
-            background: #3498db;
-            color: white;
+            border-color: var(--lib-accent);
+            background: var(--lib-accent);
+            color: var(--lib-on-accent);
         }
 
         .color-picker {
@@ -1076,8 +1133,8 @@
         }
 
         .color-option.selected {
-            border-color: #333;
-            box-shadow: 0 0 0 2px white, 0 0 0 4px currentColor;
+            border-color: var(--lib-text);
+            box-shadow: 0 0 0 2px var(--lib-surface), 0 0 0 4px currentColor;
         }
 
         .modal-actions {
@@ -1088,13 +1145,13 @@
         }
 
         .btn-secondary {
-            background: #f5f5f5;
-            color: #333;
-            border: 1px solid #ddd;
+            background: var(--lib-item-bg);
+            color: var(--lib-text);
+            border: 1px solid var(--lib-border);
         }
 
         .btn-secondary:hover {
-            background: #e8e8e8;
+            background: var(--lib-item-hover);
             box-shadow: none;
         }
 
@@ -1117,16 +1174,16 @@
         }
 
         .btn-add-to-collection {
-            background: #f5f5f5;
-            color: #666;
-            border: 1px dashed #ccc;
+            background: var(--lib-item-bg);
+            color: var(--lib-muted);
+            border: 1px dashed var(--lib-faint);
             padding: 10px 12px;
             flex: 0 0 auto;
         }
 
         .btn-add-to-collection:hover {
-            background: #e8e8e8;
-            border-color: #999;
+            background: var(--lib-item-hover);
+            border-color: var(--lib-muted);
             box-shadow: none;
         }
 
@@ -1166,15 +1223,15 @@
             align-items: center;
             gap: 12px;
             padding: 12px;
-            border: 1px solid #eee;
+            border: 1px solid var(--lib-border);
             border-radius: 8px;
             margin-bottom: 8px;
             transition: all 0.2s;
         }
 
         .manage-collection-item:hover {
-            border-color: #ddd;
-            background: #fafafa;
+            border-color: var(--lib-faint);
+            background: var(--lib-item-bg);
         }
 
         .manage-collection-icon {
@@ -1194,12 +1251,12 @@
 
         .manage-collection-name {
             font-weight: 500;
-            color: #333;
+            color: var(--lib-text);
         }
 
         .manage-collection-count {
             font-size: 0.85em;
-            color: #888;
+            color: var(--lib-faint);
         }
 
         .manage-collection-actions {
@@ -1217,21 +1274,21 @@
         }
 
         .edit-collection-btn {
-            background: #e3f2fd;
-            color: #1976d2;
+            background: rgba(52, 152, 219, 0.12);
+            color: var(--lib-accent);
         }
 
         .edit-collection-btn:hover {
-            background: #bbdefb;
+            background: rgba(52, 152, 219, 0.22);
         }
 
         .delete-collection-btn {
-            background: #ffebee;
-            color: #c62828;
+            background: rgba(231, 76, 60, 0.12);
+            color: #e74c3c;
         }
 
         .delete-collection-btn:hover {
-            background: #ffcdd2;
+            background: rgba(231, 76, 60, 0.22);
         }
 
         /* Book Assignment Modal */
@@ -1251,7 +1308,7 @@
         }
 
         .book-assignment-item:hover {
-            background: #f5f5f5;
+            background: var(--lib-item-bg);
         }
 
         .book-assignment-item input[type="checkbox"] {
@@ -1278,7 +1335,21 @@
     </style>
 </head>
 
-<body>
+<body class="theme-{{ reader_preferences.theme }}">
+    <script>
+        // Resolve the "auto" theme against the system before first paint.
+        (function () {
+            var b = document.body;
+            if (b.classList.contains('theme-auto')) {
+                b.classList.remove('theme-auto');
+                b.classList.add(
+                    window.matchMedia('(prefers-color-scheme: dark)').matches
+                        ? 'theme-dark'
+                        : 'theme-light'
+                );
+            }
+        })();
+    </script>
     <!-- Drag and Drop Overlay -->
     <div id="drop-zone-overlay">
         <div class="drop-zone-content">
@@ -1398,11 +1469,11 @@
         </div>
 
         <div class="upload-section" id="upload-section">
-            <h3 style="margin-top: 0; margin-bottom: 15px; color: #333; font-size: 1.1em;">Add a Book</h3>
+            <h3 style="margin-top: 0; margin-bottom: 15px; color: var(--lib-text); font-size: 1.1em;">Add a Book</h3>
             <form action="/upload" method="post" enctype="multipart/form-data" id="upload-form"
                 style="display: flex; gap: 10px; align-items: center;">
                 <input type="file" name="file" id="file-input" accept=".epub,.pdf" required 
-                    style="flex-grow: 1; padding: 8px 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 0.9em;">
+                    style="flex-grow: 1; padding: 8px 10px; border: 1px solid var(--lib-border); border-radius: 4px; font-size: 0.9em; color: var(--lib-text);">
                 <button type="submit" class="btn" id="upload-btn" style="flex: 0 0 auto; padding: 10px 20px;">Upload</button>
             </form>
             <div class="upload-drop-hint"><i class="fa-solid fa-cloud-arrow-down"></i> Drop file to upload instantly</div>
@@ -1543,7 +1614,7 @@
                 <div class="modal-title">Add to Collections</div>
                 <button class="modal-close" onclick="closeBookCollectionsModal()">&times;</button>
             </div>
-            <p style="color: #666; font-size: 0.9em; margin-bottom: 15px;" id="book-collections-book-title">Book Title</p>
+            <p style="color: var(--lib-muted); font-size: 0.9em; margin-bottom: 15px;" id="book-collections-book-title">Book Title</p>
             <div class="book-assignment-list" id="book-assignment-list">
                 <!-- Populated by JavaScript -->
             </div>
@@ -2014,8 +2085,8 @@
                     <div class="search-results">
                         <div class="empty-state" style="padding: 40px 20px;">
                             <div style="font-size: 3em; margin-bottom: 10px; opacity: 0.5;"><i class="fa-solid fa-magnifying-glass"></i></div>
-                            <div style="color: #666; font-size: 1.1em; margin-bottom: 5px;">No results found</div>
-                            <div style="color: #999; font-size: 0.9em;">Try different keywords or check spelling</div>
+                            <div style="color: var(--lib-muted); font-size: 1.1em; margin-bottom: 5px;">No results found</div>
+                            <div style="color: var(--lib-faint); font-size: 0.9em;">Try different keywords or check spelling</div>
                         </div>
                     </div>
                 `;
@@ -2044,18 +2115,18 @@
             
             container.innerHTML = `
                 <div class="search-results">
-                    <div style="padding: 10px 20px; background: #f5f5f5; font-size: 0.9em; color: #666; display: flex; justify-content: space-between; align-items: center;">
+                    <div style="padding: 10px 20px; background: var(--lib-item-bg); font-size: 0.9em; color: var(--lib-muted); display: flex; justify-content: space-between; align-items: center;">
                         <span>${results.length} result${results.length > 1 ? 's' : ''} found</span>
-                        <button onclick="clearSearch()" style="border: none; background: none; cursor: pointer; color: #999;"><i class="fa-solid fa-xmark"></i> Clear</button>
+                        <button onclick="clearSearch()" style="border: none; background: none; cursor: pointer; color: var(--lib-faint);"><i class="fa-solid fa-xmark"></i> Clear</button>
                     </div>
                     ${Object.entries(grouped).map(([bookId, bookData]) => `
-                        <div style="border-bottom: 2px solid #e0e0e0; padding: 10px 0;">
-                            <div style="font-weight: 600; color: #333; padding: 10px 20px; background: #f9f9f9;">
+                        <div style="border-bottom: 2px solid var(--lib-border); padding: 10px 0;">
+                            <div style="font-weight: 600; color: var(--lib-text); padding: 10px 20px; background: var(--lib-item-bg);">
                                 <i class="fa-solid fa-book"></i> ${bookData.book.book_title}
                             </div>
                             ${Object.entries(bookData.chapters).map(([chapIdx, chapData]) => `
-                                <div style="padding: 10px 20px; background: #fafafa; border-left: 3px solid #e0e0e0;">
-                                    <div style="font-weight: 500; color: #555; margin-bottom: 8px; font-size: 0.95em;">
+                                <div style="padding: 10px 20px; background: var(--lib-surface); border-left: 3px solid var(--lib-border);">
+                                    <div style="font-weight: 500; color: var(--lib-muted); margin-bottom: 8px; font-size: 0.95em;">
                                         ${chapData.chapter.chapter_title || 'Chapter ' + (chapData.chapter.chapter_index + 1)} (${chapData.matches.length} match${chapData.matches.length > 1 ? 'es' : ''})
                                     </div>
                                     ${chapData.matches.map((r, idx) => `

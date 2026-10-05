@@ -19,7 +19,8 @@ from reader3.api.deps import (
     MAX_UPLOAD_MB,
     load_book_cached,
     write_book_metadata,
-    get_cached_reading_times
+    get_cached_reading_times,
+    _serialize_reader_preferences,
 )
 
 router = APIRouter()
@@ -84,6 +85,9 @@ async def library_view(
             "library_query": q,
             "status": status,
             "max_upload_mb": MAX_UPLOAD_MB,
+            "reader_preferences": _serialize_reader_preferences(
+                user_data_manager.get_reader_preferences()
+            ),
         },
     )
 
