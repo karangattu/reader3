@@ -538,6 +538,61 @@
         /* Inline copy buttons next to headings */
         .heading-copy-btn { margin-left: 8px; display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border: 1px solid var(--reader-border); border-radius: 6px; background: var(--reader-item-bg); color: var(--reader-text); font-size: 0.8em; cursor: pointer; transition: all 0.15s; }
         .heading-copy-btn:hover { background: var(--reader-item-hover); border-color: var(--reader-accent); color: var(--reader-text); }
+
+        /* Sidebar scrim (mobile only) */
+        #sidebar-scrim { display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.4); z-index: 1400; }
+
+        /* Responsive layout for phones and narrow windows */
+        @media (max-width: 900px) {
+            #sidebar {
+                position: fixed;
+                left: 0;
+                top: 0;
+                bottom: 0;
+                height: 100vh;
+                width: min(85vw, 320px);
+                z-index: 1500;
+                box-shadow: 0 0 40px rgba(0, 0, 0, 0.4);
+                transform: translateX(0);
+                transition: transform 0.25s ease;
+            }
+            body.sidebar-collapsed #sidebar {
+                width: min(85vw, 320px);
+                padding: 20px;
+                opacity: 1;
+                pointer-events: auto;
+                border-right: 1px solid var(--reader-border);
+                transform: translateX(-100%);
+            }
+            body:not(.sidebar-collapsed) #sidebar-scrim { display: block; }
+
+            .content-container { padding: 24px 16px 48px 16px; }
+            .content-toolbar { gap: 6px; }
+            .toolbar-btn { padding: 8px 12px; font-size: 0.85em; }
+            .nav-btn { padding: 10px 14px; font-size: 0.9em; }
+            .chapter-nav { gap: 8px; }
+            .pdf-page-header { padding: 10px 10px 20px 10px; }
+            .pdf-page-actions { position: static; transform: none; justify-content: center; margin-top: 8px; }
+
+            #bookmarks-panel,
+            #vocabulary-panel,
+            #annotations-panel,
+            #session-history-panel {
+                top: 0;
+                height: 100vh;
+                width: 100vw;
+                right: -100vw;
+            }
+            #bookmarks-panel.visible,
+            #vocabulary-panel.visible,
+            #annotations-panel.visible,
+            #session-history-panel.visible {
+                right: 0;
+            }
+
+            #dictionary-popup { min-width: 0; width: calc(100vw - 32px); max-width: 420px; }
+            .reader-settings-card { border-radius: 12px; }
+        }
     </style>
 </head>
 <body class="{{ 'is-pdf ' if is_pdf else '' }}theme-{{ reader_preferences.theme }}{% if reader_preferences.high_contrast %} high-contrast{% endif %}{% if reader_preferences.reduced_motion %} reduced-motion{% endif %}" style="--reader-font-size: {{ reader_preferences.font_size_px }}px; --reader-line-height: {{ reader_preferences.line_height }}; --reader-page-width: {{ reader_preferences.page_width_px }}px; --reader-font-family: '{{ book_font or reader_preferences.font_family }}';">
@@ -553,6 +608,9 @@
     {% endif %}
 
     <button id="sidebar-toggle" type="button" onclick="toggleSidebar()" aria-pressed="false" aria-controls="sidebar">Hide Chapters</button>
+
+    <!-- Mobile sidebar scrim (closes the drawer on outside tap) -->
+    <div id="sidebar-scrim" onclick="toggleSidebar()"></div>
 
     <!-- Selection floating toolbar -->
     <div id="selection-toolbar">
@@ -3432,6 +3490,20 @@
                 toggleBtn.textContent = isCollapsed ? 'Show Chapters' : 'Hide Chapters';
                 toggleBtn.setAttribute('aria-pressed', String(isCollapsed));
             }
+        }
+
+        // On narrow screens the sidebar is an overlay drawer; start it closed.
+        const mobileSidebarQuery = window.matchMedia('(max-width: 900px)');
+        function syncResponsiveSidebar() {
+            if (mobileSidebarQuery.matches && !document.body.classList.contains('sidebar-collapsed')) {
+                toggleSidebar();
+            }
+        }
+        syncResponsiveSidebar();
+        if (typeof mobileSidebarQuery.addEventListener === 'function') {
+            mobileSidebarQuery.addEventListener('change', syncResponsiveSidebar);
+        } else {
+            mobileSidebarQuery.addListener(syncResponsiveSidebar);
         }
 
         // Scroll active chapter into view within the sidebar
