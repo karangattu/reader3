@@ -182,7 +182,7 @@
         .book-content { position: relative; z-index: 1; }
         .book-content img { max-width: 100%; height: auto; display: block; margin: 20px auto; }
         .book-content h1, .book-content h2, .book-content h3 { font-family: -apple-system, sans-serif; margin-top: 1.5em; color: var(--reader-text); }
-        .book-content p { margin-bottom: 1.5em; text-align: justify; }
+        .book-content p { margin-bottom: 1.5em; text-align: var(--reader-text-align, justify); hyphens: auto; -webkit-hyphens: auto; }
 
         .reader-settings-panel {
             position: fixed;
@@ -595,7 +595,7 @@
         }
     </style>
 </head>
-<body class="{{ 'is-pdf ' if is_pdf else '' }}theme-{{ reader_preferences.theme }}{% if reader_preferences.high_contrast %} high-contrast{% endif %}{% if reader_preferences.reduced_motion %} reduced-motion{% endif %}" style="--reader-font-size: {{ reader_preferences.font_size_px }}px; --reader-line-height: {{ reader_preferences.line_height }}; --reader-page-width: {{ reader_preferences.page_width_px }}px; --reader-font-family: '{{ book_font or reader_preferences.font_family }}';">
+<body class="{{ 'is-pdf ' if is_pdf else '' }}theme-{{ reader_preferences.theme }}{% if reader_preferences.high_contrast %} high-contrast{% endif %}{% if reader_preferences.reduced_motion %} reduced-motion{% endif %}" style="--reader-font-size: {{ reader_preferences.font_size_px }}px; --reader-line-height: {{ reader_preferences.line_height }}; --reader-page-width: {{ reader_preferences.page_width_px }}px; --reader-font-family: '{{ book_font or reader_preferences.font_family }}'; --reader-text-align: {{ reader_preferences.text_align }};">
 
     <!-- Reading progress bar at top -->
     <div id="reading-progress">
@@ -882,6 +882,17 @@
                     <input id="reader-page-width" type="range" min="560" max="960" step="20">
                 </div>
 
+                <div class="reader-setting-group">
+                    <label class="reader-setting-label" for="reader-text-align">
+                        <span>Text alignment</span>
+                    </label>
+                    <select id="reader-text-align">
+                        <option value="justify">Justified</option>
+                        <option value="left">Left-aligned</option>
+                    </select>
+                    <div class="reader-setting-help">Justified text evens out line endings; left-aligned avoids uneven spacing.</div>
+                </div>
+
                 <label class="reader-toggle-row" for="reader-reduced-motion">
                     <div>
                         <div class="reader-setting-label"><span>Reduced motion</span></div>
@@ -1114,7 +1125,7 @@
         const bookId = {{ book_id | tojson }};
         const totalPages = {{ book.spine|length }};
         const defaultPdfCopyImageDpi = {{ pdf_copy_image_dpi_default }};
-        const defaultReaderPreferences = {"theme": "light", "font_size_px": 19, "line_height": 1.8, "page_width_px": 700, "reduced_motion": false, "high_contrast": false, "font_family": "Georgia", "pdf_copy_image_dpi": {{ pdf_copy_image_dpi_default }}};
+        const defaultReaderPreferences = {"theme": "light", "font_size_px": 19, "line_height": 1.8, "page_width_px": 700, "reduced_motion": false, "high_contrast": false, "font_family": "Georgia", "pdf_copy_image_dpi": {{ pdf_copy_image_dpi_default }}, "text_align": "justify"};
         let readerPreferences = {{ reader_preferences | tojson }};
         let bookFont = {{ (book_font | tojson) if book_font else 'null' }};
         let currentPageIndex = {{ chapter_index }};
@@ -1158,6 +1169,7 @@
             const fontFamily = document.getElementById('reader-font-family');
             const bookFontCheckbox = document.getElementById('reader-book-font');
             const pdfCopyDpiSelect = document.getElementById('pdf-copy-dpi-select');
+            const textAlignSelect = document.getElementById('reader-text-align');
 
             if (!theme) return;
 
@@ -1174,6 +1186,9 @@
                 pdfCopyDpiSelect.value = String(
                     readerPreferences.pdf_copy_image_dpi || defaultPdfCopyImageDpi
                 );
+            }
+            if (textAlignSelect) {
+                textAlignSelect.value = readerPreferences.text_align || 'justify';
             }
 
             document.getElementById('reader-theme-value').textContent = theme.options[theme.selectedIndex].text;
@@ -1198,6 +1213,7 @@
             document.body.style.setProperty('--reader-line-height', readerPreferences.line_height);
             document.body.style.setProperty('--reader-page-width', `${readerPreferences.page_width_px}px`);
             document.body.style.setProperty('--reader-font-family', `'${activeFont}'`);
+            document.body.style.setProperty('--reader-text-align', readerPreferences.text_align || 'justify');
             syncReaderSettingsForm();
 
         }
@@ -1268,6 +1284,7 @@
                 reduced_motion: document.getElementById('reader-reduced-motion'),
                 high_contrast: document.getElementById('reader-high-contrast'),
                 pdf_copy_image_dpi: document.getElementById('pdf-copy-dpi-select'),
+                text_align: document.getElementById('reader-text-align'),
 
             };
 
@@ -1300,6 +1317,10 @@
             });
             controls.pdf_copy_image_dpi?.addEventListener('change', (event) => {
                 readerPreferences.pdf_copy_image_dpi = Number(event.target.value);
+                queueReaderPreferencesSave();
+            });
+            controls.text_align?.addEventListener('change', (event) => {
+                readerPreferences.text_align = event.target.value;
                 queueReaderPreferencesSave();
             });
 

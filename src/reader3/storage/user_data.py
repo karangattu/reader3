@@ -64,6 +64,7 @@ class ReaderPreferences:
     high_contrast: bool = False
     font_family: str = "Georgia"
     pdf_copy_image_dpi: int = 300
+    text_align: str = "justify"
 
 
 @dataclass
@@ -379,7 +380,8 @@ class UserDataManager:
                     reduced_motion integer not null,
                     high_contrast integer not null,
                     font_family text not null,
-                    pdf_copy_image_dpi integer not null
+                    pdf_copy_image_dpi integer not null,
+                    text_align text not null default 'justify'
                 );
 
                 create table if not exists book_fonts (
@@ -400,6 +402,16 @@ class UserDataManager:
                     on annotations(book_id, chapter_index);
                 """
             )
+            # Migration: add reader_preferences.text_align to older databases.
+            columns = {
+                row["name"]
+                for row in conn.execute("pragma table_info(reader_preferences)")
+            }
+            if "text_align" not in columns:
+                conn.execute(
+                    "alter table reader_preferences "
+                    "add column text_align text not null default 'justify'"
+                )
 
     def _has_sqlite_data(self) -> bool:
         """Return whether the SQLite store already contains user state."""
@@ -688,7 +700,7 @@ class UserDataManager:
                 "insert into reader_preferences values "
                 "(:id, :theme, :font_size_px, :line_height, :page_width_px, "
                 ":reduced_motion, :high_contrast, :font_family, "
-                ":pdf_copy_image_dpi)",
+                ":pdf_copy_image_dpi, :text_align)",
                 prefs,
             )
 

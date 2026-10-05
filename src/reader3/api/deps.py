@@ -326,6 +326,7 @@ def _serialize_reader_preferences(preferences: ReaderPreferences) -> dict:
         "high_contrast": preferences.high_contrast,
         "font_family": preferences.font_family,
         "pdf_copy_image_dpi": _effective_pdf_copy_image_dpi(preferences),
+        "text_align": getattr(preferences, "text_align", "justify"),
     }
 
 

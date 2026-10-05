@@ -61,6 +61,12 @@ async def update_reader_preferences(request: Request):
             raise HTTPException(status_code=400, detail="Invalid font family")
         updates["font_family"] = font
 
+    if "text_align" in payload:
+        text_align = str(payload["text_align"])
+        if text_align not in {"justify", "left"}:
+            raise HTTPException(status_code=400, detail="Invalid text alignment")
+        updates["text_align"] = text_align
+
     if "pdf_copy_image_dpi" in payload:
         updates["pdf_copy_image_dpi"] = _clamp_pdf_copy_image_dpi(
             int(payload["pdf_copy_image_dpi"])
