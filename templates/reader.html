@@ -64,6 +64,7 @@
 
         /* Layout */
         body { margin: 0; padding: 0; display: flex; height: 100vh; overflow: hidden; font-family: var(--reader-font-family, "Georgia"), serif; background: var(--reader-bg); color: var(--reader-text); }
+        :focus-visible { outline: 2px solid var(--reader-accent); outline-offset: 2px; border-radius: 2px; }
         body.sidebar-collapsed #sidebar { width: 0; padding: 0; border-right: none; transform: translateX(-100%); opacity: 0; pointer-events: none; }
         body.sidebar-collapsed #main { width: 100%; }
         body.selection-mode .book-content { cursor: text; user-select: text; }
@@ -164,7 +165,7 @@
         .pdf-copy-dpi-control { display: inline-flex; align-items: center; gap: 8px; min-height: 38px; padding: 0 12px; border: 1px solid var(--reader-border); border-radius: 5px; background: var(--reader-surface); color: var(--reader-muted); font-size: 0.88em; }
         .pdf-copy-dpi-control span { font-weight: 600; }
         .pdf-copy-dpi-control select { border: none; background: transparent; color: inherit; font: inherit; cursor: pointer; }
-        .pdf-copy-dpi-control select:focus { outline: none; }
+        .pdf-copy-dpi-control select:focus-visible { outline: 2px solid var(--reader-accent); outline-offset: 2px; }
 #copy-status { font-family: -apple-system, sans-serif; font-size: 0.85em; color: #198754; text-align: right; min-height: 1.2em; opacity: 0; transition: opacity 0.3s ease-in-out; font-weight: 500; }
         
         /* Reading momentum toolbar */
@@ -679,7 +680,7 @@
     </div>
     
     <!-- Bookmarks/Highlights Panel -->
-    <div id="bookmarks-panel">
+    <div id="bookmarks-panel" role="dialog" aria-label="Bookmarks and highlights">
         <div class="panel-header">
             <span class="panel-title"><i class="fa-solid fa-book-bookmark"></i> Your Notes</span>
             <button class="panel-close" onclick="toggleBookmarksPanel()"><i class="fa-solid fa-xmark"></i></button>
@@ -697,7 +698,7 @@
     </div>
     
     <!-- Search Modal -->
-    <div id="search-modal">
+    <div id="search-modal" role="dialog" aria-modal="true" aria-label="Search in this book">
         <div class="search-container">
             <div class="search-header">
                 <div class="search-input-wrapper">
@@ -712,7 +713,7 @@
     </div>
     
     <!-- Dictionary Popup -->
-    <div id="dictionary-popup">
+    <div id="dictionary-popup" role="dialog" aria-label="Word definition">
         <div class="dict-header">
             <div>
                 <span class="dict-word" id="dict-word"></span>
@@ -726,7 +727,7 @@
     </div>
     
     <!-- Vocabulary Panel -->
-    <div id="vocabulary-panel">
+    <div id="vocabulary-panel" role="dialog" aria-label="Vocabulary">
         <div class="vocab-header">
             <div class="panel-header" style="padding: 0; border: none;">
                 <span class="panel-title"><i class="fa-solid fa-language"></i> Vocabulary</span>
@@ -747,7 +748,7 @@
     </div>
     
     <!-- Annotations Panel -->
-    <div id="annotations-panel">
+    <div id="annotations-panel" role="dialog" aria-label="Annotations">
         <div class="annot-header">
             <div class="panel-header" style="padding: 0; border: none;">
                 <span class="panel-title"><i class="fa-regular fa-note-sticky"></i> Annotations</span>
@@ -773,7 +774,7 @@
     </div>
     
     <!-- Session History Panel -->
-    <div id="session-history-panel">
+    <div id="session-history-panel" role="dialog" aria-label="Reading history and stats">
         <div class="session-stats" id="session-stats">
             <div class="session-stats-title"><i class="fa-solid fa-chart-simple"></i> Your Reading Stats</div>
             <div class="session-stats-grid">
@@ -809,7 +810,7 @@
     </div>
     
     <!-- Add Note Modal -->
-    <div id="add-note-modal">
+    <div id="add-note-modal" role="dialog" aria-modal="true" aria-label="Add note">
         <div class="note-modal-content">
             <div class="note-modal-header">
                 <h3><i class="fa-regular fa-note-sticky"></i> Add Note</h3>
@@ -826,7 +827,7 @@
         </div>
     </div>
 
-    <div id="reader-settings-panel" class="reader-settings-panel" aria-hidden="true">
+    <div id="reader-settings-panel" class="reader-settings-panel" role="dialog" aria-modal="true" aria-label="Reader settings" aria-hidden="true">
         <div class="reader-settings-card">
             <div class="reader-settings-header">
                 <div class="reader-settings-title"><i class="fa-solid fa-sliders"></i> Reader Settings</div>
@@ -1166,6 +1167,28 @@
         let currentNoteContext = null; // For add note modal
         let readerSettingsSaveTimeout = null;
 
+        // Trap Tab focus within a modal dialog.
+        function enableFocusTrap(container) {
+            if (!container || container.dataset.focusTrap) return;
+            container.dataset.focusTrap = '1';
+            container.addEventListener('keydown', (event) => {
+                if (event.key !== 'Tab') return;
+                const focusables = container.querySelectorAll(
+                    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+                );
+                if (focusables.length === 0) return;
+                const first = focusables[0];
+                const last = focusables[focusables.length - 1];
+                if (event.shiftKey && document.activeElement === first) {
+                    event.preventDefault();
+                    last.focus();
+                } else if (!event.shiftKey && document.activeElement === last) {
+                    event.preventDefault();
+                    first.focus();
+                }
+            });
+        }
+
         function updateReaderSettingsStatus(message, isError = false) {
             const statusEl = document.getElementById('reader-settings-status');
             if (!statusEl) return;
@@ -1288,6 +1311,9 @@
 
             if (shouldOpen) {
                 syncReaderSettingsForm();
+                enableFocusTrap(panel);
+                const firstControl = document.getElementById('reader-theme');
+                if (firstControl) firstControl.focus();
             }
         }
 
@@ -2046,6 +2072,7 @@
             const modal = document.getElementById('search-modal');
             if (modal) {
                 modal.classList.add('visible');
+                enableFocusTrap(modal);
                 document.getElementById('search-input').focus();
             }
         }
@@ -4348,7 +4375,9 @@
             currentNoteContext = { highlightId, bookmarkId };
             document.getElementById('note-textarea').value = '';
             document.getElementById('note-tags-input').value = '';
-            document.getElementById('add-note-modal').classList.add('visible');
+            const modal = document.getElementById('add-note-modal');
+            modal.classList.add('visible');
+            enableFocusTrap(modal);
             document.getElementById('note-textarea').focus();
         }
         

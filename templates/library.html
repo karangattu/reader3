@@ -59,6 +59,12 @@
             position: relative;
         }
 
+        :focus-visible {
+            outline: 2px solid var(--lib-accent);
+            outline-offset: 2px;
+            border-radius: 2px;
+        }
+
         @media (max-width: 900px) {
             body {
                 padding: 20px;
@@ -1360,7 +1366,7 @@
     </div>
 
     <!-- Upload Progress Modal -->
-    <div id="upload-progress-modal">
+    <div id="upload-progress-modal" role="dialog" aria-modal="true" aria-label="Upload progress">
         <div class="upload-progress-content">
             <div class="upload-progress-header">
                 <div class="upload-spinner" id="upload-spinner"></div>
@@ -1553,7 +1559,7 @@
     </div>
 
     <!-- Create/Edit Collection Modal -->
-    <div class="modal-overlay" id="collection-modal">
+    <div class="modal-overlay" id="collection-modal" role="dialog" aria-modal="true" aria-labelledby="collection-modal-title">
         <div class="modal-content">
             <div class="modal-header">
                 <div class="modal-title" id="collection-modal-title">Create Collection</div>
@@ -1608,7 +1614,7 @@
     </div>
 
     <!-- Book Collections Assignment Modal -->
-    <div class="modal-overlay" id="book-collections-modal">
+    <div class="modal-overlay" id="book-collections-modal" role="dialog" aria-modal="true" aria-label="Add to collections">
         <div class="modal-content">
             <div class="modal-header">
                 <div class="modal-title">Add to Collections</div>
@@ -1626,7 +1632,7 @@
     </div>
 
     <!-- Manage Collections Modal -->
-    <div class="modal-overlay" id="manage-collections-modal">
+    <div class="modal-overlay" id="manage-collections-modal" role="dialog" aria-modal="true" aria-label="Manage collections">
         <div class="modal-content">
             <div class="modal-header">
                 <div class="modal-title">Manage Collections</div>
