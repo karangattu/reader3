@@ -77,7 +77,7 @@ _io_executor = ThreadPoolExecutor(
 MAX_UPLOAD_MB = int(os.environ.get("MAX_UPLOAD_MB", 1024))
 MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024
 
-VALID_READER_THEMES = {"light", "sepia", "dark"}
+VALID_READER_THEMES = {"light", "sepia", "dark", "auto"}
 
 VALID_READER_FONTS = {
     "Georgia", "Literata", "Merriweather", "Lora", "Source Serif 4",

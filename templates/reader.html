@@ -596,6 +596,20 @@
     </style>
 </head>
 <body class="{{ 'is-pdf ' if is_pdf else '' }}theme-{{ reader_preferences.theme }}{% if reader_preferences.high_contrast %} high-contrast{% endif %}{% if reader_preferences.reduced_motion %} reduced-motion{% endif %}" style="--reader-font-size: {{ reader_preferences.font_size_px }}px; --reader-line-height: {{ reader_preferences.line_height }}; --reader-page-width: {{ reader_preferences.page_width_px }}px; --reader-font-family: '{{ book_font or reader_preferences.font_family }}'; --reader-text-align: {{ reader_preferences.text_align }};">
+    <script>
+        // Resolve the "auto" theme against the system before first paint.
+        (function () {
+            var b = document.body;
+            if (b.classList.contains('theme-auto')) {
+                b.classList.remove('theme-auto');
+                b.classList.add(
+                    window.matchMedia('(prefers-color-scheme: dark)').matches
+                        ? 'theme-dark'
+                        : 'theme-light'
+                );
+            }
+        })();
+    </script>
 
     <!-- Reading progress bar at top -->
     <div id="reading-progress">
@@ -828,6 +842,7 @@
                         <option value="light">Paper</option>
                         <option value="sepia">Sepia</option>
                         <option value="dark">Night</option>
+                        <option value="auto">Auto (system)</option>
                     </select>
                     <div class="reader-setting-help">Choose a reading surface that matches the room and your eyes.</div>
                 </div>
@@ -1199,12 +1214,22 @@
         }
 
         function applyReaderPreferences() {
-            document.body.classList.remove('theme-light', 'theme-sepia', 'theme-dark', 'high-contrast', 'reduced-motion');
-            document.body.classList.add(`theme-${readerPreferences.theme}`);
+            document.body.classList.remove('theme-light', 'theme-sepia', 'theme-dark', 'theme-auto', 'high-contrast', 'reduced-motion');
+
+            // Resolve "auto" against the current system scheme.
+            const resolvedTheme = readerPreferences.theme === 'auto'
+                ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+                : readerPreferences.theme;
+            document.body.classList.add(`theme-${resolvedTheme}`);
+
             if (readerPreferences.high_contrast) {
                 document.body.classList.add('high-contrast');
             }
-            if (readerPreferences.reduced_motion) {
+            // Honor the OS reduced-motion preference even if the user has not
+            // explicitly opted in.
+            const reduceMotion = readerPreferences.reduced_motion
+                || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            if (reduceMotion) {
                 document.body.classList.add('reduced-motion');
             }
 
@@ -1367,6 +1392,22 @@
                     toggleReaderSettingsPanel(false);
                 }
             });
+
+            // Re-apply when the OS color scheme or motion preference changes.
+            const darkScheme = window.matchMedia('(prefers-color-scheme: dark)');
+            const reduceMotionMedia = window.matchMedia('(prefers-reduced-motion: reduce)');
+            function onSystemPrefsChange() {
+                if (readerPreferences.theme === 'auto' || reduceMotionMedia.matches) {
+                    applyReaderPreferences();
+                }
+            }
+            if (typeof darkScheme.addEventListener === 'function') {
+                darkScheme.addEventListener('change', onSystemPrefsChange);
+                reduceMotionMedia.addEventListener('change', onSystemPrefsChange);
+            } else {
+                darkScheme.addListener(onSystemPrefsChange);
+                reduceMotionMedia.addListener(onSystemPrefsChange);
+            }
         }
         
         // ===== PDF REPROCESS FUNCTIONS =====
