@@ -43,6 +43,7 @@ from reader3.services.library import (  # noqa: E402,F401
     get_pdf_page_stats,
     get_pdf_text_blocks_for_page,
     is_content_document,
+    load_from_json,
     normalize_content_href,
     parse_toc_recursive,
     process_epub,
@@ -50,9 +51,8 @@ from reader3.services.library import (  # noqa: E402,F401
     sanitize_book_text_fields,
     sanitize_text,
     sanitize_toc_entries,
-    save_to_pickle,
     save_to_json,
-    load_from_json,
+    save_to_pickle,
     search_pdf_text_positions,
     validate_pdf,
 )

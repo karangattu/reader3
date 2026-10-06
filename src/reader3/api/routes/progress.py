@@ -11,9 +11,9 @@ from fastapi.responses import PlainTextResponse
 from reader3.api.deps import (
     BOOKS_DIR,
     get_cached_reading_times,
-    user_data_manager,
-    load_book_metadata,
     get_reader_service,
+    load_book_metadata,
+    user_data_manager,
 )
 
 router = APIRouter()

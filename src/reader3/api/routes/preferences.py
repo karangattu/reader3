@@ -5,11 +5,11 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Request
 
 from reader3.api.deps import (
-    user_data_manager,
-    _serialize_reader_preferences,
-    VALID_READER_THEMES,
     VALID_READER_FONTS,
-    _clamp_pdf_copy_image_dpi
+    VALID_READER_THEMES,
+    _clamp_pdf_copy_image_dpi,
+    _serialize_reader_preferences,
+    user_data_manager,
 )
 
 router = APIRouter()

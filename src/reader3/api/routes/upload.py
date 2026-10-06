@@ -2,36 +2,36 @@
 
 from __future__ import annotations
 
-import os
-import sys
-import shutil
 import hashlib
+import os
+import shutil
+import sys
 import tempfile
-import uuid
 import threading
+import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException, File, UploadFile, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile
 from fastapi.responses import JSONResponse, RedirectResponse
 
 from reader3.api.deps import (
-    logger,
     BOOKS_DIR,
-    MAX_UPLOAD_MB,
     MAX_UPLOAD_BYTES,
+    MAX_UPLOAD_MB,
     _find_active_upload,
     _find_duplicate_book_by_hash,
     _format_pdf_validation_error,
-    cleanup_old_statuses,
-    upload_status_lock,
-    upload_status,
-    update_upload_status,
-    _process_pdf,
     _pdf_thumbnails_enabled,
     _persist_upload_metadata,
-    load_book_cached,
+    _process_pdf,
+    cleanup_old_statuses,
     get_cached_reading_times,
+    load_book_cached,
     load_book_metadata,
+    logger,
+    update_upload_status,
+    upload_status,
+    upload_status_lock,
 )
 from reader3.services.library import (
     process_epub,

@@ -7,18 +7,17 @@ import sys
 from dataclasses import replace
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
 from reader3.api.deps import (
-    logger,
     BOOKS_DIR,
-    load_book_cached,
-    _rewrite_reader_content_asset_paths,
-    user_data_manager,
     _effective_pdf_copy_image_dpi,
-    templates,
-    _serialize_reader_preferences,
     _pdf_copy_image_dpi_options,
+    _rewrite_reader_content_asset_paths,
+    _serialize_reader_preferences,
+    load_book_cached,
+    templates,
+    user_data_manager,
 )
 
 router = APIRouter()

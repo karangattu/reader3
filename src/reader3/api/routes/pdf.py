@@ -9,13 +9,15 @@ from fastapi.responses import FileResponse, Response
 
 from reader3.api.deps import (
     BOOKS_DIR,
-    load_book_cached,
-    _render_pdf_page_image_bytes,
     PDF_COPY_IMAGE_DPI,
-    get_pdf_page_stats,
-    search_pdf_text_positions,
+    _render_pdf_page_image_bytes,
+    load_book_cached,
+)
+from reader3.services.library import (
     export_pdf_pages,
+    get_pdf_page_stats,
     get_pdf_text_blocks_for_page,
+    search_pdf_text_positions,
 )
 
 router = APIRouter()

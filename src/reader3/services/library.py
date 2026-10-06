@@ -3,20 +3,20 @@ Parses an EPUB file into a structured object that can be used to serve the book 
 """
 
 import json
+import logging
 import os
 import pickle
 import posixpath
 import shutil
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from typing import Dict, List, Optional
 from urllib.parse import unquote
+
 import ebooklib
 from bs4 import BeautifulSoup, Comment
 from ebooklib import epub
 
-import logging
-from dataclasses import asdict
 from reader3.storage.schema import migrate_book_data
 
 logger = logging.getLogger(__name__)

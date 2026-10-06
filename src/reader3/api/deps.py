@@ -6,59 +6,26 @@ instead of from app.py — breaking the circular-dependency chain.
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import json
 import logging
 import os
 import pickle
-import shutil
 import sys
-import tempfile
 import threading
-import uuid
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import asynccontextmanager
-from dataclasses import replace
 from datetime import datetime
 from functools import lru_cache
 from typing import Dict, Optional
 from urllib.parse import quote, unquote
 
 from bs4 import BeautifulSoup
-from fastapi import BackgroundTasks, FastAPI, File, HTTPException, Request, UploadFile
-from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import (
-    FileResponse,
-    HTMLResponse,
-    JSONResponse,
-    PlainTextResponse,
-    RedirectResponse,
-    Response,
-)
+from fastapi import HTTPException
 from fastapi.templating import Jinja2Templates
-from starlette.middleware.base import BaseHTTPMiddleware
 
-from ..services.library import (
-    Book,
-    export_pdf_pages,
-    get_pdf_text_blocks_for_page,
-    get_pdf_page_stats,
-    process_epub,
-    save_to_pickle,
-    search_pdf_text_positions,
-    validate_pdf,
-)
+from ..services.library import Book
 from ..services.reader import ReaderService
 from ..services.search import SearchService
-from ..storage.user_data import (
-    Annotation,
-    ReaderPreferences,
-    ReadingSession,
-    SearchQuery,
-    UserDataManager,
-    VocabularyWord,
-    generate_id,
-)
+from ..storage.user_data import ReaderPreferences, UserDataManager
 
 # ---------------------------------------------------------------------------
 # Logging

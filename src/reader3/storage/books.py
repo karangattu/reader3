@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import pickle
 import shutil
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Optional, Protocol
-import logging
 
 from reader3.domain.models import Book
 from reader3.services.library import load_from_json, save_to_json

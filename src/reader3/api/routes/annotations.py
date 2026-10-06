@@ -2,17 +2,13 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import PlainTextResponse
 import json
 
-from reader3.api.deps import (
-    get_reader_service,
-    user_data_manager,
-    Annotation,
-    generate_id,
-    VocabularyWord,
-)
+from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import PlainTextResponse
+
+from reader3.api.deps import get_reader_service, user_data_manager
+from reader3.storage.user_data import Annotation, VocabularyWord, generate_id
 
 router = APIRouter()
 

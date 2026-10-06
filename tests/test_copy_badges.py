@@ -529,7 +529,7 @@ class TestCanvasSizeGuard:
 
     def test_tall_image_fails(self):
         """A very tall combined image should trigger the guard."""
-        width, height = 800, 20000
+        _width, height = 800, 20000
         exceeds = height > self.MAX_CANVAS_DIM
         assert exceeds
 
@@ -552,7 +552,7 @@ class TestCanvasSizeGuard:
 
     def test_50_pages_may_exceed(self):
         """50 high-res pages may exceed canvas limits."""
-        page_width = 2400
+        _page_width = 2400
         page_height = 3200
         padding = 20
         num_pages = 50

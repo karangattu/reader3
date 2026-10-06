@@ -1,6 +1,5 @@
 import logging
 import os
-import sys
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -20,62 +19,116 @@ logging.basicConfig(
 # ---------------------------------------------------------------------------
 # Import shared state from deps (single source of truth)
 # ---------------------------------------------------------------------------
-from .services.library import validate_pdf, save_to_pickle  # noqa: E402
-from .api.routes.upload import process_book_background  # noqa: E402
 from .api.deps import (  # noqa: E402
-    logger,
     BOOKS_DIR,
+    MAX_UPLOAD_BYTES,
+    # Constants
+    MAX_UPLOAD_MB,
+    PDF_COPY_IMAGE_DPI,
+    PDF_COPY_IMAGE_DPI_OPTIONS,
+    PDF_COPY_IMAGE_MAX_DPI,
+    VALID_READER_FONTS,
+    VALID_READER_THEMES,
+    Book,
+    _book_image_exists,
+    _book_image_url,
+    _build_library_entry,
+    _chapter_or_none,
+    # Helpers
+    _clamp_pdf_copy_image_dpi,
+    _compute_progress_percent,
+    _effective_pdf_copy_image_dpi,
+    _find_active_upload,
+    _find_duplicate_book_by_hash,
+    _format_pdf_validation_error,
     _io_executor,
-    user_data_manager,
-    templates,
-    templates_dir,
-    static_dir,
+    _pdf_copy_image_dpi_options,
+    _pdf_thumbnails_enabled,
+    _persist_upload_metadata,
+    _process_pdf,
+    _progress_status_label,
+    _render_pdf_page_image_bytes,
+    _resolve_book_image_path,
+    _rewrite_reader_content_asset_paths,
+    _run_sync,
+    _serialize_reader_preferences,
+    _url_path_basename,
+    cleanup_old_statuses,
+    get_all_book_ids,
+    get_cached_reading_times,
+    get_reader_service,
+    get_search_service,
     # Re-export commonly used names so backward-compat shims keep working
     load_book_cached,
     load_book_metadata,
-    write_book_metadata,
-    get_cached_reading_times,
-    get_all_book_ids,
-    get_reader_service,
-    get_search_service,
-    _run_sync,
+    logger,
+    static_dir,
+    templates,
+    templates_dir,
+    update_upload_status,
     upload_status,
     upload_status_lock,
-    update_upload_status,
-    cleanup_old_statuses,
-    _process_pdf,
-    # Constants
-    MAX_UPLOAD_MB,
-    MAX_UPLOAD_BYTES,
-    VALID_READER_THEMES,
-    VALID_READER_FONTS,
-    PDF_COPY_IMAGE_DPI,
-    PDF_COPY_IMAGE_MAX_DPI,
-    PDF_COPY_IMAGE_DPI_OPTIONS,
-    # Helpers
-    _clamp_pdf_copy_image_dpi,
-    _pdf_copy_image_dpi_options,
-    _pdf_thumbnails_enabled,
-    _format_pdf_validation_error,
-    _compute_progress_percent,
-    _progress_status_label,
-    _persist_upload_metadata,
-    _find_duplicate_book_by_hash,
-    _find_active_upload,
-    _build_library_entry,
-    _effective_pdf_copy_image_dpi,
-    _serialize_reader_preferences,
-    _chapter_or_none,
-    _resolve_book_image_path,
-    _url_path_basename,
-    _book_image_url,
-    _book_image_exists,
-    _rewrite_reader_content_asset_paths,
-    _render_pdf_page_image_bytes,
-    # Types for backward compat
-    save_to_pickle,
-    Book,
+    user_data_manager,
+    write_book_metadata,
 )
+from .api.routes.upload import process_book_background  # noqa: E402
+from .services.library import save_to_pickle, validate_pdf  # noqa: E402
+
+__all__ = [
+    "app",
+    "run",
+    "SecurityHeadersMiddleware",
+    "validate_pdf",
+    "save_to_pickle",
+    "process_book_background",
+    "logger",
+    "BOOKS_DIR",
+    "_io_executor",
+    "user_data_manager",
+    "templates",
+    "templates_dir",
+    "static_dir",
+    "load_book_cached",
+    "load_book_metadata",
+    "write_book_metadata",
+    "get_cached_reading_times",
+    "get_all_book_ids",
+    "get_reader_service",
+    "get_search_service",
+    "_run_sync",
+    "upload_status",
+    "upload_status_lock",
+    "update_upload_status",
+    "cleanup_old_statuses",
+    "_process_pdf",
+    "MAX_UPLOAD_MB",
+    "MAX_UPLOAD_BYTES",
+    "VALID_READER_THEMES",
+    "VALID_READER_FONTS",
+    "PDF_COPY_IMAGE_DPI",
+    "PDF_COPY_IMAGE_MAX_DPI",
+    "PDF_COPY_IMAGE_DPI_OPTIONS",
+    "_clamp_pdf_copy_image_dpi",
+    "_pdf_copy_image_dpi_options",
+    "_pdf_thumbnails_enabled",
+    "_format_pdf_validation_error",
+    "_compute_progress_percent",
+    "_progress_status_label",
+    "_persist_upload_metadata",
+    "_find_duplicate_book_by_hash",
+    "_find_active_upload",
+    "_build_library_entry",
+    "_effective_pdf_copy_image_dpi",
+    "_serialize_reader_preferences",
+    "_chapter_or_none",
+    "_resolve_book_image_path",
+    "_url_path_basename",
+    "_book_image_url",
+    "_book_image_exists",
+    "_rewrite_reader_content_asset_paths",
+    "_render_pdf_page_image_bytes",
+    "Book",
+]
 
 
 # ---------------------------------------------------------------------------
@@ -173,15 +226,15 @@ logger.info("Current working directory: %s", os.getcwd())
 # ---------------------------------------------------------------------------
 # Route includes
 # ---------------------------------------------------------------------------
+from .api.routes import annotations as annotations_routes  # noqa: E402
 from .api.routes import library as library_routes  # noqa: E402
-from .api.routes import upload as upload_routes  # noqa: E402
+from .api.routes import pdf as pdf_routes  # noqa: E402
+from .api.routes import preferences as preferences_routes  # noqa: E402
+from .api.routes import progress as progress_routes  # noqa: E402
 from .api.routes import reader as reader_routes  # noqa: E402
 from .api.routes import search as search_routes  # noqa: E402
-from .api.routes import preferences as preferences_routes  # noqa: E402
-from .api.routes import pdf as pdf_routes  # noqa: E402
-from .api.routes import progress as progress_routes  # noqa: E402
 from .api.routes import sessions as sessions_routes  # noqa: E402
-from .api.routes import annotations as annotations_routes  # noqa: E402
+from .api.routes import upload as upload_routes  # noqa: E402
 
 app.include_router(library_routes.router)
 app.include_router(upload_routes.router)

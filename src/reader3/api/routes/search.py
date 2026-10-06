@@ -5,12 +5,12 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from reader3.api.deps import (
+    _run_sync,
     get_all_book_ids,
     get_search_service,
-    _run_sync,
     user_data_manager,
-    SearchQuery,
 )
+from reader3.storage.user_data import SearchQuery
 
 router = APIRouter()
 

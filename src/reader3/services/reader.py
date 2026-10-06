@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict
+
 from reader3.storage.user_data import (
     Bookmark,
     Highlight,

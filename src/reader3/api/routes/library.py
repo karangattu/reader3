@@ -6,21 +6,21 @@ import os
 import shutil
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 
 from reader3.api.deps import (
-    logger,
     BOOKS_DIR,
-    user_data_manager,
-    templates,
-    _run_sync,
-    load_book_metadata,
-    _build_library_entry,
     MAX_UPLOAD_MB,
-    load_book_cached,
-    write_book_metadata,
-    get_cached_reading_times,
+    _build_library_entry,
+    _run_sync,
     _serialize_reader_preferences,
+    get_cached_reading_times,
+    load_book_cached,
+    load_book_metadata,
+    logger,
+    templates,
+    user_data_manager,
+    write_book_metadata,
 )
 
 router = APIRouter()

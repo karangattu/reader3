@@ -4,11 +4,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Request
 
-from reader3.api.deps import (
-    user_data_manager,
-    ReadingSession,
-    generate_id
-)
+from reader3.api.deps import user_data_manager
+from reader3.storage.user_data import ReadingSession, generate_id
 
 router = APIRouter()
 
