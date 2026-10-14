@@ -128,7 +128,7 @@ class Book:
 def clean_html_content(soup: BeautifulSoup) -> BeautifulSoup:
 
     # Remove dangerous/useless tags
-    for tag in soup(['script', 'style', 'iframe', 'video', 'nav', 'form', 'button']):
+    for tag in soup(['script', 'style', 'iframe', 'video', 'nav', 'form', 'button', 'object', 'embed']):
         tag.decompose()
 
     # Remove HTML comments
@@ -138,6 +138,20 @@ def clean_html_content(soup: BeautifulSoup) -> BeautifulSoup:
     # Remove input tags
     for tag in soup.find_all('input'):
         tag.decompose()
+
+    # Strip event-handler attributes and dangerous URL schemes from remaining tags.
+    dangerous_schemes = ("javascript:", "vbscript:", "data:text")
+    url_attrs = {"href", "src", "action", "formaction", "poster", "cite", "background"}
+    for tag in soup.find_all(True):
+        for attr in list(tag.attrs):
+            attr_lower = attr.lower()
+            if attr_lower.startswith("on"):
+                del tag[attr]
+                continue
+            if attr_lower in url_attrs:
+                value = str(tag.get(attr, "")).strip().lower()
+                if value.startswith(dangerous_schemes):
+                    del tag[attr]
 
     return soup
 
@@ -1517,8 +1531,16 @@ def save_to_json(book: Book, output_dir: str):
         if 'text_blocks' in page_data:
             del page_data['text_blocks']
             
-    with open(json_path, 'w', encoding='utf-8') as f:
+    # Write atomically so a crash mid-flush cannot corrupt book.json.
+    tmp_path = json_path + ".tmp"
+    with open(tmp_path, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False)
+        f.flush()
+        try:
+            os.fsync(f.fileno())
+        except OSError:
+            pass
+    os.replace(tmp_path, json_path)
     print(f"Saved structured JSON data to {json_path}")
 
     meta_path = os.path.join(output_dir, 'book_meta.json')
@@ -1614,7 +1636,7 @@ class DocumentService:
         raise ValueError("Only .epub and .pdf files are supported")
 
     def save(self, book: Book, output_dir: str) -> None:
-        save_to_pickle(book, output_dir)
+        save_to_json(book, output_dir)
 
     def chapter_texts(
         self,
@@ -1647,7 +1669,7 @@ if __name__ == "__main__":
     out_dir = os.path.splitext(epub_file)[0] + "_data"
 
     book_obj = process_epub(epub_file, out_dir)
-    save_to_pickle(book_obj, out_dir)
+    save_to_json(book_obj, out_dir)
     print("\n--- Summary ---")
     print(f"Title: {book_obj.metadata.title}")
     print(f"Authors: {', '.join(book_obj.metadata.authors)}")

@@ -72,7 +72,7 @@ from .api.deps import (  # noqa: E402
     write_book_metadata,
 )
 from .api.routes.upload import process_book_background  # noqa: E402
-from .services.library import save_to_pickle, validate_pdf  # noqa: E402
+from .services.library import save_to_json, save_to_pickle, validate_pdf  # noqa: E402
 
 __all__ = [
     "app",
@@ -80,6 +80,7 @@ __all__ = [
     "SecurityHeadersMiddleware",
     "validate_pdf",
     "save_to_pickle",
+    "save_to_json",
     "process_book_background",
     "logger",
     "BOOKS_DIR",
@@ -141,6 +142,11 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-Frame-Options"] = "SAMEORIGIN"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; img-src 'self' data: blob:; "
+            "style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; "
+            "font-src 'self' data:; connect-src 'self'; frame-ancestors 'self'"
+        )
         return response
 
 
@@ -202,6 +208,14 @@ class CacheControlMiddleware(BaseHTTPMiddleware):
 async def lifespan(app: FastAPI):
     logger.info("Reader3 starting up")
     yield
+    logger.info("Reader3 shutting down – waiting for background uploads")
+    try:
+        from .api.routes import upload as upload_routes
+
+        for thread in upload_routes.get_active_background_threads():
+            thread.join(timeout=10)
+    except Exception as exc:  # pragma: no cover - best effort
+        logger.warning("Failed to wait for background uploads: %s", exc)
     logger.info("Reader3 shutting down – flushing user data")
     user_data_manager.flush()
     _io_executor.shutdown(wait=False)
@@ -269,7 +283,11 @@ def run():
     host = os.environ.get("HOST", "127.0.0.1")
     port = int(os.environ.get("PORT", 8123))
     workers = int(os.environ.get("WEB_CONCURRENCY", 1))
-
+    if workers > 1:
+        logger.warning(
+            "Reader3 stores upload progress and caches in-process; forcing workers=1"
+        )
+        workers = 1
     logger.info("Starting server at http://%s:%d (workers=%d)", host, port, workers)
     uvicorn.run(
         "reader3.app:app",

@@ -2208,7 +2208,7 @@ class TestBackgroundPdfProcessingConfig:
             return object()
 
         monkeypatch.setattr(reader3, "process_pdf", fake_process_pdf)
-        monkeypatch.setattr(server, "save_to_pickle", lambda *_: None)
+        monkeypatch.setattr(server, "save_to_json", lambda *_: None)
         monkeypatch.setattr(server, "validate_pdf", lambda _: {"valid": True, "error": None})
         monkeypatch.setenv("PDF_GENERATE_THUMBNAILS", "false")
 

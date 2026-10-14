@@ -24,6 +24,7 @@ from reader3.api.deps import (
     _pdf_thumbnails_enabled,
     _persist_upload_metadata,
     _process_pdf,
+    _render_pdf_page_image_bytes,
     cleanup_old_statuses,
     get_cached_reading_times,
     load_book_cached,
@@ -35,11 +36,21 @@ from reader3.api.deps import (
 )
 from reader3.services.library import (
     process_epub,
-    save_to_pickle,
+    save_to_json,
     validate_pdf,
 )
 
 router = APIRouter()
+
+# Tracks in-flight background processing threads so shutdown can wait for them.
+_background_threads: set[threading.Thread] = set()
+_background_threads_lock = threading.Lock()
+
+
+def get_active_background_threads() -> list[threading.Thread]:
+    """Return the currently live background processing threads."""
+    with _background_threads_lock:
+        return [thread for thread in _background_threads if thread.is_alive()]
 
 
 def _call_validate_pdf(temp_path: str):
@@ -49,11 +60,11 @@ def _call_validate_pdf(temp_path: str):
     return validate_pdf(temp_path)
 
 
-def _call_save_to_pickle(book_obj, full_out_dir):
+def _call_save_to_json(book_obj, full_out_dir):
     server_mod = sys.modules.get("server")
-    if server_mod and hasattr(server_mod, "save_to_pickle"):
-        return server_mod.save_to_pickle(book_obj, full_out_dir)
-    return save_to_pickle(book_obj, full_out_dir)
+    if server_mod and hasattr(server_mod, "save_to_json"):
+        return server_mod.save_to_json(book_obj, full_out_dir)
+    return save_to_json(book_obj, full_out_dir)
 
 
 def process_book_background(
@@ -94,7 +105,7 @@ def process_book_background(
             book_obj = process_epub(temp_path, full_out_dir)
 
         update_upload_status(upload_id, progress=80, message="Saving book data...")
-        _call_save_to_pickle(book_obj, full_out_dir)
+        _call_save_to_json(book_obj, full_out_dir)
         if source_hash:
             _persist_upload_metadata(full_out_dir, source_hash, source_filename or book_obj.source_file)
 
@@ -102,6 +113,7 @@ def process_book_background(
         load_book_cached.cache_clear()
         get_cached_reading_times.cache_clear()
         load_book_metadata.cache_clear()
+        _render_pdf_page_image_bytes.cache_clear()
 
         update_upload_status(
             upload_id,
@@ -129,6 +141,8 @@ def process_book_background(
         # Clean up temp file
         if os.path.exists(temp_path):
             os.remove(temp_path)
+        with _background_threads_lock:
+            _background_threads.discard(threading.current_thread())
 
 
 @router.post("/upload")
@@ -160,6 +174,7 @@ async def upload_book(file: UploadFile = File(...), background: bool = False, ba
 
     safe_filename = os.path.basename(file.filename)
     source_hash = hasher.hexdigest()
+
     out_dir = os.path.splitext(safe_filename)[0] + "_data"
     full_out_dir = os.path.join(BOOKS_DIR, out_dir)
 
@@ -193,6 +208,27 @@ async def upload_book(file: UploadFile = File(...), background: bool = False, ba
                 status_code=400,
                 detail=_format_pdf_validation_error(validation["error"]),
             )
+    elif suffix == ".epub":
+        import zipfile
+
+        if not zipfile.is_zipfile(temp_path):
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            raise HTTPException(
+                status_code=400,
+                detail="This file does not look like a valid EPUB (not a ZIP archive).",
+            )
+        try:
+            with zipfile.ZipFile(temp_path) as archive:
+                if archive.testzip() is not None:
+                    raise zipfile.BadZipFile("corrupt archive member")
+        except (zipfile.BadZipFile, OSError) as exc:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            raise HTTPException(
+                status_code=400,
+                detail=f"This EPUB archive is corrupt: {exc}",
+            ) from exc
 
     # Background processing for PDFs (they're slower) or when explicitly requested
     if background or (suffix == ".pdf" and background_tasks is not None):
@@ -224,6 +260,8 @@ async def upload_book(file: UploadFile = File(...), background: bool = False, ba
             ),
             daemon=True
         )
+        with _background_threads_lock:
+            _background_threads.add(thread)
         thread.start()
 
         return JSONResponse(
@@ -245,12 +283,13 @@ async def upload_book(file: UploadFile = File(...), background: bool = False, ba
         else:
             book_obj = process_epub(temp_path, full_out_dir)
 
-        save_to_pickle(book_obj, full_out_dir)
+        save_to_json(book_obj, full_out_dir)
         _persist_upload_metadata(full_out_dir, source_hash, safe_filename)
 
         load_book_cached.cache_clear()
         get_cached_reading_times.cache_clear()
         load_book_metadata.cache_clear()
+        _render_pdf_page_image_bytes.cache_clear()
 
     except Exception as e:
         logger.error("Error processing book: %s", e)
@@ -316,12 +355,13 @@ async def reprocess_pdf(book_id: str):
 
         # Reprocess the PDF
         book_obj = _process_pdf(pdf_path, book_path)
-        save_to_pickle(book_obj, book_path)
+        save_to_json(book_obj, book_path)
 
         # Clear cache
         load_book_cached.cache_clear()
         get_cached_reading_times.cache_clear()
         load_book_metadata.cache_clear()
+        _render_pdf_page_image_bytes.cache_clear()
 
         return {"status": "success", "message": "PDF reprocessed successfully"}
     except Exception as e:
