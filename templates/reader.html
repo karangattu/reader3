@@ -30,6 +30,18 @@
             --reader-item-hover: #eef1f4;
             --reader-input-bg: #fff;
             --reader-text-align: justify;
+            --reader-success: #27ae60;
+            --reader-success-hover: #219a52;
+            --reader-danger: #e74c3c;
+            --reader-danger-hover: #c0392b;
+            --reader-warning: #f39c12;
+            --reader-warning-hover: #e67e22;
+            --reader-info: var(--reader-accent);
+            --reader-muted-fg: #999;
+            --reader-overlay: rgba(0, 0, 0, 0.5);
+            --reader-selection: #b3d9ff;
+            --reader-selection-fg: #000;
+            --reader-disabled-bg: #ccc;
         }
 
         body.theme-sepia {
@@ -43,6 +55,14 @@
             --reader-item-bg: #f6ebd7;
             --reader-item-hover: #efdfc2;
             --reader-input-bg: #fbf3e4;
+            --reader-success: #219a52;
+            --reader-danger: #c0392b;
+            --reader-warning: #d35400;
+            --reader-muted-fg: #8a7a68;
+            --reader-overlay: rgba(67, 54, 44, 0.55);
+            --reader-selection: #efdfc2;
+            --reader-selection-fg: #43362c;
+            --reader-disabled-bg: #d8c7ac;
         }
 
         body.theme-dark {
@@ -57,10 +77,26 @@
             --reader-item-bg: #1c2733;
             --reader-item-hover: #243341;
             --reader-input-bg: #11161c;
+            --reader-success: #2ecc71;
+            --reader-danger: #ff6b6b;
+            --reader-warning: #f9ca24;
+            --reader-muted-fg: #888;
+            --reader-overlay: rgba(0, 0, 0, 0.65);
+            --reader-selection: #2980b9;
+            --reader-selection-fg: #edf2f7;
+            --reader-disabled-bg: #555;
         }
 
         body.high-contrast {
             --reader-border: #000;
+            --reader-text: #000;
+            --reader-bg: #fff;
+            --reader-surface: #fff;
+            --reader-muted: #333;
+            --reader-success: #198754;
+            --reader-danger: #dc3545;
+            --reader-selection: #000;
+            --reader-selection-fg: #fff;
         }
 
         /* Layout */
@@ -69,12 +105,12 @@
         body.sidebar-collapsed #sidebar { width: 0; padding: 0; border-right: none; transform: translateX(-100%); opacity: 0; pointer-events: none; }
         body.sidebar-collapsed #main { width: 100%; }
         body.selection-mode .book-content { cursor: text; user-select: text; }
-        body.selection-mode .book-content ::selection { background: #ffeb3b; color: #000; }
+        body.selection-mode .book-content ::selection { background: #ffeb3b; color: var(--reader-selection-fg); }
         body.reduced-motion *, body.reduced-motion *::before, body.reduced-motion *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
         
         /* PDF-specific styles */
         body.is-pdf .book-content { user-select: text; cursor: text; }
-        body.is-pdf .book-content ::selection { background: #b3d9ff; color: #000; }
+        body.is-pdf .book-content ::selection { background: var(--reader-selection); color: var(--reader-selection-fg); }
 
         /* Sidebar */
         #sidebar { width: 300px; background: var(--reader-sidebar-bg); border-right: 1px solid var(--reader-border); overflow-y: auto; padding: 20px; flex-shrink: 0; transition: width 0.2s ease, transform 0.2s ease, opacity 0.2s ease; }
@@ -130,11 +166,11 @@
         .chapter-progress-fill { height: 100%; background: linear-gradient(90deg, var(--reader-accent), var(--reader-accent-2)); transition: width 0.3s; }
         .chapter-reading-time { font-size: 0.75em; color: var(--reader-muted); white-space: nowrap; background: var(--reader-item-bg); padding: 2px 6px; border-radius: 10px; }
         a.toc-link.read { position: relative; }
-        a.toc-link.read::after { content: '✓'; position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 0.8em; color: #27ae60; }
+        a.toc-link.read::after { content: '✓'; position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 0.8em; color: var(--reader-success); }
         a.toc-link.active::after { color: rgba(255,255,255,0.8); }
         
         /* EPUB chapter copied badge in TOC sidebar */
-        .toc-copied-badge { display: none; color: #27ae60; font-size: 0.7em; margin-left: 6px; font-weight: 500; white-space: nowrap; }
+        .toc-copied-badge { display: none; color: var(--reader-success); font-size: 0.7em; margin-left: 6px; font-weight: 500; white-space: nowrap; }
         .toc-copied-badge.visible { display: inline-flex; align-items: center; gap: 3px; }
         
         /* Empty state illustrations */
@@ -321,7 +357,7 @@
         /* PDF copy page button */
         .pdf-copy-image-btn { display: inline-flex; align-items: center; gap: 6px; background: var(--reader-item-bg); border: 1px solid var(--reader-border); color: var(--reader-text); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-family: -apple-system, sans-serif; font-size: 0.8em; transition: all 0.2s; }
         .pdf-copy-image-btn:hover { background: var(--reader-text); color: var(--reader-bg); }
-        .pdf-copy-image-btn.copied { background: #27ae60; color: #fff; border-color: #27ae60; }
+        .pdf-copy-image-btn.copied { background: var(--reader-success); color: #fff; border-color: var(--reader-success); }
         .pdf-copy-image-btn.downloaded { background: var(--reader-accent); color: var(--reader-on-accent); border-color: var(--reader-accent); }
         
         /* PDF page selection checkbox */
@@ -330,14 +366,14 @@
         .pdf-multi-copy-btn { display: none; background: var(--reader-accent); color: var(--reader-on-accent); border: none; }
         .pdf-multi-copy-btn:hover { background: var(--reader-accent-hover); }
         .pdf-multi-copy-btn.visible { display: inline-flex; }
-        .pdf-multi-copy-btn.copied { background: #27ae60; }
+        .pdf-multi-copy-btn.copied { background: var(--reader-success); }
         .pdf-multi-copy-btn.downloaded { background: var(--reader-accent-hover); }
-        .pdf-clear-btn { display: none; background: #e74c3c; color: #fff; border: none; }
-        .pdf-clear-btn:hover { background: #c0392b; }
+        .pdf-clear-btn { display: none; background: var(--reader-danger); color: #fff; border: none; }
+        .pdf-clear-btn:hover { background: var(--reader-danger-hover); }
         .pdf-clear-btn.visible { display: inline-flex; }
         
         /* PDF page copied checkmark indicator */
-        .pdf-page-copied-badge { display: inline-flex; align-items: center; gap: 4px; color: #27ae60; font-size: 0.8em; margin-left: 8px; font-weight: 500; opacity: 0; transition: opacity 0.3s ease; }
+        .pdf-page-copied-badge { display: inline-flex; align-items: center; gap: 4px; color: var(--reader-success); font-size: 0.8em; margin-left: 8px; font-weight: 500; opacity: 0; transition: opacity 0.3s ease; }
         .pdf-page-copied-badge.visible { opacity: 1; }
         .pdf-page-copied-badge i { font-size: 0.9em; }
         
@@ -358,8 +394,8 @@
         /* Copy toast notification */
         #copy-toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(100px); background: #333; color: #fff; padding: 12px 24px; border-radius: 8px; font-family: -apple-system, sans-serif; font-size: 0.9em; z-index: 1002; opacity: 0; transition: all 0.3s ease; }
         #copy-toast.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
-        #copy-toast.success { background: #27ae60; }
-        #copy-toast.error { background: #e74c3c; }
+        #copy-toast.success { background: var(--reader-success); }
+        #copy-toast.error { background: var(--reader-danger); }
         #copy-toast.info { background: var(--reader-accent); }
 
         /* Highlights */
@@ -404,7 +440,7 @@
         .highlight-text { font-size: 0.9em; color: var(--reader-muted); margin-bottom: 6px; padding: 8px; border-radius: 4px; }
         
         /* Search modal */
-        #search-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1100; }
+        #search-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--reader-overlay); z-index: 1100; }
         #search-modal.visible { display: flex; justify-content: center; align-items: flex-start; padding-top: 80px; }
         .search-container { background: var(--reader-surface); color: var(--reader-text); width: 600px; max-width: 90%; max-height: 80vh; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.3); overflow: hidden; }
         .search-header { padding: 20px; border-bottom: 1px solid var(--reader-border); }
@@ -455,7 +491,7 @@
         .dict-btn-secondary { background: var(--reader-item-bg); color: var(--reader-text); }
         .dict-btn-secondary:hover { background: var(--reader-item-hover); }
         .dict-loading { text-align: center; padding: 30px; color: var(--reader-muted); }
-        .dict-error { text-align: center; padding: 30px; color: #e74c3c; }
+        .dict-error { text-align: center; padding: 30px; color: var(--reader-danger); }
         
         /* Vocabulary panel */
         #vocabulary-panel { position: fixed; top: 60px; right: -400px; width: 380px; height: calc(100vh - 80px); background: var(--reader-surface); color: var(--reader-text); border-left: 1px solid var(--reader-border); box-shadow: -4px 0 12px rgba(0,0,0,0.1); z-index: 999; transition: right 0.3s ease; overflow: hidden; font-family: -apple-system, sans-serif; display: flex; flex-direction: column; }
@@ -492,11 +528,11 @@
         .annot-actions button { background: none; border: none; cursor: pointer; font-size: 0.85em; opacity: 0.5; color: var(--reader-text); }
         .annot-actions button:hover { opacity: 1; }
         .annot-export { padding: 15px 20px; background: var(--reader-item-bg); border-top: 1px solid var(--reader-border); }
-        .annot-export-btn { width: 100%; padding: 10px; background: #27ae60; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9em; }
-        .annot-export-btn:hover { background: #219a52; }
+        .annot-export-btn { width: 100%; padding: 10px; background: var(--reader-success); color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9em; }
+        .annot-export-btn:hover { background: var(--reader-success-hover); }
         
         /* Add note modal */
-        #add-note-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1150; justify-content: center; align-items: center; }
+        #add-note-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--reader-overlay); z-index: 1150; justify-content: center; align-items: center; }
         #add-note-modal.visible { display: flex; }
         .note-modal-content { background: var(--reader-surface); color: var(--reader-text); width: 500px; max-width: 90%; border-radius: 12px; overflow: hidden; }
         .note-modal-header { padding: 20px; border-bottom: 1px solid var(--reader-border); display: flex; justify-content: space-between; align-items: center; }
@@ -531,7 +567,7 @@
         #highlight-context-menu.visible { display: block; }
         .highlight-menu-item { padding: 10px 16px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 0.9em; transition: background 0.2s; }
         .highlight-menu-item:hover { background: var(--reader-item-hover); }
-        .highlight-menu-item.delete { color: #e74c3c; }
+        .highlight-menu-item.delete { color: var(--reader-danger); }
         .highlight-menu-item.delete:hover { background: var(--reader-item-hover); }
         .highlight-menu-colors { display: flex; gap: 6px; padding: 10px 16px; border-bottom: 1px solid var(--reader-border); }
         .highlight-menu-color { width: 24px; height: 24px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; transition: all 0.2s; }

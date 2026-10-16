@@ -22,6 +22,18 @@
             --lib-accent-hover: #2980b9;
             --lib-on-accent: #fff;
             --lib-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+            --lib-success: #27ae60;
+            --lib-success-hover: #219a52;
+            --lib-danger: #e74c3c;
+            --lib-danger-hover: #c0392b;
+            --lib-warning: #f39c12;
+            --lib-warning-hover: #e67e22;
+            --lib-info: var(--lib-accent);
+            --lib-muted-fg: #999;
+            --lib-overlay: rgba(0, 0, 0, 0.5);
+            --lib-selection: #b3d9ff;
+            --lib-selection-fg: #000;
+            --lib-disabled-bg: #ccc;
         }
 
         body.theme-sepia {
@@ -35,6 +47,14 @@
             --lib-item-hover: #efdfc2;
             --lib-input-bg: #fbf3e4;
             --lib-shadow: 0 1px 3px rgba(67, 54, 44, 0.12);
+            --lib-success: #219a52;
+            --lib-danger: #c0392b;
+            --lib-warning: #d35400;
+            --lib-muted-fg: #8a7a68;
+            --lib-overlay: rgba(67, 54, 44, 0.55);
+            --lib-selection: #efdfc2;
+            --lib-selection-fg: #43362c;
+            --lib-disabled-bg: #d8c7ac;
         }
 
         body.theme-dark {
@@ -48,6 +68,14 @@
             --lib-item-hover: #243341;
             --lib-input-bg: #11161c;
             --lib-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+            --lib-success: #2ecc71;
+            --lib-danger: #ff6b6b;
+            --lib-warning: #f9ca24;
+            --lib-muted-fg: #888;
+            --lib-overlay: rgba(0, 0, 0, 0.65);
+            --lib-selection: #2980b9;
+            --lib-selection-fg: #edf2f7;
+            --lib-disabled-bg: #555;
         }
 
         body {
@@ -412,7 +440,7 @@
 
         .reading-status-pill.completed {
             background: rgba(46, 204, 113, 0.15);
-            color: #27ae60;
+            color: var(--lib-success);
         }
 
         .book-actions {
@@ -447,13 +475,13 @@
         }
 
         .btn-delete {
-            background: #e74c3c;
+            background: var(--lib-danger);
             flex: 0 0 auto;
             padding: 10px 12px;
         }
 
         .btn-delete:hover {
-            background: #c0392b;
+            background: var(--lib-danger-hover);
             box-shadow: 0 4px 8px rgba(231, 76, 60, 0.3);
         }
 
@@ -860,14 +888,14 @@
 
         .upload-status-message.success {
             background: rgba(46, 204, 113, 0.12);
-            color: #27ae60;
-            border-left: 4px solid #27ae60;
+            color: var(--lib-success);
+            border-left: 4px solid var(--lib-success);
         }
 
         .upload-status-message.error {
             background: rgba(231, 76, 60, 0.12);
-            color: #e74c3c;
-            border-left: 4px solid #e74c3c;
+            color: var(--lib-danger);
+            border-left: 4px solid var(--lib-danger);
         }
 
         /* Enhanced upload section */
@@ -1290,7 +1318,7 @@
 
         .delete-collection-btn {
             background: rgba(231, 76, 60, 0.12);
-            color: #e74c3c;
+            color: var(--lib-danger);
         }
 
         .delete-collection-btn:hover {
