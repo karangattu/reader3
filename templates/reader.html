@@ -643,6 +643,26 @@
             #dictionary-popup { min-width: 0; width: calc(100vw - 32px); max-width: 420px; }
             .reader-settings-card { border-radius: 12px; }
         }
+        /* Component entrance animation */
+        @keyframes reader-modal-in {
+            from { opacity: 0; transform: scale(0.97) translateY(10px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        #search-modal.visible .search-container,
+        #add-note-modal.visible .note-modal-content {
+            animation: reader-modal-in var(--reader-motion-base) var(--reader-ease-enter);
+        }
+
+        #dictionary-popup.visible {
+            animation: reader-modal-in var(--reader-motion-fast) var(--reader-ease-enter);
+        }
+
+        /* Toast nudge */
+        #copy-toast.visible {
+            animation: reader-modal-in var(--reader-motion-fast) var(--reader-ease-enter);
+        }
+
     </style>
 </head>
 <body class="{{ 'is-pdf ' if is_pdf else '' }}theme-{{ reader_preferences.theme }}{% if reader_preferences.high_contrast %} high-contrast{% endif %}{% if reader_preferences.reduced_motion %} reduced-motion{% endif %}" style="--reader-font-size: {{ reader_preferences.font_size_px }}px; --reader-line-height: {{ reader_preferences.line_height }}; --reader-page-width: {{ reader_preferences.page_width_px }}px; --reader-font-family: '{{ book_font or reader_preferences.font_family }}'; --reader-text-align: {{ reader_preferences.text_align }};">
