@@ -10,6 +10,12 @@ A lightweight, self-hosted EPUB & PDF reader for reading books.
 - **Library Shelf**: Automatic cover art extraction for EPUB and PDF documents.
 - **Android App**: Standalone mobile release with offline library ([download `reader3.apk`](reader3.apk)).
 
+## Screenshots
+
+![Reader3 library UI](assets/library.png)
+
+![Reader3 reader UI](assets/reader.png)
+
 ## Local setup
 
 Requirements:
