@@ -481,7 +481,7 @@ def _book_image_exists(book_id: str, image_path: str) -> bool:
     return os.path.exists(_resolve_book_image_path(book_id, image_name))
 
 
-def _rewrite_reader_content_asset_paths(content: str, book_id: str, book: Book) -> str:
+def _rewrite_reader_content_asset_paths_impl(content: str, book_id: str, book: Book) -> str:
     """Rewrite legacy relative image paths so reader pages resolve assets reliably."""
     if not content or "<img" not in content.lower():
         return content
@@ -516,6 +516,40 @@ def _rewrite_reader_content_asset_paths(content: str, book_id: str, book: Book) 
             img["src"] = _book_image_url(book_id, mapped_path)
 
     return str(soup)
+
+
+# Cache of rewritten chapter HTML, keyed by (book_id, content length, content hash).
+_REWRITE_CACHE: dict[tuple[str, int, int], str] = {}
+_REWRITE_CACHE_LOCK = threading.Lock()
+_REWRITE_CACHE_MAX = 4096
+
+
+def _rewrite_reader_content_asset_paths(content: str, book_id: str, book: Book) -> str:
+    """Cached entry point preserving the historical call signature."""
+    if not content or "<img" not in content.lower():
+        return content
+
+    cache_key = (book_id, len(content), hash(content))
+    with _REWRITE_CACHE_LOCK:
+        cached = _REWRITE_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
+
+    result = _rewrite_reader_content_asset_paths_impl(content, book_id, book)
+
+    with _REWRITE_CACHE_LOCK:
+        if len(_REWRITE_CACHE) >= _REWRITE_CACHE_MAX:
+            for old_key in list(_REWRITE_CACHE.keys())[: _REWRITE_CACHE_MAX // 4]:
+                _REWRITE_CACHE.pop(old_key, None)
+        _REWRITE_CACHE[cache_key] = result
+
+    return result
+
+
+def clear_rewrite_cache() -> None:
+    """Drop all cached rewritten chapter payloads."""
+    with _REWRITE_CACHE_LOCK:
+        _REWRITE_CACHE.clear()
 
 
 @lru_cache(maxsize=128)

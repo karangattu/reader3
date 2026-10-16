@@ -25,6 +25,7 @@ from reader3.api.deps import (
     _persist_upload_metadata,
     _process_pdf,
     _render_pdf_page_image_bytes,
+    clear_rewrite_cache,
     cleanup_old_statuses,
     get_cached_reading_times,
     load_book_cached,
@@ -114,6 +115,7 @@ def process_book_background(
         get_cached_reading_times.cache_clear()
         load_book_metadata.cache_clear()
         _render_pdf_page_image_bytes.cache_clear()
+        clear_rewrite_cache()
 
         update_upload_status(
             upload_id,
@@ -290,6 +292,7 @@ async def upload_book(file: UploadFile = File(...), background: bool = False, ba
         get_cached_reading_times.cache_clear()
         load_book_metadata.cache_clear()
         _render_pdf_page_image_bytes.cache_clear()
+        clear_rewrite_cache()
 
     except Exception as e:
         logger.error("Error processing book: %s", e)
@@ -362,6 +365,7 @@ async def reprocess_pdf(book_id: str):
         get_cached_reading_times.cache_clear()
         load_book_metadata.cache_clear()
         _render_pdf_page_image_bytes.cache_clear()
+        clear_rewrite_cache()
 
         return {"status": "success", "message": "PDF reprocessed successfully"}
     except Exception as e:
