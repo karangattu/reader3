@@ -10,7 +10,7 @@ import math
 import os
 import re
 from collections import Counter
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 INDEX_VERSION = 1
@@ -117,7 +117,7 @@ def ensure_book_index(book_id: str, book: Any, book_dir: str) -> Dict[str, Any]:
         "book_id": book_id,
         "book_title": getattr(getattr(book, "metadata", None), "title", ""),
         "processed_at": getattr(book, "processed_at", ""),
-        "generated_at": datetime.utcnow().isoformat(),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
         "chapter_count": len(getattr(book, "spine", [])),
         "documents": documents,
     }

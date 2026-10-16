@@ -11,7 +11,9 @@ from reader3.api.deps import (
     BOOKS_DIR,
     PDF_COPY_IMAGE_DPI,
     _render_pdf_page_image_bytes,
+    _run_sync,
     load_book_cached,
+    repair_pdf_thumbnails,
 )
 from reader3.services.library import (
     export_pdf_pages,
@@ -30,8 +32,12 @@ async def render_pdf_page_image(
     dpi: int = PDF_COPY_IMAGE_DPI,
 ):
     """Render a PDF page on demand as a PNG for clipboard/export workflows."""
-    image_bytes = _render_pdf_page_image_bytes(book_id, page_num, dpi=dpi)
-    return Response(content=image_bytes, media_type="image/png")
+    image_bytes = await _run_sync(_render_pdf_page_image_bytes, book_id, page_num, dpi)
+    return Response(
+        content=image_bytes,
+        media_type="image/png",
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
 
 
 @router.get("/api/v1/pdf/{book_id}/stats")
@@ -93,6 +99,14 @@ async def serve_thumbnail(book_id: str, thumb_name: str):
     return FileResponse(thumb_path, media_type="image/png")
 
 
+@router.post("/api/v1/pdf/{book_id}/thumbnails/repair")
+async def repair_pdf_thumbnail_set(book_id: str):
+    """Generate any missing thumbnails for a PDF book."""
+    result = await _run_sync(repair_pdf_thumbnails, book_id)
+    # Keep the thumbnail list cache-friendly; no cached route list exists.
+    return result
+
+
 @router.get("/api/v1/pdf/{book_id}/annotations")
 async def get_pdf_annotations(book_id: str, page: int = None):
     """
@@ -149,7 +163,10 @@ async def search_pdf_positions(book_id: str, q: str, page: int = None):
     if not q or len(q) < 2:
         return {"query": q, "results": [], "total": 0}
 
-    results = search_pdf_text_positions(book, q, page)
+    book_dir = os.path.join(BOOKS_DIR, os.path.basename(book_id))
+    results = await _run_sync(
+        search_pdf_text_positions, book, q, page, book_dir
+    )
 
     return {
         "query": q,
@@ -182,6 +199,14 @@ async def get_pdf_page_info(book_id: str, page_num: int):
         }
 
     page_data = book.pdf_page_data[page_num]
+    book_dir = os.path.join(BOOKS_DIR, os.path.basename(book_id))
+    try:
+        text_blocks = await _run_sync(
+            get_pdf_text_blocks_for_page, book, page_num, book_dir
+        )
+        text_block_count = len(text_blocks)
+    except Exception:
+        text_block_count = 0
     return {
         "page": page_num,
         "available": True,
@@ -191,7 +216,7 @@ async def get_pdf_page_info(book_id: str, page_num: int):
         "word_count": page_data.word_count,
         "has_images": page_data.has_images,
         "annotation_count": len(page_data.annotations),
-        "text_block_count": 0  # Text blocks now extracted on-demand
+        "text_block_count": text_block_count,
     }
 
 
@@ -330,8 +355,10 @@ async def get_pdf_text_layer(book_id: str, page_num: int):
     height = page_data.height if page_data else 0
     
     # Extract text blocks on-demand from source PDF
-    book_dir = os.path.join(BOOKS_DIR, book_id)
-    text_blocks = get_pdf_text_blocks_for_page(book, page_num, book_dir)
+    book_dir = os.path.join(BOOKS_DIR, os.path.basename(book_id))
+    text_blocks = await _run_sync(
+        get_pdf_text_blocks_for_page, book, page_num, book_dir
+    )
     
     blocks = [
         {

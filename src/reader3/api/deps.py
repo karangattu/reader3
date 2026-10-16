@@ -69,7 +69,11 @@ def _pdf_copy_image_dpi_options(default_dpi: int) -> list[int]:
 
 def _run_sync(fn, *args):
     """Schedule a blocking function on the I/O thread pool."""
-    return asyncio.get_event_loop().run_in_executor(_io_executor, fn, *args)
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = asyncio.get_event_loop()
+    return loop.run_in_executor(_io_executor, fn, *args)
 
 
 def _pdf_thumbnails_enabled() -> bool:
@@ -235,8 +239,7 @@ def _persist_upload_metadata(book_dir: str, source_hash: str, source_filename: s
             metadata = json.load(handle)
         metadata["source_hash"] = source_hash
         metadata["source_file"] = source_filename
-        with open(meta_path, "w", encoding="utf-8") as handle:
-            json.dump(metadata, handle, ensure_ascii=False)
+        _atomic_write_json(meta_path, metadata)
     except Exception as exc:
         logger.error("Error updating upload metadata for %s: %s", book_dir, exc)
 
@@ -317,17 +320,38 @@ def load_book_cached(folder_name: str) -> Optional[Book]:
     Loads the book from the pickle file.
     Cached so we don't re-read the disk on every click.
     """
-    file_path = os.path.join(BOOKS_DIR, folder_name, "book.pkl")
-    if not os.path.exists(file_path):
+    book_dir = os.path.join(BOOKS_DIR, folder_name)
+    json_path = os.path.join(book_dir, "book.json")
+    if os.path.exists(json_path):
+        try:
+            from ..services.library import load_from_json
+
+            return load_from_json(json_path)
+        except Exception as e:
+            logger.error("Error loading book %s from JSON: %s", folder_name, e)
+            return None
+
+    # Backward compatibility: migrate legacy pickles to JSON on first read.
+    pkl_path = os.path.join(book_dir, "book.pkl")
+    if not os.path.exists(pkl_path):
         return None
 
     try:
-        with open(file_path, "rb") as f:
+        with open(pkl_path, "rb") as f:
             book = pickle.load(f)
-        return book
     except Exception as e:
         logger.error("Error loading book %s: %s", folder_name, e)
         return None
+
+    try:
+        from ..services.library import save_to_json
+
+        save_to_json(book, book_dir)
+        logger.info("Migrated %s from pickle to JSON", folder_name)
+    except Exception as e:
+        logger.warning("Failed to auto-migrate %s to JSON: %s", folder_name, e)
+
+    return book
 
 
 @lru_cache(maxsize=200)
@@ -348,6 +372,19 @@ def load_book_metadata(folder_name: str) -> Optional[dict]:
     return write_book_metadata(folder_name, book)
 
 
+def _atomic_write_json(path: str, payload):
+    """Atomically serialize JSON so interrupted writes cannot corrupt files."""
+    tmp_path = path + ".tmp"
+    with open(tmp_path, "w", encoding="utf-8") as handle:
+        json.dump(payload, handle, ensure_ascii=False)
+        handle.flush()
+        try:
+            os.fsync(handle.fileno())
+        except OSError:
+            pass
+    os.replace(tmp_path, path)
+
+
 def write_book_metadata(folder_name: str, book: Book) -> dict:
     """Write lightweight metadata to disk and return it."""
     meta_path = os.path.join(BOOKS_DIR, folder_name, "book_meta.json")
@@ -364,8 +401,7 @@ def write_book_metadata(folder_name: str, book: Book) -> dict:
     }
 
     try:
-        with open(meta_path, "w", encoding="utf-8") as f:
-            json.dump(metadata, f, ensure_ascii=False)
+        _atomic_write_json(meta_path, metadata)
     except Exception as e:
         logger.error("Error writing metadata for %s: %s", folder_name, e)
 
@@ -445,7 +481,7 @@ def _book_image_exists(book_id: str, image_path: str) -> bool:
     return os.path.exists(_resolve_book_image_path(book_id, image_name))
 
 
-def _rewrite_reader_content_asset_paths(content: str, book_id: str, book: Book) -> str:
+def _rewrite_reader_content_asset_paths_impl(content: str, book_id: str, book: Book) -> str:
     """Rewrite legacy relative image paths so reader pages resolve assets reliably."""
     if not content or "<img" not in content.lower():
         return content
@@ -482,6 +518,41 @@ def _rewrite_reader_content_asset_paths(content: str, book_id: str, book: Book) 
     return str(soup)
 
 
+# Cache of rewritten chapter HTML, keyed by (book_id, content length, content hash).
+_REWRITE_CACHE: dict[tuple[str, int, int], str] = {}
+_REWRITE_CACHE_LOCK = threading.Lock()
+_REWRITE_CACHE_MAX = 4096
+
+
+def _rewrite_reader_content_asset_paths(content: str, book_id: str, book: Book) -> str:
+    """Cached entry point preserving the historical call signature."""
+    if not content or "<img" not in content.lower():
+        return content
+
+    cache_key = (book_id, len(content), hash(content))
+    with _REWRITE_CACHE_LOCK:
+        cached = _REWRITE_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
+
+    result = _rewrite_reader_content_asset_paths_impl(content, book_id, book)
+
+    with _REWRITE_CACHE_LOCK:
+        if len(_REWRITE_CACHE) >= _REWRITE_CACHE_MAX:
+            for old_key in list(_REWRITE_CACHE.keys())[: _REWRITE_CACHE_MAX // 4]:
+                _REWRITE_CACHE.pop(old_key, None)
+        _REWRITE_CACHE[cache_key] = result
+
+    return result
+
+
+def clear_rewrite_cache() -> None:
+    """Drop all cached rewritten chapter payloads."""
+    with _REWRITE_CACHE_LOCK:
+        _REWRITE_CACHE.clear()
+
+
+@lru_cache(maxsize=128)
 def _render_pdf_page_image_bytes(
     book_id: str,
     page_num: int,
@@ -499,7 +570,8 @@ def _render_pdf_page_image_bytes(
         raise HTTPException(status_code=404, detail="Source PDF not available")
 
     safe_book_id = os.path.basename(book_id)
-    pdf_path = os.path.join(BOOKS_DIR, safe_book_id, book.pdf_source_path)
+    pdf_name = os.path.basename(book.pdf_source_path or "")
+    pdf_path = os.path.join(BOOKS_DIR, safe_book_id, pdf_name)
     if not os.path.exists(pdf_path):
         raise HTTPException(status_code=404, detail="Source PDF not found")
 
@@ -528,6 +600,95 @@ def _render_pdf_page_image_bytes(
             exc,
         )
         raise HTTPException(status_code=500, detail="Failed to render PDF page image")
+
+
+def repair_pdf_thumbnails(book_id: str) -> dict:
+    """Generate any missing thumbnails for a PDF book.
+
+    This repairs libraries where thumbnail generation was disabled or failed
+    during the original import, without reprocessing the whole PDF.
+    """
+    safe_book_id = os.path.basename(book_id)
+    book = load_book_cached(safe_book_id)
+    if not book:
+        raise HTTPException(status_code=404, detail="Book not found")
+    if not book.is_pdf:
+        raise HTTPException(status_code=400, detail="Not a PDF book")
+
+    pdf_name = os.path.basename(book.pdf_source_path or "")
+    if not pdf_name:
+        raise HTTPException(status_code=404, detail="Source PDF not available")
+    book_dir = os.path.join(BOOKS_DIR, safe_book_id)
+    pdf_path = os.path.join(book_dir, pdf_name)
+    if not os.path.exists(pdf_path):
+        raise HTTPException(status_code=404, detail="Source PDF not found")
+
+    try:
+        import fitz
+
+        from ..services.library import generate_pdf_thumbnail, save_to_json
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"PDF tools unavailable: {exc}") from exc
+
+    thumbs_dir = os.path.join(book_dir, "thumbnails")
+    os.makedirs(thumbs_dir, exist_ok=True)
+
+    total_pages = int(book.pdf_total_pages or 0)
+    generated = 0
+    existing = 0
+    failed = []
+
+    try:
+        with fitz.open(pdf_path) as doc:
+            if total_pages <= 0 or total_pages > len(doc):
+                total_pages = len(doc)
+            for page_num in range(total_pages):
+                thumb_path = os.path.join(
+                    thumbs_dir, f"thumb_{page_num + 1}.png"
+                )
+                if os.path.exists(thumb_path):
+                    existing += 1
+                    continue
+                try:
+                    page = doc[page_num]
+                    generate_pdf_thumbnail(page, page_num, thumbs_dir)
+                    generated += 1
+                except Exception as exc:
+                    logger.error(
+                        "Thumbnail generation failed for %s page %s: %s",
+                        safe_book_id,
+                        page_num + 1,
+                        exc,
+                    )
+                    failed.append({"page": page_num, "error": str(exc)})
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to open PDF: {exc}") from exc
+
+    all_present = (existing + generated) >= total_pages and total_pages > 0
+    book.pdf_thumbnails_generated = all_present or book.pdf_thumbnails_generated
+    book.pdf_total_pages = total_pages or book.pdf_total_pages
+
+    try:
+        save_to_json(book, book_dir)
+    except Exception as exc:
+        logger.error("Error saving repaired thumbnail metadata for %s: %s", safe_book_id, exc)
+
+    # Invalidate caches after mutating book data.
+    load_book_cached.cache_clear()
+    load_book_metadata.cache_clear()
+    get_cached_reading_times.cache_clear()
+    _render_pdf_page_image_bytes.cache_clear()
+
+    return {
+        "book_id": safe_book_id,
+        "generated": generated,
+        "existing": existing,
+        "failed": failed,
+        "total": total_pages,
+        "available": all_present,
+    }
 
 
 def get_all_book_ids():

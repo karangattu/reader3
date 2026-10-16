@@ -51,7 +51,6 @@ class FileSystemBookRepository:
                  os.path.exists(os.path.join(self.books_dir, item, "book.pkl")))
         ]
 
-    @lru_cache(maxsize=50)
     def load_book(self, book_id: str) -> Optional[Book]:
         book_dir = os.path.join(self.books_dir, book_id)
         json_path = os.path.join(book_dir, "book.json")
@@ -82,7 +81,6 @@ class FileSystemBookRepository:
         except Exception:
             return None
 
-    @lru_cache(maxsize=200)
     def load_metadata(self, book_id: str) -> Optional[dict]:
         meta_path = os.path.join(self.books_dir, book_id, "book_meta.json")
         if os.path.exists(meta_path):
@@ -113,11 +111,8 @@ class FileSystemBookRepository:
         os.makedirs(os.path.dirname(meta_path), exist_ok=True)
         with open(meta_path, "w", encoding="utf-8") as handle:
             json.dump(metadata, handle, ensure_ascii=False)
-        self.load_metadata.cache_clear()
         return metadata
 
     def delete_book(self, book_id: str) -> None:
         safe_book_id = os.path.basename(book_id)
         shutil.rmtree(os.path.join(self.books_dir, safe_book_id))
-        self.load_book.cache_clear()
-        self.load_metadata.cache_clear()

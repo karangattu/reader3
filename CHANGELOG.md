@@ -26,6 +26,27 @@ All notable changes to Reader3 will be documented in this file.
 
 ---
 
+## [1.10.0] - 2026-10-14
+
+### Added
+
+- **PDF thumbnail repair** — New admin endpoint to generate only missing PDF thumbnails without reprocessing a book.
+- **PDF on-demand rendering/cache** — Rendered PDF pages are now cached, and page info reports real text-block counts.
+
+### Fixed
+
+- **Text-alignment persistence** — Reader text alignment is now saved and restored correctly.
+- **EPUB XSS hardening** — Dangerous event-handler attributes and unsafe URLs are stripped during EPUB import.
+- **EPUB upload validation** — Corrupt or mislabeled EPUB uploads fail early with a clear error.
+- **PDF path safety** — On-demand PDF image rendering now guards against path traversal.
+- **Page rendering concurrency** — PDF rendering and text extraction no longer block the event loop.
+
+### Technical
+
+- Migrated book storage to JSON by default, with automatic legacy pickle migration and atomic writes for book JSON/metadata.
+- Added a single-worker guard, graceful background upload shutdown, and a Content-Security-Policy header.
+- Cache invalidation now includes rendered PDF page images.
+
 ## [1.9.0] - 2026-09-05
 
 ### Added
