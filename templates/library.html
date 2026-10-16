@@ -34,6 +34,12 @@
             --lib-selection: #b3d9ff;
             --lib-selection-fg: #000;
             --lib-disabled-bg: #ccc;
+            --lib-motion-fast: 120ms;
+            --lib-motion-base: 200ms;
+            --lib-motion-slow: 300ms;
+            --lib-ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+            --lib-ease-enter: cubic-bezier(0, 0.9, 0.2, 1);
+            --lib-ease-exit: cubic-bezier(0.4, 0, 1, 1);
         }
 
         body.theme-sepia {
@@ -197,7 +203,7 @@
             font-size: 0.9em;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: all var(--lib-motion-base) ease;
         }
 
         .btn-ghost:hover {
@@ -218,7 +224,7 @@
             border-radius: 6px;
             cursor: pointer;
             font-size: 0.9em;
-            transition: all 0.2s;
+            transition: all var(--lib-motion-base);
             text-decoration: none;
             color: var(--lib-text);
         }
@@ -250,7 +256,7 @@
             border-radius: 6px;
             cursor: pointer;
             font-size: 0.9em;
-            transition: all 0.2s;
+            transition: all var(--lib-motion-base);
             color: var(--lib-faint);
         }
 
@@ -339,7 +345,7 @@
             border-radius: 8px;
             box-shadow: var(--lib-shadow);
             border: 1px solid var(--lib-border);
-            transition: all 0.3s ease;
+            transition: all var(--lib-motion-slow) ease;
             display: flex;
             flex-direction: column;
         }
@@ -462,7 +468,7 @@
             cursor: pointer;
             flex: 1;
             text-align: center;
-            transition: all 0.2s ease;
+            transition: all var(--lib-motion-base) ease;
         }
 
         .btn:hover {
@@ -498,7 +504,7 @@
             border-radius: 8px;
             font-size: 1em;
             outline: none;
-            transition: border-color 0.2s;
+            transition: border-color var(--lib-motion-base);
             background: var(--lib-input-bg);
             color: var(--lib-text);
         }
@@ -540,7 +546,7 @@
             padding: 15px 20px;
             border-bottom: 1px solid var(--lib-border);
             cursor: pointer;
-            transition: background 0.2s;
+            transition: background var(--lib-motion-base);
         }
         .search-result:last-child { border-bottom: none; }
         .search-result:hover { background: var(--lib-item-hover); }
@@ -550,7 +556,7 @@
         .search-result-context mark { background: #ffeb3b; color: #000; padding: 0 2px; border-radius: 2px; }
         .no-results { text-align: center; padding: 30px; color: var(--lib-faint); }
         .reading-progress-bar { height: 4px; background: var(--lib-border); border-radius: 2px; margin-top: 10px; overflow: hidden; }
-        .reading-progress-fill { height: 100%; background: linear-gradient(90deg, var(--lib-accent), var(--lib-accent-2)); transition: width 0.3s; }
+        .reading-progress-fill { height: 100%; background: linear-gradient(90deg, var(--lib-accent), var(--lib-accent-2)); transition: width var(--lib-motion-slow); }
         
         /* Recently Read Section */
         .recently-read-section {
@@ -607,7 +613,7 @@
             padding: 12px;
             box-shadow: var(--lib-shadow);
             border: 1px solid var(--lib-border);
-            transition: all 0.2s ease;
+            transition: all var(--lib-motion-base) ease;
             cursor: pointer;
             text-decoration: none;
             color: inherit;
@@ -665,7 +671,7 @@
         .recent-book-progress-fill {
             height: 100%;
             background: linear-gradient(90deg, var(--lib-accent), var(--lib-accent-2));
-            transition: width 0.3s;
+            transition: width var(--lib-motion-slow);
         }
         .recent-book-meta {
             display: flex;
@@ -864,7 +870,7 @@
             height: 100%;
             background: linear-gradient(90deg, var(--lib-accent), var(--lib-accent-2));
             width: 0%;
-            transition: width 0.3s ease;
+            transition: width var(--lib-motion-slow) ease;
         }
 
         .upload-progress-text {
@@ -906,7 +912,7 @@
             margin-bottom: 30px;
             box-shadow: var(--lib-shadow);
             border: 1px solid var(--lib-border);
-            transition: all 0.3s ease;
+            transition: all var(--lib-motion-slow) ease;
         }
 
         .upload-section.drag-over {
@@ -921,7 +927,7 @@
             color: var(--lib-accent);
             font-size: 0.9em;
             margin-top: 10px;
-            animation: fadeIn 0.3s;
+            animation: fadeIn var(--lib-motion-slow);
         }
 
         @keyframes fadeIn {
@@ -971,7 +977,7 @@
             cursor: pointer;
             font-size: 0.85em;
             color: var(--lib-muted);
-            transition: all 0.2s;
+            transition: all var(--lib-motion-base);
         }
 
         .add-collection-btn:hover {
@@ -997,7 +1003,7 @@
             cursor: pointer;
             font-size: 0.85em;
             color: var(--lib-muted);
-            transition: all 0.2s;
+            transition: all var(--lib-motion-base);
         }
 
         .collection-chip:hover {
@@ -1105,7 +1111,7 @@
             border: 2px solid var(--lib-border);
             border-radius: 6px;
             font-size: 1em;
-            transition: border-color 0.2s;
+            transition: border-color var(--lib-motion-base);
             box-sizing: border-box;
             background: var(--lib-input-bg);
             color: var(--lib-text);
@@ -1131,7 +1137,7 @@
             border: 2px solid var(--lib-border);
             border-radius: 8px;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all var(--lib-motion-base);
             font-size: 1.1em;
             color: var(--lib-muted);
         }
@@ -1159,7 +1165,7 @@
             border-radius: 50%;
             cursor: pointer;
             border: 3px solid transparent;
-            transition: all 0.2s;
+            transition: all var(--lib-motion-base);
         }
 
         .color-option:hover {
@@ -1260,7 +1266,7 @@
             border: 1px solid var(--lib-border);
             border-radius: 8px;
             margin-bottom: 8px;
-            transition: all 0.2s;
+            transition: all var(--lib-motion-base);
         }
 
         .manage-collection-item:hover {
@@ -1304,7 +1310,7 @@
             border-radius: 5px;
             cursor: pointer;
             font-size: 0.85em;
-            transition: all 0.2s;
+            transition: all var(--lib-motion-base);
         }
 
         .edit-collection-btn {
@@ -1338,7 +1344,7 @@
             padding: 10px;
             border-radius: 6px;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all var(--lib-motion-base);
         }
 
         .book-assignment-item:hover {
