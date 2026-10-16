@@ -246,8 +246,14 @@ class UserDataManager:
 
     def _connect(self) -> sqlite3.Connection:
         """Open a SQLite connection for user data persistence."""
-        conn = sqlite3.connect(self.db_file)
+        conn = sqlite3.connect(self.db_file, timeout=10.0)
         conn.row_factory = sqlite3.Row
+        try:
+            conn.execute("PRAGMA busy_timeout=5000")
+            conn.execute("PRAGMA synchronous=NORMAL")
+            conn.execute("PRAGMA journal_mode=WAL")
+        except sqlite3.Error:
+            pass
         return conn
 
     @contextmanager
@@ -400,6 +406,14 @@ class UserDataManager:
                     on bookmarks(book_id);
                 create index if not exists idx_annotations_book
                     on annotations(book_id, chapter_index);
+                create index if not exists idx_chapter_progress_book
+                    on chapter_progress(book_id);
+                create index if not exists idx_reading_sessions_book
+                    on reading_sessions(book_id);
+                create index if not exists idx_vocabulary_book
+                    on vocabulary(book_id, chapter_index);
+                create index if not exists idx_book_fonts_book
+                    on book_fonts(book_id);
                 """
             )
             # Migration: add reader_preferences.text_align to older databases.
@@ -899,7 +913,21 @@ class UserDataManager:
         """Save reading progress for a book."""
         data = self.load()
         data.progress[progress.book_id] = progress
-        self.save()
+        self._ensure_schema()
+        row = asdict(progress)
+        with self._managed_connection() as conn:
+            conn.execute(
+                "insert into reading_progress values "
+                "(:book_id, :chapter_index, :scroll_position, :last_read, "
+                ":total_chapters, :reading_time_seconds) "
+                "on conflict(book_id) do update set "
+                "chapter_index=excluded.chapter_index, "
+                "scroll_position=excluded.scroll_position, "
+                "last_read=excluded.last_read, "
+                "total_chapters=excluded.total_chapters, "
+                "reading_time_seconds=excluded.reading_time_seconds",
+                row,
+            )
     
     def get_progress(self, book_id: str) -> Optional[ReadingProgress]:
         """Get reading progress for a book."""
@@ -911,7 +939,14 @@ class UserDataManager:
         data = self.load()
         if book_id in data.progress:
             data.progress[book_id].reading_time_seconds += seconds
-            self.save_deferred()
+            self._ensure_schema()
+            with self._managed_connection() as conn:
+                conn.execute(
+                    "update reading_progress "
+                    "set reading_time_seconds = reading_time_seconds + ? "
+                    "where book_id = ?",
+                    (seconds, book_id),
+                )
 
     # Reader Preferences
     def get_reader_preferences(self) -> ReaderPreferences:
@@ -977,7 +1012,19 @@ class UserDataManager:
             current = data.chapter_progress[book_id][str(chapter_index)]
         if progress_percent > current:
             data.chapter_progress[book_id][chapter_index] = min(100, progress_percent)
-            self.save()
+            self._ensure_schema()
+            with self._managed_connection() as conn:
+                conn.execute(
+                    "insert into chapter_progress values "
+                    "(:book_id, :chapter_index, :progress_percent) "
+                    "on conflict(book_id, chapter_index) do update set "
+                    "progress_percent=excluded.progress_percent",
+                    {
+                        "book_id": book_id,
+                        "chapter_index": chapter_index,
+                        "progress_percent": min(100, progress_percent),
+                    },
+                )
 
     # Copied Pages / Chapters (persistent copy badges)
     def get_copied_pages(self, book_id: str) -> List:
@@ -992,7 +1039,16 @@ class UserDataManager:
         new_items = set(items)
         merged = existing | new_items
         data.copied_pages[book_id] = sorted(merged, key=lambda x: (isinstance(x, str), x))
-        self.save()
+        self._ensure_schema()
+        with self._managed_connection() as conn:
+            conn.execute(
+                "insert into copied_pages values (:book_id, :items_json) "
+                "on conflict(book_id) do update set items_json=excluded.items_json",
+                {
+                    "book_id": book_id,
+                    "items_json": json.dumps(data.copied_pages[book_id]),
+                },
+            )
 
     # Search History
     def add_search(self, query: SearchQuery):
