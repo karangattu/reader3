@@ -21,6 +21,12 @@ from reader3.storage.schema import migrate_book_data
 
 logger = logging.getLogger(__name__)
 
+# Display-page render defaults. Override with environment variables when a
+# library prefers lossless PNGs or a different resolution/quality.
+PDF_PAGE_IMAGE_DPI = int(os.environ.get("PDF_PAGE_IMAGE_DPI", "200"))
+PDF_PAGE_IMAGE_FORMAT = os.environ.get("PDF_PAGE_IMAGE_FORMAT", "jpeg").strip().lower()
+PDF_PAGE_IMAGE_QUALITY = int(os.environ.get("PDF_PAGE_IMAGE_QUALITY", "88"))
+
 # --- Data structures ---
 
 @dataclass
@@ -662,26 +668,81 @@ def generate_pdf_thumbnail(page, page_num: int, thumbs_dir: str,
     return f"thumbnails/{thumb_filename}"
 
 
-def generate_pdf_page_image(page, page_num: int, images_dir: str,
-                            dpi: int = 150) -> str:
-    """
-    Render a PDF page as a high-quality image for display.
-    Returns the relative path to the image.
+def _pdf_page_image_settings(
+    dpi: Optional[int] = None,
+    image_format: Optional[str] = None,
+    quality: Optional[int] = None,
+) -> tuple[int, str, int, str]:
+    """Resolve display-page render settings from explicit values or env defaults."""
+    resolved_format = (image_format or PDF_PAGE_IMAGE_FORMAT).strip().lower()
+    if resolved_format in {"jpg", "jpeg"}:
+        resolved_format = "jpeg"
+    elif resolved_format != "png":
+        resolved_format = "jpeg"
+
+    resolved_dpi = int(dpi if dpi is not None else PDF_PAGE_IMAGE_DPI)
+    resolved_dpi = max(72, min(resolved_dpi, 600))
+
+    resolved_quality = int(quality if quality is not None else PDF_PAGE_IMAGE_QUALITY)
+    resolved_quality = max(1, min(resolved_quality, 100))
+
+    extension = "jpg" if resolved_format == "jpeg" else "png"
+    return resolved_dpi, resolved_format, resolved_quality, extension
+
+
+def render_pdf_page_image(
+    page,
+    page_num: int,
+    images_dir: str,
+    dpi: Optional[int] = None,
+    image_format: Optional[str] = None,
+    quality: Optional[int] = None,
+) -> dict:
+    """Render a PDF page as a display image and return its metadata.
+
+    JPEG is the default because full-page PNGs are several times larger for
+    little visible benefit on screen. PNG remains available for lossless output.
     """
     import fitz
-    # Calculate zoom for desired DPI (72 is default PDF resolution)
-    zoom = dpi / 72
-    matrix = fitz.Matrix(zoom, zoom)
 
-    # Render page to pixmap
-    pix = page.get_pixmap(matrix=matrix, alpha=False)
+    resolved_dpi, resolved_format, resolved_quality, extension = (
+        _pdf_page_image_settings(dpi, image_format, quality)
+    )
 
-    # Save as PNG
-    img_filename = f"page_{page_num + 1}.png"
+    zoom = resolved_dpi / 72
+    pix = page.get_pixmap(matrix=fitz.Matrix(zoom, zoom), alpha=False)
+
+    img_filename = f"page_{page_num + 1}.{extension}"
     img_path = os.path.join(images_dir, img_filename)
-    pix.save(img_path)
+    if resolved_format == "jpeg":
+        image_bytes = pix.tobytes("jpeg", jpg_quality=resolved_quality)
+    else:
+        image_bytes = pix.tobytes("png")
 
-    return f"images/{img_filename}"
+    with open(img_path, "wb") as handle:
+        handle.write(image_bytes)
+
+    return {
+        "path": f"images/{img_filename}",
+        "width": pix.width,
+        "height": pix.height,
+        "dpi": resolved_dpi,
+        "format": resolved_format,
+    }
+
+
+def generate_pdf_page_image(
+    page,
+    page_num: int,
+    images_dir: str,
+    dpi: int = 150,
+) -> str:
+    """Render a page image and return its relative path.
+
+    Kept as a compatibility wrapper; new code should use
+    :func:`render_pdf_page_image` so it also receives the pixel dimensions.
+    """
+    return render_pdf_page_image(page, page_num, images_dir, dpi=dpi)["path"]
 
 
 def validate_pdf(pdf_path: str) -> dict:
@@ -883,7 +944,8 @@ def process_pdf(pdf_path: str, output_dir: str,
 
                 # Render page as image for display
                 try:
-                    page_image_path = generate_pdf_page_image(page, i, images_dir)
+                    page_image = render_pdf_page_image(page, i, images_dir)
+                    page_image_path = page_image["path"]
                 except Exception as e:
                     print(f"Warning: Image render failed for page {i+1}: {e}")
                     failed_pages.append(i)
@@ -925,8 +987,11 @@ def process_pdf(pdf_path: str, output_dir: str,
                 chapter_id = f"page_{i+1}"
                 chapter_title = f"Page {i+1}"
 
+                page_image_width = page_image["width"]
+                page_image_height = page_image["height"]
+
                 content_html = f'''<div class="pdf-page-image-container">
-<img src="{page_image_path}" alt="Page {i+1}" class="pdf-page-image" />
+<img src="{page_image_path}" alt="Page {i+1}" class="pdf-page-image" width="{page_image_width}" height="{page_image_height}" loading="lazy" decoding="async" />
 </div>'''
 
                 if not has_native_toc:

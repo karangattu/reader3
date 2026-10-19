@@ -24,7 +24,6 @@ from reader3.api.deps import (
     _pdf_thumbnails_enabled,
     _persist_upload_metadata,
     _process_pdf,
-    _render_pdf_page_image_bytes,
     clear_rewrite_cache,
     cleanup_old_statuses,
     get_cached_reading_times,
@@ -114,7 +113,6 @@ def process_book_background(
         load_book_cached.cache_clear()
         get_cached_reading_times.cache_clear()
         load_book_metadata.cache_clear()
-        _render_pdf_page_image_bytes.cache_clear()
         clear_rewrite_cache()
 
         update_upload_status(
@@ -291,7 +289,6 @@ async def upload_book(file: UploadFile = File(...), background: bool = False, ba
         load_book_cached.cache_clear()
         get_cached_reading_times.cache_clear()
         load_book_metadata.cache_clear()
-        _render_pdf_page_image_bytes.cache_clear()
         clear_rewrite_cache()
 
     except Exception as e:
@@ -343,28 +340,49 @@ async def reprocess_pdf(book_id: str):
     if not book.is_pdf:
         raise HTTPException(status_code=400, detail="Only PDF books can be reprocessed")
 
-    # Find the original PDF file
-    pdf_name = safe_book_id.replace("_data", ".pdf")
-    pdf_path = os.path.join(BOOKS_DIR, pdf_name)
+    # Prefer the source PDF stored inside the book directory; the original
+    # upload may have been removed after processing.
+    book_path = os.path.join(BOOKS_DIR, safe_book_id)
+    source_candidates = []
+    if book.pdf_source_path:
+        source_candidates.append(
+            os.path.join(book_path, os.path.basename(book.pdf_source_path))
+        )
+    source_candidates.extend([
+        os.path.join(BOOKS_DIR, safe_book_id.replace("_data", ".pdf")),
+        os.path.join(BOOKS_DIR, book.source_file),
+    ])
+    pdf_path = next(
+        (path for path in dict.fromkeys(source_candidates) if os.path.exists(path)),
+        None,
+    )
 
-    if not os.path.exists(pdf_path):
+    if not pdf_path:
         raise HTTPException(
             status_code=400,
             detail="Original PDF not found. Please re-upload the PDF."
         )
 
+    temp_pdf = None
     try:
-        book_path = os.path.join(BOOKS_DIR, safe_book_id)
+        # Copy the source outside the book directory: process_pdf swaps the
+        # destination atomically, which would invalidate an open source path.
+        fd, temp_pdf = tempfile.mkstemp(
+            prefix="reader3_reprocess_", suffix=".pdf", dir=BOOKS_DIR
+        )
+        os.close(fd)
+        shutil.copy2(pdf_path, temp_pdf)
 
         # Reprocess the PDF
-        book_obj = _process_pdf(pdf_path, book_path)
+        book_obj = _process_pdf(
+            temp_pdf, book_path, source_filename=book.source_file
+        )
         save_to_json(book_obj, book_path)
 
         # Clear cache
         load_book_cached.cache_clear()
         get_cached_reading_times.cache_clear()
         load_book_metadata.cache_clear()
-        _render_pdf_page_image_bytes.cache_clear()
         clear_rewrite_cache()
 
         return {"status": "success", "message": "PDF reprocessed successfully"}
@@ -373,3 +391,9 @@ async def reprocess_pdf(book_id: str):
         raise HTTPException(
             status_code=500, detail=f"Failed to reprocess PDF: {str(e)}"
         )
+    finally:
+        if temp_pdf and os.path.exists(temp_pdf):
+            try:
+                os.remove(temp_pdf)
+            except OSError:
+                pass

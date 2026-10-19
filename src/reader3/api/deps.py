@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import math
 import os
 import pickle
 import sys
@@ -55,6 +56,8 @@ VALID_READER_FONTS = {
 PDF_COPY_IMAGE_DPI = int(os.environ.get("PDF_COPY_IMAGE_DPI", 300))
 PDF_COPY_IMAGE_MAX_DPI = 600
 PDF_COPY_IMAGE_DPI_OPTIONS = (150, 200, 300, 450, 600)
+PDF_RENDER_MAX_DIMENSION = int(os.environ.get("PDF_RENDER_MAX_DIMENSION", "8192"))
+PDF_RENDER_MAX_PIXELS = int(os.environ.get("PDF_RENDER_MAX_PIXELS", "40000000"))
 
 
 def _clamp_pdf_copy_image_dpi(dpi: int) -> int:
@@ -552,13 +555,45 @@ def clear_rewrite_cache() -> None:
         _REWRITE_CACHE.clear()
 
 
-@lru_cache(maxsize=128)
-def _render_pdf_page_image_bytes(
+def _pdf_page_image_cache_path(book_id: str, page_num: int, dpi: int) -> str:
+    """Return the on-disk cache path for a rendered copy/export page."""
+    safe_book_id = os.path.basename(book_id)
+    return os.path.join(
+        BOOKS_DIR,
+        safe_book_id,
+        "cache",
+        "pdf-pages",
+        f"page_{page_num + 1}_{dpi}.png",
+    )
+
+
+def _pdf_render_zoom(page_width: float, page_height: float, requested_dpi: int) -> float:
+    """Return a zoom that respects the configured maximum render size."""
+    zoom = requested_dpi / 72
+    if page_width <= 0 or page_height <= 0:
+        return zoom
+
+    scale_for_dimension = min(
+        PDF_RENDER_MAX_DIMENSION / page_width,
+        PDF_RENDER_MAX_DIMENSION / page_height,
+    )
+    scale_for_area = math.sqrt(
+        PDF_RENDER_MAX_PIXELS / max(page_width * page_height, 1.0)
+    )
+    return max(0.01, min(zoom, scale_for_dimension, scale_for_area))
+
+
+def _ensure_pdf_page_image_file(
     book_id: str,
     page_num: int,
     dpi: int = PDF_COPY_IMAGE_DPI,
-) -> bytes:
-    """Render a PDF page on demand and return PNG bytes."""
+) -> tuple[str, int]:
+    """Render a PDF page to a cached PNG and return its path and effective DPI.
+
+    The cache lives inside the book directory so reprocessing and deleting a
+    book automatically invalidate it. Disk caching avoids holding many
+    full-resolution page bitmaps in process memory across requests.
+    """
     book = load_book_cached(book_id)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
@@ -576,6 +611,9 @@ def _render_pdf_page_image_bytes(
         raise HTTPException(status_code=404, detail="Source PDF not found")
 
     export_dpi = _clamp_pdf_copy_image_dpi(dpi)
+    cache_path = _pdf_page_image_cache_path(safe_book_id, page_num, export_dpi)
+    if os.path.exists(cache_path):
+        return cache_path, export_dpi
 
     try:
         import fitz
@@ -584,12 +622,19 @@ def _render_pdf_page_image_bytes(
             if page_num < 0 or page_num >= len(doc):
                 raise HTTPException(status_code=404, detail="Page not found")
 
-            zoom = export_dpi / 72
-            pix = doc[page_num].get_pixmap(
+            page = doc[page_num]
+            try:
+                rect = page.rect
+                zoom = _pdf_render_zoom(rect.width, rect.height, export_dpi)
+            except Exception:
+                zoom = export_dpi / 72
+
+            pix = page.get_pixmap(
                 matrix=fitz.Matrix(zoom, zoom),
                 alpha=False,
             )
-            return pix.tobytes("png")
+            image_bytes = pix.tobytes("png")
+            effective_dpi = max(1, round(zoom * 72))
     except HTTPException:
         raise
     except Exception as exc:
@@ -600,6 +645,37 @@ def _render_pdf_page_image_bytes(
             exc,
         )
         raise HTTPException(status_code=500, detail="Failed to render PDF page image")
+
+    os.makedirs(os.path.dirname(cache_path), exist_ok=True)
+    tmp_path = f"{cache_path}.{os.getpid()}.{threading.get_ident()}.tmp"
+    try:
+        with open(tmp_path, "wb") as handle:
+            handle.write(image_bytes)
+            handle.flush()
+            try:
+                os.fsync(handle.fileno())
+            except OSError:
+                pass
+        os.replace(tmp_path, cache_path)
+    finally:
+        if os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
+
+    return cache_path, effective_dpi
+
+
+def _render_pdf_page_image_bytes(
+    book_id: str,
+    page_num: int,
+    dpi: int = PDF_COPY_IMAGE_DPI,
+) -> bytes:
+    """Render a PDF page on demand and return PNG bytes (compatibility helper)."""
+    cache_path, _ = _ensure_pdf_page_image_file(book_id, page_num, dpi)
+    with open(cache_path, "rb") as handle:
+        return handle.read()
 
 
 def repair_pdf_thumbnails(book_id: str) -> dict:
@@ -679,7 +755,6 @@ def repair_pdf_thumbnails(book_id: str) -> dict:
     load_book_cached.cache_clear()
     load_book_metadata.cache_clear()
     get_cached_reading_times.cache_clear()
-    _render_pdf_page_image_bytes.cache_clear()
 
     return {
         "book_id": safe_book_id,

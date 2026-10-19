@@ -5,12 +5,12 @@ from __future__ import annotations
 import os
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse
 
 from reader3.api.deps import (
     BOOKS_DIR,
     PDF_COPY_IMAGE_DPI,
-    _render_pdf_page_image_bytes,
+    _ensure_pdf_page_image_file,
     _run_sync,
     load_book_cached,
     repair_pdf_thumbnails,
@@ -32,11 +32,19 @@ async def render_pdf_page_image(
     dpi: int = PDF_COPY_IMAGE_DPI,
 ):
     """Render a PDF page on demand as a PNG for clipboard/export workflows."""
-    image_bytes = await _run_sync(_render_pdf_page_image_bytes, book_id, page_num, dpi)
-    return Response(
-        content=image_bytes,
+    image_path, effective_dpi = await _run_sync(
+        _ensure_pdf_page_image_file, book_id, page_num, dpi
+    )
+    filename = f"{os.path.basename(book_id)}-page-{page_num + 1}-{effective_dpi}dpi.png"
+    return FileResponse(
+        image_path,
         media_type="image/png",
-        headers={"Cache-Control": "public, max-age=3600"},
+        filename=filename,
+        content_disposition_type="inline",
+        headers={
+            "Cache-Control": "public, max-age=3600",
+            "X-PDF-Effective-DPI": str(effective_dpi),
+        },
     )
 
 
@@ -281,15 +289,24 @@ async def export_pdf_pages_endpoint(book_id: str, request: Request):
             detail="start_page must be less than or equal to end_page"
         )
 
-    # We need the original PDF file to export
-    # Check if it exists in the uploads or can be reconstructed
+    # Prefer the source PDF stored inside the book directory; the original
+    # upload may have been removed after processing.
     original_pdf = None
-    possible_paths = [
+    possible_paths = []
+    if book.pdf_source_path:
+        possible_paths.append(
+            os.path.join(
+                BOOKS_DIR,
+                os.path.basename(book_id),
+                os.path.basename(book.pdf_source_path),
+            )
+        )
+    possible_paths.extend([
         os.path.join(BOOKS_DIR, book.source_file),
         os.path.join(BOOKS_DIR, book_id.replace("_data", ".pdf")),
-    ]
+    ])
 
-    for path in possible_paths:
+    for path in dict.fromkeys(possible_paths):
         if os.path.exists(path):
             original_pdf = path
             break

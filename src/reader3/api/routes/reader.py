@@ -70,6 +70,17 @@ async def read_chapter(request: Request, book_id: str, chapter_index: int):
 
     reader_preferences = user_data_manager.get_reader_preferences()
     pdf_copy_image_dpi_default = _effective_pdf_copy_image_dpi(reader_preferences)
+    current_pdf_page_data = (
+        book.pdf_page_data.get(chapter_index) if book.is_pdf else None
+    )
+    pdf_page_dimensions = (
+        {
+            str(page_num): {"width": page.width, "height": page.height}
+            for page_num, page in book.pdf_page_data.items()
+        }
+        if book.is_pdf
+        else {}
+    )
 
     return templates.TemplateResponse(
         request,
@@ -90,6 +101,8 @@ async def read_chapter(request: Request, book_id: str, chapter_index: int):
             "pdf_copy_image_dpi_options": _pdf_copy_image_dpi_options(
                 pdf_copy_image_dpi_default
             ),
+            "current_pdf_page_data": current_pdf_page_data,
+            "pdf_page_dimensions": pdf_page_dimensions,
         },
     )
 
@@ -116,10 +129,13 @@ async def get_pages(book_id: str, start: int, count: int):
 
     for i in range(start, end):
         chapter = book.spine[i]
+        page_data = book.pdf_page_data.get(i)
         pages.append({
             "index": i,
             "title": chapter.title,
             "content": _rewrite_reader_content_asset_paths(chapter.content, book_id, book),
+            "width": page_data.width if page_data else 0,
+            "height": page_data.height if page_data else 0,
         })
 
     return {"pages": pages, "total": total}

@@ -12,12 +12,19 @@ All notable changes to Reader3 will be documented in this file.
 - **Responsive reader** — On small screens the chapter sidebar becomes an overlay drawer (with scrim) and panels become full-screen sheets.
 - **Accessibility** — Visible `:focus-visible` indicators, dialog `role`/`aria` semantics, and focus trapping in reader modals.
 - **Next-chapter prefetch** — Forward navigation renders instantly.
+- **PDF display rendering controls** — PDF pages now render to JPEG at 200 DPI by default, with `PDF_PAGE_IMAGE_FORMAT`, `PDF_PAGE_IMAGE_DPI`, and `PDF_PAGE_IMAGE_QUALITY` overrides. Page tags also reserve their dimensions and lazy-load, so long PDFs use far less bandwidth and storage.
+- **Adaptive multi-page image copy** — Web and Android PDF readers now reduce composite resolution to fit browser canvas limits, draw pages one at a time, and report selections that are too large instead of silently downloading a pile of files.
+- **Native share fallback** — Web image copy falls back to the system share sheet on mobile before downloading; the Android reader now has a dedicated **Share Image** action instead of opening the share sheet after every copy.
+- **Bounded Android page cache** — The Android PDF reader keeps only a small window of rendered page canvases instead of retaining every page bitmap, preventing out-of-memory crashes on long PDFs.
 
 ### Fixed
 
 - **Night/Sepia chrome** — Panels, modals, popovers, and the chapter footer now theme correctly instead of staying white.
 - **Library media query** — The misplaced `@media` block nested inside `body {}` now applies on narrow viewports.
 - **Cover cropping** — Book covers use a 2:3 aspect ratio instead of being decapitated.
+- **Safari/iOS image copy** — Clipboard writes now start inside the click gesture with a `Promise<Blob>`, so Safari no longer falls back to download.
+- **PDF source lookup** — Reprocessing and exporting now use the `source.pdf` stored inside the book directory, so they work after the original upload has been removed.
+- **Copy-image memory** — Rendered copy/export pages are cached on disk instead of in an in-process LRU, and render dimensions are capped to avoid memory spikes at high DPI.
 
 ### Technical
 

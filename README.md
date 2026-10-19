@@ -37,6 +37,21 @@ uv run python launcher.py
 
 The app opens in your browser. Upload a book to start reading.
 
+## PDF rendering settings
+
+New PDF imports render display pages as 200 DPI JPEG and lazy-load them. The copy/export pipeline keeps full-resolution PNG output. Override the defaults with environment variables:
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `PDF_PAGE_IMAGE_FORMAT` | `jpeg` | `jpeg` or `png` for display pages |
+| `PDF_PAGE_IMAGE_DPI` | `200` | Display-page resolution |
+| `PDF_PAGE_IMAGE_QUALITY` | `88` | JPEG quality for display pages |
+| `PDF_COPY_IMAGE_DPI` | `300` | Default clipboard/export resolution |
+| `PDF_RENDER_MAX_DIMENSION` | `8192` | Maximum width/height of a rendered copy page |
+| `PDF_RENDER_MAX_PIXELS` | `40000000` | Maximum pixel area of a rendered copy page |
+
+Existing PDFs keep their current page images until they are reprocessed.
+
 ## Tests
 
 ```bash
