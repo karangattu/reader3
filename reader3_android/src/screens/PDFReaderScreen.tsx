@@ -13,7 +13,7 @@ import { BookEntry } from "./LibraryScreen";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
-import { formatPageInfo, calculatePdfChunks, sanitizePdfUri, getCompositeImageFilename } from "../utils/pdfHelpers.ts";
+import { formatPageInfo, calculatePdfChunks, sanitizePdfUri, getCompositeImageFilename, calculateCompositeLayout } from "../utils/pdfHelpers.ts";
 
 export default function PDFReaderScreen() {
     const route = useRoute<any>();
@@ -88,89 +88,97 @@ export default function PDFReaderScreen() {
         }
     }, [book?.uri]);
 
-    const savePdfPageImage = useCallback(async (dataUrl: string, page: number) => {
-        const base64 = dataUrl.replace(/^data:image\/png;base64,/, "");
-        let copiedToClipboard = false;
+    const parseImageDataUrl = useCallback((dataUrl: string) => {
+        const match = /^data:image\/([a-z0-9+.-]+);base64,(.*)$/i.exec(dataUrl);
+        if (!match) return null;
+        const subtype = match[1].toLowerCase();
+        return {
+            subtype,
+            base64: match[2],
+        };
+    }, []);
+
+    const copyImageToClipboard = useCallback(async (dataUrl: string) => {
+        const image = parseImageDataUrl(dataUrl);
+        if (!image) return false;
         try {
-            await Clipboard.setImageAsync(base64);
-            copiedToClipboard = true;
-        } catch { }
+            await Clipboard.setImageAsync(image.base64);
+            return true;
+        } catch {
+            return false;
+        }
+    }, [parseImageDataUrl]);
 
-        let savedFilePath: string | null = null;
-        try {
-            const cacheDir = new Directory(FileSystem.Paths.cache, "reader3_images");
-            if (!cacheDir.exists) cacheDir.create();
-
-            const filename = `page_${page}_${Date.now()}.png`;
-            const imgFile = new ExpoFile(cacheDir, filename);
-            if (!imgFile.exists) {
-                imgFile.create({ overwrite: true });
-            }
-            imgFile.write(base64, { encoding: "base64" });
-            savedFilePath = imgFile.uri;
-        } catch { }
-
-        if (copiedToClipboard) {
-            showToast(`Page ${page} image copied to clipboard!`);
-        } else if (savedFilePath) {
-            showToast(`Page ${page} image saved`);
-        } else {
+    const shareImage = useCallback(async (dataUrl: string, filename: string, title: string) => {
+        const image = parseImageDataUrl(dataUrl);
+        if (!image) {
             showToast("Failed to save image");
+            return false;
         }
-
-        if (savedFilePath) {
-            try {
-                if (await Sharing.isAvailableAsync()) {
-                    await Sharing.shareAsync(savedFilePath, {
-                        mimeType: "image/png",
-                        dialogTitle: `Page ${page} - ${book?.title || "PDF"}`,
-                    });
-                }
-            } catch { }
-        }
-    }, [book?.title, showToast]);
-
-    const savePdfCompositeImage = useCallback(async (dataUrl: string, pages: number[]) => {
-        const base64 = dataUrl.replace(/^data:image\/png;base64,/, "");
-        let copiedToClipboard = false;
-        try {
-            await Clipboard.setImageAsync(base64);
-            copiedToClipboard = true;
-        } catch { }
 
         let savedFilePath: string | null = null;
         try {
             const cacheDir = new Directory(FileSystem.Paths.cache, "reader3_images");
             if (!cacheDir.exists) cacheDir.create();
 
-            const filename = getCompositeImageFilename(pages);
             const imgFile = new ExpoFile(cacheDir, filename);
             if (!imgFile.exists) {
                 imgFile.create({ overwrite: true });
             }
-            imgFile.write(base64, { encoding: "base64" });
+            imgFile.write(image.base64, { encoding: "base64" });
             savedFilePath = imgFile.uri;
-        } catch { }
+        } catch {
+            showToast("Failed to save image");
+            return false;
+        }
 
-        if (copiedToClipboard) {
+        try {
+            if (!(await Sharing.isAvailableAsync())) {
+                showToast("Sharing is not available");
+                return false;
+            }
+            await Sharing.shareAsync(savedFilePath, {
+                mimeType: `image/${image.subtype === "jpg" ? "jpeg" : image.subtype}`,
+                dialogTitle: title,
+            });
+            return true;
+        } catch {
+            showToast("Failed to share image");
+            return false;
+        }
+    }, [parseImageDataUrl, showToast]);
+
+    const copyPdfPageImage = useCallback(async (dataUrl: string, page: number) => {
+        if (await copyImageToClipboard(dataUrl)) {
+            showToast(`Page ${page} image copied to clipboard!`);
+            return;
+        }
+        await shareImage(
+            dataUrl,
+            `page_${page}_${Date.now()}.png`,
+            `Page ${page} - ${book?.title || "PDF"}`
+        );
+    }, [book?.title, copyImageToClipboard, shareImage, showToast]);
+
+    const copyPdfCompositeImage = useCallback(async (dataUrl: string, pages: number[]) => {
+        if (await copyImageToClipboard(dataUrl)) {
             showToast(`${pages.length} page${pages.length > 1 ? "s" : ""} image copied to clipboard!`);
-        } else if (savedFilePath) {
-            showToast(`${pages.length} page${pages.length > 1 ? "s" : ""} composite image saved`);
-        } else {
-            showToast("Failed to save composite image");
+            return;
         }
+        await shareImage(
+            dataUrl,
+            getCompositeImageFilename(pages),
+            `Pages ${pages.join(", ")} - ${book?.title || "PDF"}`
+        );
+    }, [book?.title, copyImageToClipboard, shareImage, showToast]);
 
-        if (savedFilePath) {
-            try {
-                if (await Sharing.isAvailableAsync()) {
-                    await Sharing.shareAsync(savedFilePath, {
-                        mimeType: "image/png",
-                        dialogTitle: `Pages ${pages.join(", ")} - ${book?.title || "PDF"}`,
-                    });
-                }
-            } catch { }
-        }
-    }, [book?.title, showToast]);
+    const sharePdfPageImage = useCallback(async (dataUrl: string, page: number) => {
+        await shareImage(
+            dataUrl,
+            `page_${page}_${Date.now()}.png`,
+            `Page ${page} - ${book?.title || "PDF"}`
+        );
+    }, [book?.title, shareImage]);
 
     const savePdfCover = useCallback(async (bookId: string, dataUrl: string) => {
         try {
@@ -216,10 +224,47 @@ export default function PDFReaderScreen() {
                     showToast(`Page text copied (${data.text.length} chars)`);
                     break;
                 case "copyImage":
-                    savePdfPageImage(data.dataUrl, data.page);
+                    copyPdfPageImage(data.dataUrl, data.page);
+                    break;
+                case "shareImage":
+                    sharePdfPageImage(data.dataUrl, data.page);
                     break;
                 case "copySelectedImages":
-                    savePdfCompositeImage(data.dataUrl, data.pages);
+                    copyPdfCompositeImage(data.dataUrl, data.pages);
+                    break;
+                case "compositeLayoutRequest": {
+                    const layout = calculateCompositeLayout(
+                        data.dimensions || [],
+                        data.targetDpi || 300,
+                        20,
+                        16384,
+                        268435456,
+                        96
+                    );
+                    if (!layout) {
+                        showToast("Too many pages for a single image. Select fewer pages.");
+                        webviewRef.current?.injectJavaScript(`
+                            if (window.cancelCompositeRequest) {
+                                window.cancelCompositeRequest(${Number(data.requestId) || 0});
+                            }
+                            true;
+                        `);
+                        break;
+                    }
+                    webviewRef.current?.injectJavaScript(`
+                        if (window.applyCompositeLayout) {
+                            window.applyCompositeLayout(${JSON.stringify({
+                                layout,
+                                pages: data.pages,
+                                requestId: data.requestId,
+                            })});
+                        }
+                        true;
+                    `);
+                    break;
+                }
+                case "copyError":
+                    showToast(data.message || "PDF image action failed");
                     break;
                 case "selectionCopy":
                     Clipboard.setStringAsync(data.text);
@@ -230,7 +275,7 @@ export default function PDFReaderScreen() {
                     break;
             }
         } catch { }
-    }, [saveProgress, savePdfPageImage, savePdfCompositeImage, savePdfCover, sendPdfChunks, book?.id, showToast]);
+    }, [saveProgress, copyPdfPageImage, copyPdfCompositeImage, sharePdfPageImage, savePdfCover, sendPdfChunks, book?.id, showToast]);
 
     const sendCommand = (cmd: string, args: any = {}) => {
         webviewRef.current?.injectJavaScript(`
@@ -243,6 +288,7 @@ export default function PDFReaderScreen() {
 
     const copyCurrentPageText = () => sendCommand("copyPageText", { page: currentPage });
     const copyCurrentPageImage = () => sendCommand("copyPageImage", { page: currentPage });
+    const shareCurrentPageImage = () => sendCommand("sharePageImage", { page: currentPage });
 
     const jumpToPage = () => {
         const page = parseInt(jumpPageText, 10);
@@ -426,6 +472,10 @@ if (typeof pdfjsLib === "undefined") {
     var renderingPages = {};
     var receivedChunks = [];
     var totalExpectedChunks = 0;
+    var currentVisiblePage = 1;
+    // Keep only a small window of rendered canvases; long PDFs otherwise pin
+    // every page bitmap in memory and eventually crash the WebView.
+    var MAX_PAGE_CANVAS_CACHE = 7;
 
     window.receivePdfChunk = function(index, total, chunk) {
         receivedChunks[index] = chunk;
@@ -566,6 +616,8 @@ if (typeof pdfjsLib === "undefined") {
         var observer = new IntersectionObserver(function(entries) {
             entries.forEach(function(entry) {
                 if (entry.isIntersecting) {
+                    currentVisiblePage = pageNum;
+                    evictDistantPageCanvases(pageNum);
                     renderPage(pageNum);
                     window.ReactNativeWebView.postMessage(JSON.stringify({
                         type: "pageChanged",
@@ -576,6 +628,48 @@ if (typeof pdfjsLib === "undefined") {
         }, { rootMargin: "300px 0px" });
 
         observer.observe(pageDiv);
+    }
+
+    function releasePageCanvas(pageNum) {
+        var canvas = pageCanvases[pageNum];
+        if (!canvas) return;
+
+        var container = document.getElementById("page-" + pageNum);
+        if (container && canvas.parentNode) {
+            var height = canvas.getBoundingClientRect().height;
+            var placeholder = document.createElement("div");
+            placeholder.className = "page-placeholder";
+            placeholder.id = "placeholder-" + pageNum;
+            placeholder.textContent = "Page " + pageNum;
+            if (height > 0) {
+                placeholder.style.height = Math.round(height) + "px";
+            }
+            canvas.replaceWith(placeholder);
+        }
+
+        // Explicitly shrink the backing store so the bitmap can be collected
+        // immediately instead of waiting for GC.
+        canvas.width = 1;
+        canvas.height = 1;
+        delete pageCanvases[pageNum];
+    }
+
+    function evictDistantPageCanvases(centerPage) {
+        var keepFrom = centerPage - Math.floor(MAX_PAGE_CANVAS_CACHE / 2);
+        var keepTo = centerPage + Math.floor(MAX_PAGE_CANVAS_CACHE / 2);
+        Object.keys(pageCanvases).forEach(function(key) {
+            var pageNum = parseInt(key, 10);
+            if (pageNum < keepFrom || pageNum > keepTo) {
+                releasePageCanvas(pageNum);
+            }
+        });
+    }
+
+    function postCopyError(message) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: "copyError",
+            message: message,
+        }));
     }
 
     async function renderPage(pageNum) {
@@ -591,8 +685,8 @@ if (typeof pdfjsLib === "undefined") {
             var viewport = page.getViewport({ scale: Math.max(targetScale, 1.5) });
 
             var canvas = document.createElement("canvas");
-            canvas.width = viewport.width;
-            canvas.height = viewport.height;
+            canvas.width = Math.floor(viewport.width);
+            canvas.height = Math.floor(viewport.height);
             canvas.style.width = "100%";
             canvas.style.height = "auto";
 
@@ -600,9 +694,14 @@ if (typeof pdfjsLib === "undefined") {
             await page.render({ canvasContext: ctx, viewport: viewport }).promise;
 
             pageCanvases[pageNum] = canvas;
+            if (Math.abs(pageNum - currentVisiblePage) <= Math.floor(MAX_PAGE_CANVAS_CACHE / 2)) {
+                evictDistantPageCanvases(currentVisiblePage);
+            }
 
             var textContent = await page.getTextContent();
-            var text = textContent.items.map(function(item) { return item.str; }).join(" ");
+            var text = textContent.items.map(function(item) {
+                return item.str + (item.hasEOL ? "\n" : " ");
+            }).join("").replace(/[ \t]+\n/g, "\n").trim();
             pageTexts[pageNum] = text;
 
             var placeholder = document.getElementById("placeholder-" + pageNum);
@@ -635,8 +734,16 @@ if (typeof pdfjsLib === "undefined") {
         var unscaledViewport = page.getViewport({ scale: 1.0 });
         var baseScale = targetDpi / 72;
         var maxDimension = 4096;
-        var largestDim = Math.max(unscaledViewport.width * baseScale, unscaledViewport.height * baseScale);
-        var scale = largestDim > maxDimension ? (maxDimension / Math.max(unscaledViewport.width, unscaledViewport.height)) : Math.max(baseScale, 1.0);
+        var maxPixels = 16777216; // Keep the exported canvas under ~16 MP.
+        var dimensionScale = Math.min(
+            maxDimension / unscaledViewport.width,
+            maxDimension / unscaledViewport.height
+        );
+        var areaScale = Math.sqrt(
+            maxPixels / Math.max(unscaledViewport.width * unscaledViewport.height, 1)
+        );
+        var scale = Math.min(baseScale, dimensionScale, areaScale);
+        if (!isFinite(scale) || scale <= 0) scale = 1;
         var viewport = page.getViewport({ scale: scale });
 
         var canvas = document.createElement("canvas");
@@ -645,6 +752,12 @@ if (typeof pdfjsLib === "undefined") {
         var ctx = canvas.getContext("2d");
         await page.render({ canvasContext: ctx, viewport: viewport }).promise;
         return canvas;
+    }
+
+    async function getPageDimensions(pageNum) {
+        var page = await pdfDoc.getPage(pageNum);
+        var viewport = page.getViewport({ scale: 1.0 });
+        return { width: viewport.width, height: viewport.height };
     }
 
     window.handleCommand = function(data) {
@@ -658,6 +771,9 @@ if (typeof pdfjsLib === "undefined") {
                 break;
             case "copyPageImage":
                 copyPageImage(data.page);
+                break;
+            case "sharePageImage":
+                sharePageImage(data.page);
                 break;
         }
     };
@@ -674,15 +790,23 @@ if (typeof pdfjsLib === "undefined") {
         if (badge) badge.classList.add("visible");
     };
 
+    async function renderPageImageDataUrl(pageNum) {
+        var canvas = await renderHighResPage(pageNum, 300);
+        if (!canvas) {
+            if (!pageCanvases[pageNum]) await renderPage(pageNum);
+            canvas = pageCanvases[pageNum];
+        }
+        if (!canvas) return null;
+        return canvas.toDataURL("image/png");
+    }
+
     window.copyPageImage = async function(pageNum) {
         try {
-            var canvas = await renderHighResPage(pageNum, 300);
-            if (!canvas) {
-                if (!pageCanvases[pageNum]) await renderPage(pageNum);
-                canvas = pageCanvases[pageNum];
+            var dataUrl = await renderPageImageDataUrl(pageNum);
+            if (!dataUrl) {
+                postCopyError("Page image is not available yet");
+                return;
             }
-            if (!canvas) return;
-            var dataUrl = canvas.toDataURL("image/png");
             window.ReactNativeWebView.postMessage(JSON.stringify({
                 type: "copyImage",
                 page: pageNum,
@@ -692,6 +816,25 @@ if (typeof pdfjsLib === "undefined") {
             if (badge) badge.classList.add("visible");
         } catch(err) {
             console.error("Failed to export high-res page image", err);
+            postCopyError("Failed to render page image");
+        }
+    };
+
+    window.sharePageImage = async function(pageNum) {
+        try {
+            var dataUrl = await renderPageImageDataUrl(pageNum);
+            if (!dataUrl) {
+                postCopyError("Page image is not available yet");
+                return;
+            }
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: "shareImage",
+                page: pageNum,
+                dataUrl: dataUrl,
+            }));
+        } catch(err) {
+            console.error("Failed to export page image for sharing", err);
+            postCopyError("Failed to render page image");
         }
     };
 
@@ -728,56 +871,113 @@ if (typeof pdfjsLib === "undefined") {
         }
     }
 
+    var compositeRequestCounter = 0;
+    var pendingCompositeRequestId = 0;
+    var compositeRenderInProgress = false;
+
     window.copySelectedPagesAsImage = async function() {
         var pages = Array.from(selectedPages).sort(function(a, b) { return a - b; });
-        if (pages.length === 0) return;
+        if (pages.length === 0 || compositeRenderInProgress) return;
+
+        if (pages.length > 40) {
+            postCopyError("Too many pages for a single image. Select 40 or fewer.");
+            return;
+        }
+
+        compositeRenderInProgress = true;
+        var requestId = ++compositeRequestCounter;
+        pendingCompositeRequestId = requestId;
+
+        setTimeout(function() {
+            if (pendingCompositeRequestId === requestId) {
+                pendingCompositeRequestId = 0;
+                compositeRenderInProgress = false;
+                postCopyError("Timed out preparing the image");
+            }
+        }, 15000);
 
         try {
-            var targetDpi = pages.length > 5 ? 200 : 300;
-            var canvases = [];
-            for (var i = 0; i < pages.length; i++) {
-                var p = pages[i];
-                var c = await renderHighResPage(p, targetDpi);
-                if (!c) {
-                    if (!pageCanvases[p]) await renderPage(p);
-                    c = pageCanvases[p];
-                }
-                if (c) canvases.push(c);
+            var pageDims = [];
+            for (var d = 0; d < pages.length; d++) {
+                pageDims.push(await getPageDimensions(pages[d]));
             }
 
-            if (canvases.length === 0) return;
-
-            var padding = 20;
-            var maxWidth = 0;
-            var totalHeight = 0;
-            for (var j = 0; j < canvases.length; j++) {
-                if (canvases[j].width > maxWidth) maxWidth = canvases[j].width;
-                totalHeight += canvases[j].height + padding;
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: "compositeLayoutRequest",
+                requestId: requestId,
+                pages: pages,
+                dimensions: pageDims,
+                targetDpi: pages.length > 5 ? 200 : 300,
+            }));
+        } catch(err) {
+            console.error("Failed to measure selected pages", err);
+            if (pendingCompositeRequestId === requestId) {
+                pendingCompositeRequestId = 0;
+                compositeRenderInProgress = false;
             }
+            postCopyError("Failed to measure selected pages");
+        }
+    };
 
-            var maxAllowedHeight = 16384;
-            var scaleDown = totalHeight > maxAllowedHeight ? (maxAllowedHeight / totalHeight) : 1.0;
-            var finalWidth = Math.floor(maxWidth * scaleDown);
-            var finalHeight = Math.floor(totalHeight * scaleDown);
+    window.cancelCompositeRequest = function(requestId) {
+        if (requestId !== pendingCompositeRequestId) return;
+        pendingCompositeRequestId = 0;
+        compositeRenderInProgress = false;
+    };
 
+    window.applyCompositeLayout = async function(payload) {
+        if (!payload || payload.requestId !== pendingCompositeRequestId) return;
+
+        pendingCompositeRequestId = 0;
+        var pages = payload.pages || [];
+        var layout = payload.layout;
+        if (!layout || pages.length === 0 || !pdfDoc) {
+            compositeRenderInProgress = false;
+            return;
+        }
+
+        try {
             var compositeCanvas = document.createElement("canvas");
-            compositeCanvas.width = finalWidth;
-            compositeCanvas.height = finalHeight;
+            compositeCanvas.width = layout.width;
+            compositeCanvas.height = layout.height;
             var ctx = compositeCanvas.getContext("2d");
             ctx.fillStyle = "#ffffff";
-            ctx.fillRect(0, 0, finalWidth, finalHeight);
+            ctx.fillRect(0, 0, layout.width, layout.height);
 
+            var renderedPages = [];
             var yOffset = 0;
-            for (var k = 0; k < canvases.length; k++) {
-                var itemCanvas = canvases[k];
-                var itemW = itemCanvas.width * scaleDown;
-                var itemH = itemCanvas.height * scaleDown;
-                var xOffset = (finalWidth - itemW) / 2;
-                ctx.drawImage(itemCanvas, xOffset, yOffset, itemW, itemH);
-                yOffset += itemH + (padding * scaleDown);
+            for (var i = 0; i < pages.length; i++) {
+                var pageNum = pages[i];
+                var page = await pdfDoc.getPage(pageNum);
+                var viewport = page.getViewport({ scale: layout.scale });
+                var itemWidth = Math.floor(viewport.width);
+                var itemHeight = Math.floor(viewport.height);
+
+                try {
+                    var scratch = document.createElement("canvas");
+                    scratch.width = itemWidth;
+                    scratch.height = itemHeight;
+                    var scratchCtx = scratch.getContext("2d");
+                    await page.render({ canvasContext: scratchCtx, viewport: viewport }).promise;
+
+                    var xOffset = Math.max(0, Math.round((layout.width - itemWidth) / 2));
+                    ctx.drawImage(scratch, xOffset, yOffset, itemWidth, itemHeight);
+                    scratch.width = 1;
+                    scratch.height = 1;
+                    renderedPages.push(pageNum);
+                } catch (pageErr) {
+                    console.warn("Skipping page " + pageNum, pageErr);
+                }
+
+                yOffset += itemHeight + layout.padding;
             }
 
-            pages.forEach(function(p) {
+            if (renderedPages.length === 0) {
+                postCopyError("No pages could be rendered");
+                return;
+            }
+
+            renderedPages.forEach(function(p) {
                 var badge = document.getElementById("badge-" + p);
                 if (badge) badge.classList.add("visible");
             });
@@ -786,10 +986,13 @@ if (typeof pdfjsLib === "undefined") {
             window.ReactNativeWebView.postMessage(JSON.stringify({
                 type: "copySelectedImages",
                 dataUrl: dataUrl,
-                pages: pages,
+                pages: renderedPages,
             }));
         } catch(err) {
             console.error("Failed to export high-res composite image", err);
+            postCopyError("Failed to render selected pages");
+        } finally {
+            compositeRenderInProgress = false;
         }
     };
 
@@ -838,10 +1041,10 @@ if (typeof pdfjsLib === "undefined") {
                         <Text style={styles.actionBtnText}>Copy Image</Text>
                     </View>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.actionBtn} onPress={() => setJumpModalVisible(true)}>
+                <TouchableOpacity style={styles.actionBtn} onPress={shareCurrentPageImage}>
                     <View style={styles.actionBtnRow}>
-                        <FontAwesome name="bookmark-o" size={14} color="#007AFF" />
-                        <Text style={styles.actionBtnText}>Go to Page</Text>
+                        <FontAwesome name="share-alt" size={14} color="#007AFF" />
+                        <Text style={styles.actionBtnText}>Share Image</Text>
                     </View>
                 </TouchableOpacity>
             </View>
