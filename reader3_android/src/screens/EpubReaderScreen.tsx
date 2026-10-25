@@ -28,7 +28,7 @@ export default function EpubReaderScreen() {
     const route = useRoute<any>();
     const navigation = useNavigation<any>();
     const book = route.params?.book as BookEntry;
-    const webviewRef = useRef<WebView>(null);
+    const webviewRef = useRef<WebView<object>>(null);
     const insets = useSafeAreaInsets();
 
     const [chapters, setChapters] = useState<{ html: string; plainText: string; href: string }[]>([]);
@@ -62,7 +62,7 @@ export default function EpubReaderScreen() {
                 }
             }
         } catch { }
-    }, [book?.id]);
+    }, [book]);
 
     const saveProgress = useCallback(async (chapterIdx: number, progress?: number, newCopied?: Set<number>) => {
         if (!book?.id) return;
@@ -77,7 +77,7 @@ export default function EpubReaderScreen() {
                 copiedChapters: copiedList,
             }));
         } catch { }
-    }, [book?.id, readProgress, copiedChapters]);
+    }, [book, readProgress, copiedChapters]);
 
     const loadEpub = useCallback(async () => {
         if (!book?.uri) return;
@@ -224,10 +224,11 @@ export default function EpubReaderScreen() {
         } finally {
             setLoading(false);
         }
-    }, [book?.uri, book?.coverUri, book?.id]);
+    }, [book]);
 
     useEffect(() => {
         if (book?.uri) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- Load book data from the file system when the selected book changes.
             loadEpub();
             loadProgress();
         }
@@ -567,7 +568,7 @@ ${bodyContent}
                         <Text style={styles.loadingText}>Loading EPUB...</Text>
                     </View>
                 ) : chapters.length > 0 ? (
-                    <WebView
+                    <WebView<object>
                         key={currentChapter}
                         ref={webviewRef}
                         originWhitelist={['*']}

@@ -14,7 +14,8 @@ from typing import Dict, List, Optional
 from urllib.parse import unquote
 
 import ebooklib
-from bs4 import BeautifulSoup, Comment
+import nh3
+from bs4 import BeautifulSoup
 from ebooklib import epub
 
 from reader3.storage.schema import migrate_book_data
@@ -131,35 +132,22 @@ class Book:
 
 # --- Utilities ---
 
+# Preserve book structure, chapter anchors, and local illustrations while rejecting
+# active content. Beautiful Soup parses HTML; nh3 enforces the security policy.
+_BOOK_HTML_CLEANER = nh3.Cleaner(
+    tags=(nh3.ALLOWED_TAGS - {"nav"}) | {"section", "main", "title"},
+    clean_content_tags={"script", "style", "iframe", "video", "nav", "form", "button", "object", "embed"},
+    attributes={
+        **nh3.ALLOWED_ATTRIBUTES,
+        "*": {"id", "class", "title", "lang", "dir"},
+        "a": {"href", "name", "title", "epub:type"},
+        "img": {"src", "alt", "title", "width", "height"},
+    },
+)
+
+
 def clean_html_content(soup: BeautifulSoup) -> BeautifulSoup:
-
-    # Remove dangerous/useless tags
-    for tag in soup(['script', 'style', 'iframe', 'video', 'nav', 'form', 'button', 'object', 'embed']):
-        tag.decompose()
-
-    # Remove HTML comments
-    for comment in soup.find_all(string=lambda text: isinstance(text, Comment)):
-        comment.extract()
-
-    # Remove input tags
-    for tag in soup.find_all('input'):
-        tag.decompose()
-
-    # Strip event-handler attributes and dangerous URL schemes from remaining tags.
-    dangerous_schemes = ("javascript:", "vbscript:", "data:text")
-    url_attrs = {"href", "src", "action", "formaction", "poster", "cite", "background"}
-    for tag in soup.find_all(True):
-        for attr in list(tag.attrs):
-            attr_lower = attr.lower()
-            if attr_lower.startswith("on"):
-                del tag[attr]
-                continue
-            if attr_lower in url_attrs:
-                value = str(tag.get(attr, "")).strip().lower()
-                if value.startswith(dangerous_schemes):
-                    del tag[attr]
-
-    return soup
+    return BeautifulSoup(_BOOK_HTML_CLEANER.clean(str(soup)), "html.parser")
 
 
 def extract_plain_text(soup: BeautifulSoup) -> str:

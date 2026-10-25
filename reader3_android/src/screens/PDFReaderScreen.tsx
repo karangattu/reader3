@@ -14,12 +14,13 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { formatPageInfo, calculatePdfChunks, sanitizePdfUri, getCompositeImageFilename, calculateCompositeLayout } from "../utils/pdfHelpers.ts";
+import { PDFJS_BOOTSTRAP, PDFJS_DOCUMENT_OPTIONS } from "../utils/pdfjsBootstrap.ts";
 
 export default function PDFReaderScreen() {
     const route = useRoute<any>();
     const navigation = useNavigation<any>();
     const book = route.params?.book as BookEntry;
-    const webviewRef = useRef<WebView>(null);
+    const webviewRef = useRef<WebView<object>>(null);
     const insets = useSafeAreaInsets();
 
     const [totalPages, setTotalPages] = useState(0);
@@ -44,7 +45,7 @@ export default function PDFReaderScreen() {
                 if (parsed.lastPage) setCurrentPage(parsed.lastPage);
             }
         } catch { }
-    }, [book?.id]);
+    }, [book]);
 
     const saveProgress = useCallback(async (page: number) => {
         if (!book?.id) return;
@@ -54,10 +55,11 @@ export default function PDFReaderScreen() {
                 totalPages,
             }));
         } catch { }
-    }, [book?.id, totalPages]);
+    }, [book, totalPages]);
 
     useEffect(() => {
         if (book?.uri) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- Restore the selected book's persisted progress from storage.
             loadProgress();
         }
     }, [book?.uri, loadProgress]);
@@ -86,7 +88,7 @@ export default function PDFReaderScreen() {
                 true;
             `);
         }
-    }, [book?.uri]);
+    }, [book]);
 
     const parseImageDataUrl = useCallback((dataUrl: string) => {
         const match = /^data:image\/([a-z0-9+.-]+);base64,(.*)$/i.exec(dataUrl);
@@ -275,7 +277,7 @@ export default function PDFReaderScreen() {
                     break;
             }
         } catch { }
-    }, [saveProgress, copyPdfPageImage, copyPdfCompositeImage, sharePdfPageImage, savePdfCover, sendPdfChunks, book?.id, showToast]);
+    }, [saveProgress, copyPdfPageImage, copyPdfCompositeImage, sharePdfPageImage, savePdfCover, sendPdfChunks, book, showToast]);
 
     const sendCommand = (cmd: string, args: any = {}) => {
         webviewRef.current?.injectJavaScript(`
@@ -307,12 +309,7 @@ export default function PDFReaderScreen() {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<script src="file:///android_asset/pdfjs/pdf.min.js"></script>
-<script>
-if (typeof pdfjsLib === "undefined") {
-    document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"><\/script>');
-}
-</script>
+${PDFJS_BOOTSTRAP}
 <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: #525659; font-family: -apple-system, sans-serif; padding-bottom: 70px; }
@@ -460,10 +457,6 @@ if (typeof pdfjsLib === "undefined") {
 </div>
 
 <script>
-    if (window.pdfjsLib) {
-        pdfjsLib.GlobalWorkerOptions.workerSrc = "file:///android_asset/pdfjs/pdf.worker.min.js";
-    }
-
     var PDF_FILE_URI = ${JSON.stringify(sanitizePdfUri(book?.uri || ""))};
     var pdfDoc = null;
     var pageCanvases = {};
@@ -530,8 +523,8 @@ if (typeof pdfjsLib === "undefined") {
 
     async function initPdfWithData(uint8) {
         try {
-            if (!window.pdfjsLib) throw new Error("PDF.js library failed to load");
-            pdfDoc = await pdfjsLib.getDocument({ data: uint8 }).promise;
+            await window.pdfjsReady;
+            pdfDoc = await pdfjsLib.getDocument({ data: uint8, ${PDFJS_DOCUMENT_OPTIONS} }).promise;
             var totalPages = pdfDoc.numPages;
 
             var outlineData = [];
@@ -700,8 +693,8 @@ if (typeof pdfjsLib === "undefined") {
 
             var textContent = await page.getTextContent();
             var text = textContent.items.map(function(item) {
-                return item.str + (item.hasEOL ? "\n" : " ");
-            }).join("").replace(/[ \t]+\n/g, "\n").trim();
+                return item.str + (item.hasEOL ? "\\n" : " ");
+            }).join("").replace(/[ \\t]+\\n/g, "\\n").trim();
             pageTexts[pageNum] = text;
 
             var placeholder = document.getElementById("placeholder-" + pageNum);
@@ -1050,7 +1043,7 @@ if (typeof pdfjsLib === "undefined") {
             </View>
 
             <View style={styles.container}>
-                <WebView
+                <WebView<object>
                     ref={webviewRef}
                     originWhitelist={["*"]}
                     source={{ html: getPdfViewerHTML(), baseUrl: "file:///" }}

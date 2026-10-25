@@ -11,6 +11,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { extractEpubCover } from '../utils/coverHelpers.ts';
+import { PDFJS_BOOTSTRAP, PDFJS_DOCUMENT_OPTIONS } from '../utils/pdfjsBootstrap.ts';
 
 const BOOKS_STORAGE_KEY = '@reader3:books';
 
@@ -28,19 +29,10 @@ const PDF_COVER_EXTRACTOR_HTML = `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
-<script src="file:///android_asset/pdfjs/pdf.min.js"></script>
-<script>
-if (typeof pdfjsLib === 'undefined') {
-    document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"><\\/script>');
-}
-</script>
+${PDFJS_BOOTSTRAP}
 </head>
 <body>
 <script>
-if (window.pdfjsLib) {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'file:///android_asset/pdfjs/pdf.worker.min.js';
-}
-
 function loadPdfArrayBuffer(uri) {
     return new Promise(function(resolve, reject) {
         var xhr = new XMLHttpRequest();
@@ -66,9 +58,9 @@ function loadPdfArrayBuffer(uri) {
 
 window.extractCover = async function(id, fileUri) {
     try {
-        if (!window.pdfjsLib) throw new Error('PDF.js not loaded');
+        await window.pdfjsReady;
         var uint8 = await loadPdfArrayBuffer(fileUri);
-        var doc = await pdfjsLib.getDocument({ data: uint8 }).promise;
+        var doc = await pdfjsLib.getDocument({ data: uint8, ${PDFJS_DOCUMENT_OPTIONS} }).promise;
         var page = await doc.getPage(1);
         var baseViewport = page.getViewport({ scale: 1 });
         var scale = 240 / baseViewport.width;
@@ -93,7 +85,7 @@ export default function LibraryScreen() {
     const [refreshing, setRefreshing] = useState(false);
     const navigation = useNavigation<any>();
     const insets = useSafeAreaInsets();
-    const pdfWebviewRef = useRef<WebView>(null);
+    const pdfWebviewRef = useRef<WebView<object>>(null);
 
     const triggerPdfCoverExtraction = useCallback((id: string, uri: string) => {
         pdfWebviewRef.current?.injectJavaScript(`
@@ -336,7 +328,7 @@ export default function LibraryScreen() {
                 )}
             </View>
 
-            <WebView
+            <WebView<object>
                 ref={pdfWebviewRef}
                 originWhitelist={['*']}
                 source={{ html: PDF_COVER_EXTRACTOR_HTML, baseUrl: 'file:///' }}

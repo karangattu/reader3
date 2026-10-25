@@ -248,6 +248,32 @@ class TestBook:
 class TestCleanHtmlContent:
     """Tests for HTML cleaning functionality."""
 
+    @pytest.mark.parametrize("url", [
+        "javascript:alert(1)",
+        "java&#x09;script:alert(1)",
+        "java&#x0a;script:alert(1)",
+        "data:text/html,unsafe",
+    ])
+    def test_rejects_active_links(self, url):
+        cleaned = clean_html_content(BeautifulSoup(
+            f'<a href="{url}" onclick="alert(1)">Book link</a>', "html.parser"
+        ))
+        assert cleaned.a.get("href") is None
+        assert cleaned.a.get("onclick") is None
+        assert cleaned.a.get_text() == "Book link"
+
+    def test_preserves_book_navigation_and_images(self):
+        cleaned = clean_html_content(BeautifulSoup(
+            '<section id="chapter"><h2>Title</h2><a href="#note">Note</a>'
+            '<img src="images/cover.jpg" alt="Cover" width="200">'
+            '<p id="note">Footnote</p></section>', "html.parser"
+        ))
+        assert cleaned.section["id"] == "chapter"
+        assert cleaned.a["href"] == "#note"
+        assert cleaned.img["src"] == "images/cover.jpg"
+        assert cleaned.img["alt"] == "Cover"
+        assert cleaned.p["id"] == "note"
+
     def test_remove_script_tags(self):
         """Test that script tags are removed."""
         html = "<div><script>alert('evil')</script><p>Good content</p></div>"

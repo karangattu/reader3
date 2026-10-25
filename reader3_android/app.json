@@ -7,7 +7,6 @@
     "icon": "./assets/images/icon.png",
     "scheme": "reader3android",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.anonymous.reader3-android"
@@ -19,7 +18,6 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.anonymous.reader3_android"
     },
@@ -40,7 +38,7 @@
           }
         }
       ],
-      "@config-plugins/react-native-pdf"
+      "./plugins/with-pdfjs.cjs"
     ],
     "experiments": {
       "reactCompiler": true

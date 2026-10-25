@@ -29,6 +29,7 @@ COPY --from=builder /install /usr/local
 
 # Copy application code
 COPY server.py reader3.py semantic_search.py user_data.py ./
+ENV PYTHONPATH=/app/src
 COPY src/ src/
 COPY templates/ templates/
 

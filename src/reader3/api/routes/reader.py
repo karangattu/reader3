@@ -6,6 +6,7 @@ import os
 import sys
 from dataclasses import replace
 
+from bs4 import BeautifulSoup
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
@@ -19,6 +20,7 @@ from reader3.api.deps import (
     templates,
     user_data_manager,
 )
+from reader3.services.library import clean_html_content
 
 router = APIRouter()
 
@@ -50,9 +52,13 @@ async def read_chapter(request: Request, book_id: str, chapter_index: int):
         raise HTTPException(status_code=404, detail="Chapter not found")
 
     current_chapter = book.spine[chapter_index]
+    # Sanitize stored EPUBs too, so existing imports receive the updated policy.
+    content = current_chapter.content
+    if not book.is_pdf:
+        content = str(clean_html_content(BeautifulSoup(content, "html.parser")))
     current_chapter = replace(
         current_chapter,
-        content=_rewrite_reader_content_asset_paths(current_chapter.content, book_id, book),
+        content=_rewrite_reader_content_asset_paths(content, book_id, book),
     )
 
     # Calculate Prev/Next links

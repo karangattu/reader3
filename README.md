@@ -61,7 +61,14 @@ uv run python -m pytest -q
 ## Build
 
 ```bash
-uv run python build_executable.py
+uv run --extra build python build_executable.py
+```
+
+PyInstaller is installed only with the `build` extra. HTTPX and pytest are test
+dependencies. To refresh the deployment requirements after a dependency update:
+
+```bash
+uv export --no-dev --no-emit-project --format requirements-txt --output-file requirements.txt
 ```
 
 ## Notes

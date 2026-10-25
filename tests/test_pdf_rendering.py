@@ -73,6 +73,23 @@ class TestPdfPageImageSettings:
 
 
 class TestPdfDisplayRendering:
+    def test_copy_text_keeps_columns_together(self, tmp_path):
+        pdf_path = tmp_path / "reading-order.pdf"
+        with fitz.open() as doc:
+            page = doc.new_page()
+            page.insert_text((72, 72), "Left column first")
+            page.insert_text((72, 110), "Left column second")
+            page.insert_text((320, 72), "Right column first")
+            page.insert_text((320, 110), "Right column second")
+            doc.save(pdf_path)
+
+        book = process_pdf(str(pdf_path), str(tmp_path / "processed"), generate_thumbnails=False)
+        text = book.spine[0].text
+        assert text.splitlines() == [
+            "Left column first", "Left column second",
+            "Right column first", "Right column second",
+        ]
+
     def test_render_pdf_page_image_writes_jpeg(self, tmp_path):
         doc = fitz.open()
         page = doc.new_page(width=612, height=792)

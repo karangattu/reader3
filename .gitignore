@@ -16,3 +16,10 @@ user_data.json
 *.sqlite3
 /node_modules
 /android
+
+# Generated mobile dependencies and native projects
+/reader3_android/node_modules/
+/reader3_android/android/
+/reader3_android/ios/
+/reader3_android/.expo/
+/reader3_android/assets/pdfjs/

@@ -11,13 +11,14 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
+from bs4 import BeautifulSoup
 from fastapi.testclient import TestClient
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import server
-from reader3 import Book, BookMetadata, ChapterContent, TOCEntry, save_to_pickle
+from reader3 import Book, BookMetadata, ChapterContent, TOCEntry, save_to_json, save_to_pickle
 from server import app
 
 
@@ -86,6 +87,28 @@ def create_test_book(
 def client():
     """Create a test client for the FastAPI app."""
     return TestClient(app)
+
+
+def test_existing_epub_html_is_sanitized_when_read(client):
+    book_dir = create_test_book("legacy-unsafe-epub", "Legacy EPUB", chapters=1)
+    book = server.load_book_cached(book_dir.name)
+    book.spine[0].content = (
+        '<h2 id="chapter">Chapter</h2>'
+        '<a href="java&#x09;script:alert(1)" onclick="alert(1)">Unsafe link</a>'
+        '<script>window.bookPayload = true;</script>'
+    )
+    save_to_json(book, str(book_dir))
+    server.load_book_cached.cache_clear()
+
+    response = client.get(f"/read/{book_dir.name}/0")
+    assert response.status_code == 200
+    page = BeautifulSoup(response.text, "html.parser")
+    link = page.find("a", string="Unsafe link")
+    assert link is not None
+    assert link.get("href") is None
+    assert link.get("onclick") is None
+    assert "window.bookPayload" not in response.text
+    assert page.find("h2", id="chapter") is not None
 
 
 class TestLibraryEndpoint:
