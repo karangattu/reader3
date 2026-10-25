@@ -5,10 +5,12 @@ Tests for the FastAPI server.
 import hashlib
 import json
 import os
+import re
 import sys
 import types
 from datetime import datetime, timedelta
 from pathlib import Path
+from urllib.parse import urljoin
 
 import pytest
 from bs4 import BeautifulSoup
@@ -87,6 +89,33 @@ def create_test_book(
 def client():
     """Create a test client for the FastAPI app."""
     return TestClient(app)
+
+
+def test_reader_and_library_icons_load_from_local_assets(client):
+    book_dir = create_test_book("local-icon-assets", "Local icons", chapters=1)
+    checked_styles = set()
+    for url in ("/", f"/read/{book_dir.name}/0"):
+        response = client.get(url)
+        assert response.status_code == 200
+        assert "font-src 'self' data:" in response.headers["Content-Security-Policy"]
+        page = BeautifulSoup(response.text, "html.parser")
+        icon_styles = [
+            link["href"] for link in page.select('link[rel="stylesheet"][href]')
+            if "fontawesome" in link["href"] or "font-awesome" in link["href"]
+        ]
+        assert icon_styles
+        for stylesheet in icon_styles:
+            assert stylesheet.startswith("/static/")
+            if stylesheet in checked_styles:
+                continue
+            checked_styles.add(stylesheet)
+            css = client.get(stylesheet)
+            assert css.status_code == 200
+            assert css.headers["content-type"].startswith("text/css")
+            for font in re.findall(r"url\(([^)]+)\)", css.text):
+                font_response = client.get(urljoin(stylesheet, font.strip("\"'")))
+                assert font_response.status_code == 200
+                assert font_response.content
 
 
 def test_existing_epub_html_is_sanitized_when_read(client):
