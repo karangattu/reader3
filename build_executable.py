@@ -50,7 +50,6 @@ def build(onefile: bool = False, console: bool = False):
         'uvicorn.lifespan',
         'uvicorn.lifespan.on',
         'uvicorn.lifespan.off',
-        'orjson',
         'fitz',
         'pymupdf',
         'ebooklib',
