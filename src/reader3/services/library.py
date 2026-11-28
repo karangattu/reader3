@@ -128,6 +128,7 @@ class Book:
     pdf_has_toc: bool = False  # True if PDF has native outline/bookmarks
     pdf_thumbnails_generated: bool = False
     pdf_source_path: Optional[str] = None  # Path to stored PDF for on-demand text extraction
+    content_sanitized_version: int = 0
 
 
 # --- Utilities ---
@@ -1118,20 +1119,16 @@ def export_pdf_pages(book: Book, output_path: str, start_page: int,
         raise ValueError("This function only works with PDF books")
 
     try:
-        doc = fitz.open(original_pdf_path)
-        new_doc = fitz.open()
+        with fitz.open(original_pdf_path) as doc, fitz.open() as new_doc:
+            # Validate page range
+            start_page = max(0, start_page)
+            end_page = min(end_page, len(doc) - 1)
 
-        # Validate page range
-        start_page = max(0, start_page)
-        end_page = min(end_page, len(doc) - 1)
+            # Copy pages
+            new_doc.insert_pdf(doc, from_page=start_page, to_page=end_page)
 
-        # Copy pages
-        new_doc.insert_pdf(doc, from_page=start_page, to_page=end_page)
-
-        # Save
-        new_doc.save(output_path)
-        new_doc.close()
-        doc.close()
+            # Save
+            new_doc.save(output_path)
 
         return True
     except Exception as e:
@@ -1521,7 +1518,8 @@ def process_epub(epub_path: str, output_dir: str) -> Book:
             source_file=os.path.basename(epub_path),
             processed_at=datetime.now().isoformat(),
             added_at=datetime.now().isoformat(),
-            cover_image=cover_image
+            cover_image=cover_image,
+            content_sanitized_version=2,
         )
 
         sanitize_book_text_fields(final_book)
@@ -1576,8 +1574,14 @@ def save_to_pickle(book: Book, output_dir: str):
 
 def save_to_json(book: Book, output_dir: str):
     json_path = os.path.join(output_dir, 'book.json')
+    if not book.is_pdf:
+        for chapter in book.spine:
+            chapter.content = str(
+                clean_html_content(BeautifulSoup(chapter.content, "html.parser"))
+            )
+        book.content_sanitized_version = 2
     data = asdict(book)
-    data['_schema_version'] = 1
+    data['_schema_version'] = 2
     
     # Exclude text_blocks from PDFPageData as they are generated on demand
     for page_data in data.get('pdf_page_data', {}).values():
@@ -1623,6 +1627,13 @@ def load_from_json(json_path: str) -> Book:
     
     metadata = BookMetadata(**data['metadata'])
     spine = [ChapterContent(**ch) for ch in data['spine']]
+    content_sanitized_version = int(data.get("content_sanitized_version", 0))
+    if content_sanitized_version < 2 and not data.get("is_pdf", False):
+        for chapter in spine:
+            chapter.content = str(
+                clean_html_content(BeautifulSoup(chapter.content, "html.parser"))
+            )
+        content_sanitized_version = 2
     
     def dict_to_toc(toc_list):
         result = []
@@ -1660,7 +1671,8 @@ def load_from_json(json_path: str) -> Book:
         pdf_total_pages=data.get('pdf_total_pages', 0),
         pdf_has_toc=data.get('pdf_has_toc', False),
         pdf_thumbnails_generated=data.get('pdf_thumbnails_generated', False),
-        pdf_source_path=data.get('pdf_source_path')
+        pdf_source_path=data.get('pdf_source_path'),
+        content_sanitized_version=content_sanitized_version,
     )
 
 class DocumentService:

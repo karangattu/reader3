@@ -236,8 +236,10 @@ class UserDataManager:
         self.db_file = os.path.join(data_dir, self.DB_FILENAME)
         self._data: Optional[UserData] = None
         self._dirty = False
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self._timer: Optional[threading.Timer] = None
+        self._schema_ready = False
+        self._wal_configured = False
     
     def _ensure_dir(self):
         """Ensure data directory exists."""
@@ -251,7 +253,10 @@ class UserDataManager:
         try:
             conn.execute("PRAGMA busy_timeout=5000")
             conn.execute("PRAGMA synchronous=NORMAL")
-            conn.execute("PRAGMA journal_mode=WAL")
+            with self._lock:
+                if not self._wal_configured:
+                    conn.execute("PRAGMA journal_mode=WAL")
+                    self._wal_configured = True
         except sqlite3.Error:
             pass
         return conn
@@ -267,7 +272,10 @@ class UserDataManager:
             conn.close()
 
     def _ensure_schema(self):
-        """Create the local app-state schema if needed."""
+        """Create the local app-state schema once per manager."""
+        with self._lock:
+            if self._schema_ready:
+                return
         self._ensure_dir()
         with self._managed_connection() as conn:
             conn.executescript(
@@ -426,6 +434,8 @@ class UserDataManager:
                     "alter table reader_preferences "
                     "add column text_align text not null default 'justify'"
                 )
+        with self._lock:
+            self._schema_ready = True
 
     def _has_sqlite_data(self) -> bool:
         """Return whether the SQLite store already contains user state."""
@@ -742,21 +752,136 @@ class UserDataManager:
                 (data.version,),
             )
     
-    def load(self) -> UserData:
-        """Load user data from disk."""
-        if self._data is not None:
-            return self._data
-        
-        self._ensure_dir()
+    def _write(self, sql: str, params=()) -> None:
+        """Run one short, transaction-aware write."""
         self._ensure_schema()
+        with self._managed_connection() as conn:
+            conn.execute(sql, params)
 
-        if not self._has_sqlite_data() and os.path.exists(self.data_file):
-            self._data = self._load_legacy_json()
-            self._write_to_sqlite(self._data)
-        else:
-            self._data = self._load_from_sqlite()
-        
-        return self._data
+    def _upsert_record(self, table: str, record, key: str) -> None:
+        """Upsert one dataclass record without rewriting unrelated tables."""
+        values = asdict(record)
+        columns = list(values)
+        assignments = ", ".join(
+            f"{column}=excluded.{column}" for column in columns if column != key
+        )
+        placeholders = ", ".join(f":{column}" for column in columns)
+        self._write(
+            f"insert into {table} ({', '.join(columns)}) values ({placeholders}) "
+            f"on conflict({key}) do update set {assignments}",
+            values,
+        )
+
+    def _delete_record(self, table: str, column: str, value) -> None:
+        self._write(f"delete from {table} where {column} = ?", (value,))
+
+    def _upsert_annotation(self, annotation: Annotation) -> None:
+        values = asdict(annotation)
+        values["tags_json"] = json.dumps(values.pop("tags"))
+        self._write(
+            "insert into annotations "
+            "(id, book_id, chapter_index, note_text, highlight_id, bookmark_id, "
+            "position_offset, created_at, updated_at, tags_json) "
+            "values (:id, :book_id, :chapter_index, :note_text, :highlight_id, "
+            ":bookmark_id, :position_offset, :created_at, :updated_at, :tags_json) "
+            "on conflict(id) do update set "
+            "book_id=excluded.book_id, chapter_index=excluded.chapter_index, "
+            "note_text=excluded.note_text, highlight_id=excluded.highlight_id, "
+            "bookmark_id=excluded.bookmark_id, "
+            "position_offset=excluded.position_offset, "
+            "created_at=excluded.created_at, updated_at=excluded.updated_at, "
+            "tags_json=excluded.tags_json",
+            values,
+        )
+
+    def _upsert_collection(self, collection: Collection) -> None:
+        values = asdict(collection)
+        values["book_ids_json"] = json.dumps(values.pop("book_ids"))
+        values["is_smart"] = int(values["is_smart"])
+        self._write(
+            "insert into collections "
+            "(id, name, description, icon, color, book_ids_json, created_at, "
+            "updated_at, is_smart, sort_order) "
+            "values (:id, :name, :description, :icon, :color, :book_ids_json, "
+            ":created_at, :updated_at, :is_smart, :sort_order) "
+            "on conflict(id) do update set "
+            "name=excluded.name, description=excluded.description, "
+            "icon=excluded.icon, color=excluded.color, "
+            "book_ids_json=excluded.book_ids_json, "
+            "created_at=excluded.created_at, updated_at=excluded.updated_at, "
+            "is_smart=excluded.is_smart, sort_order=excluded.sort_order",
+            values,
+        )
+
+    def _upsert_preferences(self, preferences: ReaderPreferences) -> None:
+        values = asdict(preferences)
+        values["id"] = 1
+        values["reduced_motion"] = int(values["reduced_motion"])
+        values["high_contrast"] = int(values["high_contrast"])
+        self._write(
+            "insert into reader_preferences "
+            "(id, theme, font_size_px, line_height, page_width_px, "
+            "reduced_motion, high_contrast, font_family, pdf_copy_image_dpi, "
+            "text_align) "
+            "values (:id, :theme, :font_size_px, :line_height, :page_width_px, "
+            ":reduced_motion, :high_contrast, :font_family, "
+            ":pdf_copy_image_dpi, :text_align) "
+            "on conflict(id) do update set "
+            "theme=excluded.theme, font_size_px=excluded.font_size_px, "
+            "line_height=excluded.line_height, page_width_px=excluded.page_width_px, "
+            "reduced_motion=excluded.reduced_motion, "
+            "high_contrast=excluded.high_contrast, "
+            "font_family=excluded.font_family, "
+            "pdf_copy_image_dpi=excluded.pdf_copy_image_dpi, "
+            "text_align=excluded.text_align",
+            values,
+        )
+
+    def _replace_search_history(self, history: list[SearchQuery]) -> None:
+        """Replace only the bounded 50-row search-history table."""
+        self._ensure_schema()
+        with self._managed_connection() as conn:
+            conn.execute("delete from search_history")
+            conn.executemany(
+                "insert into search_history values "
+                "(:position, :query, :book_id, :timestamp, :results_count)",
+                [
+                    {"position": idx, **asdict(query)}
+                    for idx, query in enumerate(history[:50])
+                ],
+            )
+
+    def _replace_reading_sessions(self, sessions: list[ReadingSession]) -> None:
+        """Replace only the bounded 100-row reading-session table."""
+        self._ensure_schema()
+        with self._managed_connection() as conn:
+            conn.execute("delete from reading_sessions")
+            conn.executemany(
+                "insert into reading_sessions values "
+                "(:position, :id, :book_id, :book_title, :chapter_index, "
+                ":chapter_title, :start_time, :end_time, :duration_seconds, "
+                ":pages_read, :scroll_position)",
+                [
+                    {"position": idx, **asdict(session)}
+                    for idx, session in enumerate(sessions[:100])
+                ],
+            )
+
+    def load(self) -> UserData:
+        """Load user data from disk once per manager."""
+        with self._lock:
+            if self._data is not None:
+                return self._data
+            self._ensure_dir()
+            self._ensure_schema()
+
+            if not self._has_sqlite_data() and os.path.exists(self.data_file):
+                self._data = self._load_legacy_json()
+                self._write_to_sqlite(self._data)
+            else:
+                self._data = self._load_from_sqlite()
+
+            return self._data
     
     def save(self):
         """Persist data to disk immediately (atomic write)."""
@@ -807,7 +932,7 @@ class UserDataManager:
         if highlight.book_id not in data.highlights:
             data.highlights[highlight.book_id] = []
         data.highlights[highlight.book_id].append(highlight)
-        self.save()
+        self._upsert_record("highlights", highlight, "id")
         return highlight
     
     def get_highlights(self, book_id: str, chapter_index: Optional[int] = None) -> List[Highlight]:
@@ -830,7 +955,7 @@ class UserDataManager:
         ]
         
         if len(data.highlights[book_id]) < original_len:
-            self.save()
+            self._delete_record("highlights", "id", highlight_id)
             return True
         return False
     
@@ -843,7 +968,7 @@ class UserDataManager:
         for h in data.highlights[book_id]:
             if h.id == highlight_id:
                 h.note = note
-                self.save()
+                self._upsert_record("highlights", h, "id")
                 return True
         return False
     
@@ -860,7 +985,7 @@ class UserDataManager:
         for h in data.highlights[book_id]:
             if h.id == highlight_id:
                 h.color = color
-                self.save()
+                self._upsert_record("highlights", h, "id")
                 return True
         return False
     
@@ -871,7 +996,7 @@ class UserDataManager:
         if bookmark.book_id not in data.bookmarks:
             data.bookmarks[bookmark.book_id] = []
         data.bookmarks[bookmark.book_id].append(bookmark)
-        self.save()
+        self._upsert_record("bookmarks", bookmark, "id")
         return bookmark
     
     def get_bookmarks(self, book_id: str) -> List[Bookmark]:
@@ -891,7 +1016,7 @@ class UserDataManager:
         ]
         
         if len(data.bookmarks[book_id]) < original_len:
-            self.save()
+            self._delete_record("bookmarks", "id", bookmark_id)
             return True
         return False
     
@@ -904,7 +1029,7 @@ class UserDataManager:
         for b in data.bookmarks[book_id]:
             if b.id == bookmark_id:
                 b.note = note
-                self.save()
+                self._upsert_record("bookmarks", b, "id")
                 return True
         return False
     
@@ -973,7 +1098,7 @@ class UserDataManager:
             if field_name in kwargs and kwargs[field_name] is not None:
                 setattr(prefs, field_name, kwargs[field_name])
 
-        self.save()
+        self._upsert_preferences(prefs)
         return prefs
 
     # Per-book font overrides
@@ -986,13 +1111,17 @@ class UserDataManager:
         """Set a per-book font override."""
         data = self.load()
         data.book_fonts[book_id] = font_family
-        self.save()
+        self._write(
+            "insert into book_fonts values (:book_id, :font_family) "
+            "on conflict(book_id) do update set font_family=excluded.font_family",
+            {"book_id": book_id, "font_family": font_family},
+        )
 
     def clear_book_font(self, book_id: str):
         """Remove a per-book font override."""
         data = self.load()
         data.book_fonts.pop(book_id, None)
-        self.save()
+        self._delete_record("book_fonts", "book_id", book_id)
 
     # Chapter Progress (per-chapter tracking)
     def get_chapter_progress(self, book_id: str) -> Dict[int, float]:
@@ -1057,7 +1186,7 @@ class UserDataManager:
         # Keep only last 50 searches
         data.search_history.insert(0, query)
         data.search_history = data.search_history[:50]
-        self.save()
+        self._replace_search_history(data.search_history)
     
     def get_search_history(self, limit: int = 20) -> List[SearchQuery]:
         """Get recent search history."""
@@ -1068,7 +1197,7 @@ class UserDataManager:
         """Clear search history."""
         data = self.load()
         data.search_history = []
-        self.save()
+        self._write("delete from search_history")
     
     # Export
     def export_book_data(self, book_id: str, format: str = 'json') -> str:
@@ -1197,7 +1326,23 @@ class UserDataManager:
             changed = True
         
         if changed:
-            self.save()
+            for table in (
+                "highlights",
+                "bookmarks",
+                "reading_progress",
+                "chapter_progress",
+                "vocabulary",
+                "annotations",
+                "copied_pages",
+                "book_fonts",
+            ):
+                self._delete_record(table, "book_id", book_id)
+            self._delete_record("reading_sessions", "book_id", book_id)
+            self._write("delete from search_history where book_id = ?", (book_id,))
+            data.search_history = [
+                query for query in data.search_history if query.book_id != book_id
+            ]
+            data.book_fonts.pop(book_id, None)
 
     # ========== Reading Sessions ==========
     
@@ -1207,7 +1352,7 @@ class UserDataManager:
         data.reading_sessions.insert(0, session)
         # Keep only last 100 sessions
         data.reading_sessions = data.reading_sessions[:100]
-        self.save()
+        self._replace_reading_sessions(data.reading_sessions)
         return session
     
     def end_reading_session(self, session_id: str, 
@@ -1222,7 +1367,13 @@ class UserDataManager:
                 session.duration_seconds = duration_seconds
                 session.pages_read = pages_read
                 session.scroll_position = scroll_position
-                self.save()
+                values = asdict(session)
+                self._write(
+                    "update reading_sessions set end_time=:end_time, "
+                    "duration_seconds=:duration_seconds, pages_read=:pages_read, "
+                    "scroll_position=:scroll_position where id=:id",
+                    values,
+                )
                 return True
         return False
     
@@ -1287,11 +1438,11 @@ class UserDataManager:
         if existing:
             # Update existing word
             existing[0].reviewed_count += 1
-            self.save()
+            self._upsert_record("vocabulary", existing[0], "id")
             return existing[0]
         
         data.vocabulary[word.book_id].append(word)
-        self.save()
+        self._upsert_record("vocabulary", word, "id")
         return word
     
     def get_vocabulary(self, book_id: str = None) -> List[VocabularyWord]:
@@ -1317,7 +1468,7 @@ class UserDataManager:
         ]
         
         if len(data.vocabulary[book_id]) < original_len:
-            self.save()
+            self._delete_record("vocabulary", "id", word_id)
             return True
         return False
     
@@ -1341,7 +1492,7 @@ class UserDataManager:
         if annotation.book_id not in data.annotations:
             data.annotations[annotation.book_id] = []
         data.annotations[annotation.book_id].append(annotation)
-        self.save()
+        self._upsert_annotation(annotation)
         return annotation
     
     def get_annotations(self, book_id: str, 
@@ -1367,7 +1518,7 @@ class UserDataManager:
                 a.updated_at = datetime.now().isoformat()
                 if tags is not None:
                     a.tags = tags
-                self.save()
+                self._upsert_annotation(a)
                 return True
         return False
     
@@ -1383,7 +1534,7 @@ class UserDataManager:
         ]
         
         if len(data.annotations[book_id]) < original_len:
-            self.save()
+            self._delete_record("annotations", "id", annotation_id)
             return True
         return False
     
@@ -1479,7 +1630,7 @@ class UserDataManager:
         )
         
         data.collections.append(collection)
-        self.save()
+        self._upsert_collection(collection)
         return collection
     
     def get_collections(self) -> List[Collection]:
@@ -1511,7 +1662,7 @@ class UserDataManager:
                 if color is not None:
                     c.color = color
                 c.updated_at = datetime.now().isoformat()
-                self.save()
+                self._upsert_collection(c)
                 return True
         return False
     
@@ -1522,7 +1673,7 @@ class UserDataManager:
         data.collections = [c for c in data.collections if c.id != collection_id]
         
         if len(data.collections) < original_len:
-            self.save()
+            self._delete_record("collections", "id", collection_id)
             return True
         return False
     
@@ -1534,7 +1685,7 @@ class UserDataManager:
                 if book_id not in c.book_ids:
                     c.book_ids.append(book_id)
                     c.updated_at = datetime.now().isoformat()
-                    self.save()
+                    self._upsert_collection(c)
                 return True
         return False
     
@@ -1546,7 +1697,7 @@ class UserDataManager:
                 if book_id in c.book_ids:
                     c.book_ids.remove(book_id)
                     c.updated_at = datetime.now().isoformat()
-                    self.save()
+                    self._upsert_collection(c)
                 return True
         return False
     
@@ -1574,7 +1725,8 @@ class UserDataManager:
                 changed = True
         
         if changed:
-            self.save()
+            for collection in data.collections:
+                self._upsert_collection(collection)
         return True
     
     def reorder_collections(self, collection_ids: List[str]) -> bool:
@@ -1588,7 +1740,8 @@ class UserDataManager:
             if c.id in order_map:
                 c.sort_order = order_map[c.id]
         
-        self.save()
+        for collection in data.collections:
+            self._upsert_collection(collection)
         return True
     
     def get_books_in_collection(self, collection_id: str) -> List[str]:
@@ -1611,4 +1764,5 @@ class UserDataManager:
                 changed = True
         
         if changed:
-            self.save()
+            for collection in data.collections:
+                self._upsert_collection(collection)

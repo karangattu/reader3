@@ -15,26 +15,42 @@ from reader3.storage.user_data import SearchQuery
 router = APIRouter()
 
 @router.get("/api/v1/search")
-async def search_books(q: str, book_id: str | None = None, mode: str = "exact"):
+async def search_books(
+    q: str,
+    book_id: str | None = None,
+    mode: str = "exact",
+    limit: int = 100,
+    offset: int = 0,
+):
     if not q or len(q) < 2:
         return {"results": [], "query": q, "total": 0, "mode": mode}
 
-    book_ids = [book_id] if book_id else get_all_book_ids()
-    max_total_results = 500
+    limit = max(1, min(limit, 200))
+    offset = max(0, offset)
 
     def _do_search():
+        book_ids = [book_id] if book_id else get_all_book_ids()
         return get_search_service().search(
             q,
             book_ids,
             mode=mode,
-            limit=max_total_results,
+            limit=limit,
+            offset=offset,
         )
 
     results = await _run_sync(_do_search)
-    user_data_manager.add_search(
-        SearchQuery(query=q, book_id=book_id, results_count=len(results))
+    await _run_sync(
+        user_data_manager.add_search,
+        SearchQuery(query=q, book_id=book_id, results_count=len(results)),
     )
-    return {"query": q, "results": results, "total": len(results), "mode": mode}
+    return {
+        "query": q,
+        "results": results,
+        "total": len(results),
+        "mode": mode,
+        "limit": limit,
+        "offset": offset,
+    }
 
 
 @router.get("/api/v1/search/history")

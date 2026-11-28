@@ -58,6 +58,7 @@ from .api.deps import (  # noqa: E402
     get_cached_reading_times,
     get_reader_service,
     get_search_service,
+    invalidate_book_caches,
     # Re-export commonly used names so backward-compat shims keep working
     load_book_cached,
     load_book_metadata,
@@ -96,6 +97,7 @@ __all__ = [
     "get_all_book_ids",
     "get_reader_service",
     "get_search_service",
+    "invalidate_book_caches",
     "_run_sync",
     "upload_status",
     "upload_status_lock",
@@ -207,13 +209,18 @@ class CacheControlMiddleware(BaseHTTPMiddleware):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Reader3 starting up")
+    try:
+        from .api.routes import upload as upload_routes
+
+        upload_routes.recover_upload_jobs()
+    except Exception as exc:  # pragma: no cover - best effort
+        logger.warning("Failed to recover background uploads: %s", exc)
     yield
     logger.info("Reader3 shutting down – waiting for background uploads")
     try:
         from .api.routes import upload as upload_routes
 
-        for thread in upload_routes.get_active_background_threads():
-            thread.join(timeout=10)
+        upload_routes.shutdown_upload_executor()
     except Exception as exc:  # pragma: no cover - best effort
         logger.warning("Failed to wait for background uploads: %s", exc)
     logger.info("Reader3 shutting down – flushing user data")

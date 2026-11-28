@@ -6,7 +6,6 @@ import os
 import sys
 from dataclasses import replace
 
-from bs4 import BeautifulSoup
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
@@ -15,12 +14,12 @@ from reader3.api.deps import (
     _effective_pdf_copy_image_dpi,
     _pdf_copy_image_dpi_options,
     _rewrite_reader_content_asset_paths,
+    _run_sync,
     _serialize_reader_preferences,
     load_book_cached,
     templates,
     user_data_manager,
 )
-from reader3.services.library import clean_html_content
 
 router = APIRouter()
 
@@ -44,7 +43,7 @@ async def redirect_to_first_chapter(request: Request, book_id: str):
 @router.get("/read/{book_id}/{chapter_index}", response_class=HTMLResponse)
 async def read_chapter(request: Request, book_id: str, chapter_index: int):
     """The main reader interface."""
-    book = _get_book(book_id)
+    book = await _run_sync(_get_book, book_id)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
 
@@ -52,10 +51,8 @@ async def read_chapter(request: Request, book_id: str, chapter_index: int):
         raise HTTPException(status_code=404, detail="Chapter not found")
 
     current_chapter = book.spine[chapter_index]
-    # Sanitize stored EPUBs too, so existing imports receive the updated policy.
+    # Stored EPUBs are sanitized at import or during the one-time load migration.
     content = current_chapter.content
-    if not book.is_pdf:
-        content = str(clean_html_content(BeautifulSoup(content, "html.parser")))
     current_chapter = replace(
         current_chapter,
         content=_rewrite_reader_content_asset_paths(content, book_id, book),
@@ -119,7 +116,7 @@ async def get_pages(book_id: str, start: int, count: int):
     Fetches multiple pages for infinite scrolling (PDF only).
     Returns JSON with array of page content.
     """
-    book = _get_book(book_id)
+    book = await _run_sync(_get_book, book_id)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
 
@@ -161,7 +158,7 @@ async def get_chapters_text(request: Request):
     if not book_id:
         raise HTTPException(status_code=400, detail="book_id is required")
 
-    book = _get_book(book_id)
+    book = await _run_sync(_get_book, book_id)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
 

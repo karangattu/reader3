@@ -10,6 +10,7 @@ from fastapi.responses import PlainTextResponse
 
 from reader3.api.deps import (
     BOOKS_DIR,
+    _run_sync,
     get_cached_reading_times,
     get_reader_service,
     load_book_metadata,
@@ -32,39 +33,38 @@ async def get_chapter_reading_times(book_id: str):
 @router.get("/api/v1/recently-read")
 async def get_recently_read_books(limit: int = 5):
     """Get recently read books sorted by last_read time."""
-    recently_read = []
-    
-    # Scan all book folders
-    if os.path.exists(BOOKS_DIR):
-        for item in os.listdir(BOOKS_DIR):
-            if item.endswith("_data") and os.path.isdir(os.path.join(BOOKS_DIR, item)):
-                progress = user_data_manager.get_progress(item)
-                if progress and progress.last_read:
-                    meta = load_book_metadata(item)
-                    if meta:
-                        # Calculate progress percentage
-                        chapter_progress = user_data_manager.get_chapter_progress(item)
-                        overall_progress = 0.0
-                        total_chapters = meta.get("chapters", 0)
-                        if chapter_progress and total_chapters > 0:
-                            total_progress = sum(chapter_progress.values())
-                            overall_progress = total_progress / total_chapters
-                        
-                        recently_read.append({
-                            "id": item,
-                            "title": meta.get("title", "Untitled"),
-                            "author": ", ".join(meta.get("authors", [])),
-                            "cover_image": meta.get("cover_image"),
-                            "last_read": progress.last_read,
-                            "chapter_index": progress.chapter_index,
-                            "progress_percent": overall_progress,
-                            "reading_time_seconds": progress.reading_time_seconds,
-                        })
-    
-    # Sort by last_read descending
-    recently_read.sort(key=lambda x: x["last_read"], reverse=True)
-    
-    return {"books": recently_read[:limit]}
+    def _get_recently_read():
+        recently_read = []
+
+        # Scan all book folders off the event loop.
+        if os.path.exists(BOOKS_DIR):
+            for item in os.listdir(BOOKS_DIR):
+                if item.endswith("_data") and os.path.isdir(os.path.join(BOOKS_DIR, item)):
+                    progress = user_data_manager.get_progress(item)
+                    if progress and progress.last_read:
+                        meta = load_book_metadata(item)
+                        if meta:
+                            chapter_progress = user_data_manager.get_chapter_progress(item)
+                            overall_progress = 0.0
+                            total_chapters = meta.get("chapters", 0)
+                            if chapter_progress and total_chapters > 0:
+                                overall_progress = sum(chapter_progress.values()) / total_chapters
+
+                            recently_read.append({
+                                "id": item,
+                                "title": meta.get("title", "Untitled"),
+                                "author": ", ".join(meta.get("authors", [])),
+                                "cover_image": meta.get("cover_image"),
+                                "last_read": progress.last_read,
+                                "chapter_index": progress.chapter_index,
+                                "progress_percent": overall_progress,
+                                "reading_time_seconds": progress.reading_time_seconds,
+                            })
+
+        recently_read.sort(key=lambda x: x["last_read"], reverse=True)
+        return recently_read[:limit]
+
+    return {"books": await _run_sync(_get_recently_read)}
 
 
 @router.get("/api/v1/progress/{book_id}")

@@ -65,6 +65,8 @@ def build(onefile: bool = False, console: bool = False):
         'reader3.services.search',
         'reader3.storage.books',
         'reader3.storage.indexes',
+        'reader3.storage.jobs',
+        'reader3.storage.search',
         'reader3.storage.user_data',
     ]
 

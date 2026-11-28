@@ -8,13 +8,15 @@ import shutil
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse
 
+from reader3.storage.search import get_exact_search_index
+
 from reader3.api.deps import (
     BOOKS_DIR,
     MAX_UPLOAD_MB,
     _build_library_entry,
     _run_sync,
     _serialize_reader_preferences,
-    get_cached_reading_times,
+    invalidate_book_caches,
     load_book_cached,
     load_book_metadata,
     logger,
@@ -166,10 +168,11 @@ async def delete_book(book_id: str):
     try:
         # Remove the entire book directory
         shutil.rmtree(book_path)
-        # Clear the cache
-        load_book_cached.cache_clear()
-        get_cached_reading_times.cache_clear()
-        load_book_metadata.cache_clear()
+        # Invalidate only the deleted book.
+        invalidate_book_caches(safe_book_id)
+        await _run_sync(
+            get_exact_search_index(BOOKS_DIR).remove_book, safe_book_id
+        )
         # Clean up user data for this book
         user_data_manager.cleanup_book_data(safe_book_id)
         # Remove book from all collections

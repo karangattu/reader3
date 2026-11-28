@@ -9,9 +9,11 @@ import json
 import math
 import os
 import re
-from collections import Counter
+from collections import Counter, OrderedDict
 from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, List, Optional, Tuple
+
+from reader3.storage.search import get_exact_search_index
 
 INDEX_VERSION = 1
 INDEX_FILENAME = "semantic_index.json"
@@ -26,7 +28,8 @@ STOPWORDS = {
     "with", "you", "your",
 }
 
-_INDEX_CACHE: Dict[str, Dict[str, Any]] = {}
+_INDEX_CACHE: OrderedDict[str, Dict[str, Any]] = OrderedDict()
+_INDEX_CACHE_MAX = 32
 
 
 def _normalize_token(token: str) -> str:
@@ -61,10 +64,14 @@ def _load_index(path: str) -> Optional[Dict[str, Any]]:
     mtime = os.path.getmtime(path)
     cached = _INDEX_CACHE.get(path)
     if cached and cached.get("mtime") == mtime:
+        _INDEX_CACHE.move_to_end(path)
         return cached.get("data")
     with open(path, "r", encoding="utf-8") as f:
         data = json.load(f)
     _INDEX_CACHE[path] = {"mtime": mtime, "data": data}
+    _INDEX_CACHE.move_to_end(path)
+    while len(_INDEX_CACHE) > _INDEX_CACHE_MAX:
+        _INDEX_CACHE.popitem(last=False)
     return data
 
 
@@ -74,6 +81,9 @@ def _write_index(path: str, data: Dict[str, Any]) -> None:
         json.dump(data, f, ensure_ascii=True)
     os.replace(tmp_path, path)
     _INDEX_CACHE[path] = {"mtime": os.path.getmtime(path), "data": data}
+    _INDEX_CACHE.move_to_end(path)
+    while len(_INDEX_CACHE) > _INDEX_CACHE_MAX:
+        _INDEX_CACHE.popitem(last=False)
 
 
 def _should_rebuild(index: Optional[Dict[str, Any]], book: Any) -> bool:
@@ -268,24 +278,45 @@ class SearchService:
         *,
         mode: str = "exact",
         limit: int = 500,
+        offset: int = 0,
     ) -> List[Dict[str, Any]]:
         if mode == "semantic":
-            return semantic_search_books(
+            results = semantic_search_books(
                 query=query,
                 book_ids=book_ids,
                 books_dir=self.books_dir,
                 load_book_fn=self.load_book,
-                limit=limit,
+                limit=limit + offset,
             )
-        return self._exact_search(query, book_ids, limit)
+            return results[offset : offset + limit]
+        return self._exact_search(query, book_ids, limit, offset)
 
     def _exact_search(
         self,
         query: str,
         book_ids: List[str],
         limit: int,
+        offset: int = 0,
     ) -> List[Dict[str, Any]]:
+        indexed = get_exact_search_index(self.books_dir).search(
+            query,
+            book_ids,
+            self.load_book,
+            limit=limit,
+            offset=offset,
+        )
+        if indexed is not None:
+            results = []
+            for match in indexed:
+                text = match.pop("text")
+                match["context"] = _build_context(
+                    text, match["position"], match["match_length"]
+                )
+                results.append(match)
+            return results
+
         results = []
+        skipped = 0
         query_lower = query.lower()
 
         for book_id in book_ids:
@@ -321,20 +352,23 @@ class SearchService:
                             context = context[:space_idx]
                         context = context + "..."
 
-                    results.append(
-                        {
-                            "book_id": book_id,
-                            "book_title": book_title,
-                            "chapter_index": idx,
-                            "chapter_href": chapter.href,
-                            "chapter_title": chapter.title,
-                            "context": context.strip(),
-                            "position": pos,
-                            "match_length": len(query),
-                        }
-                    )
-                    if len(results) >= limit:
-                        break
+                    if skipped < offset:
+                        skipped += 1
+                    else:
+                        results.append(
+                            {
+                                "book_id": book_id,
+                                "book_title": book_title,
+                                "chapter_index": idx,
+                                "chapter_href": chapter.href,
+                                "chapter_title": chapter.title,
+                                "context": context.strip(),
+                                "position": pos,
+                                "match_length": len(query),
+                            }
+                        )
+                        if len(results) >= limit:
+                            break
                     start = pos + len(query)
 
         return results

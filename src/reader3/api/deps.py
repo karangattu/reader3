@@ -13,9 +13,10 @@ import os
 import pickle
 import sys
 import threading
+import time
+from collections import OrderedDict, namedtuple
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
-from functools import lru_cache
 from typing import Dict, Optional
 from urllib.parse import quote, unquote
 
@@ -26,6 +27,7 @@ from fastapi.templating import Jinja2Templates
 from ..services.library import Book
 from ..services.reader import ReaderService
 from ..services.search import SearchService
+from ..storage.jobs import get_upload_job_store
 from ..storage.user_data import ReaderPreferences, UserDataManager
 
 # ---------------------------------------------------------------------------
@@ -58,6 +60,8 @@ PDF_COPY_IMAGE_MAX_DPI = 600
 PDF_COPY_IMAGE_DPI_OPTIONS = (150, 200, 300, 450, 600)
 PDF_RENDER_MAX_DIMENSION = int(os.environ.get("PDF_RENDER_MAX_DIMENSION", "8192"))
 PDF_RENDER_MAX_PIXELS = int(os.environ.get("PDF_RENDER_MAX_PIXELS", "40000000"))
+PDF_COPY_CACHE_MAX_MB = max(1, int(os.environ.get("PDF_COPY_CACHE_MAX_MB", "512")))
+BOOK_CACHE_MAX_MB = max(16, int(os.environ.get("BOOK_CACHE_MAX_MB", "128")))
 
 
 def _clamp_pdf_copy_image_dpi(dpi: int) -> int:
@@ -111,13 +115,32 @@ def _format_pdf_validation_error(error: Optional[str]) -> str:
 # ---------------------------------------------------------------------------
 upload_status: Dict[str, dict] = {}
 upload_status_lock = threading.Lock()
+_last_persisted_upload_status: Dict[str, tuple[float, int]] = {}
 
 
 def update_upload_status(upload_id: str, **kwargs):
     """Thread-safe update of upload status."""
+    now = time.monotonic()
     with upload_status_lock:
         if upload_id in upload_status:
             upload_status[upload_id].update(kwargs)
+        last_at, last_progress = _last_persisted_upload_status.get(
+            upload_id, (float("-inf"), -1)
+        )
+        progress = int(kwargs.get("progress", last_progress))
+        should_persist = (
+            "status" in kwargs
+            or "completed_at" in kwargs
+            or abs(progress - last_progress) >= 5
+            or now - last_at >= 2.0
+        )
+        if should_persist:
+            _last_persisted_upload_status[upload_id] = (now, progress)
+    if should_persist:
+        try:
+            get_upload_job_store(BOOKS_DIR).update(upload_id, **kwargs)
+        except Exception as exc:
+            logger.warning("Could not persist upload status for %s: %s", upload_id, exc)
 
 
 def cleanup_old_statuses():
@@ -130,6 +153,11 @@ def cleanup_old_statuses():
         ]
         for uid in to_remove:
             del upload_status[uid]
+            _last_persisted_upload_status.pop(uid, None)
+    try:
+        get_upload_job_store(BOOKS_DIR).cleanup_old_statuses(cutoff)
+    except Exception as exc:
+        logger.warning("Could not clean up persisted upload statuses: %s", exc)
 
 
 # ---------------------------------------------------------------------------
@@ -275,6 +303,12 @@ def _find_active_upload(filename: str) -> Optional[str]:
                 and status.get("status") in {"queued", "processing"}
             ):
                 return uid
+    try:
+        for job in get_upload_job_store(BOOKS_DIR).active():
+            if job.get("filename") == filename:
+                return job["id"]
+    except Exception as exc:
+        logger.warning("Could not inspect persisted upload jobs: %s", exc)
     return None
 
 
@@ -317,8 +351,7 @@ def _serialize_reader_preferences(preferences: ReaderPreferences) -> dict:
     }
 
 
-@lru_cache(maxsize=50)
-def load_book_cached(folder_name: str) -> Optional[Book]:
+def _load_book_uncached(folder_name: str) -> Optional[Book]:
     """
     Loads the book from the pickle file.
     Cached so we don't re-read the disk on every click.
@@ -347,8 +380,14 @@ def load_book_cached(folder_name: str) -> Optional[Book]:
         return None
 
     try:
-        from ..services.library import save_to_json
+        from ..services.library import clean_html_content, save_to_json
 
+        if not book.is_pdf and getattr(book, "content_sanitized_version", 0) < 2:
+            for chapter in book.spine:
+                chapter.content = str(
+                    clean_html_content(BeautifulSoup(chapter.content, "html.parser"))
+                )
+            book.content_sanitized_version = 2
         save_to_json(book, book_dir)
         logger.info("Migrated %s from pickle to JSON", folder_name)
     except Exception as e:
@@ -357,8 +396,106 @@ def load_book_cached(folder_name: str) -> Optional[Book]:
     return book
 
 
-@lru_cache(maxsize=200)
-def load_book_metadata(folder_name: str) -> Optional[dict]:
+_CacheInfo = namedtuple("CacheInfo", "hits misses currsize maxsize")
+
+
+class _SignatureCache:
+    """Bounded LRU cache that invalidates automatically when files change."""
+
+    def __init__(self, loader, path_resolver, *, max_bytes=None, max_entries=200):
+        self._loader = loader
+        self._path_resolver = path_resolver
+        self._max_bytes = max_bytes
+        self._max_entries = max_entries
+        self._entries = OrderedDict()
+        self._locks = {}
+        self._locks_guard = threading.Lock()
+        self._hits = 0
+        self._misses = 0
+
+    def _signature(self, key):
+        try:
+            stat = os.stat(self._path_resolver(key))
+            return stat.st_mtime_ns, stat.st_size
+        except OSError:
+            return None
+
+    def _key_lock(self, key):
+        with self._locks_guard:
+            return self._locks.setdefault(key, threading.Lock())
+
+    def __call__(self, key):
+        signature = self._signature(key)
+        with self._key_lock(key):
+            entry = self._entries.get(key)
+            if entry and entry[0] == signature:
+                self._hits += 1
+                self._entries.move_to_end(key)
+                return entry[1]
+
+            self._misses += 1
+            value = self._loader(key)
+            if value is None:
+                self._entries.pop(key, None)
+                return None
+
+            weight = 1
+            if self._max_bytes is not None and signature is not None:
+                # JSON size is a stable proxy; Python objects usually cost more.
+                weight = max(1, signature[1] * 4)
+            self._entries[key] = (signature, value, weight)
+            self._entries.move_to_end(key)
+            self._evict()
+            return value
+
+    def _evict(self):
+        while self._entries and (
+            len(self._entries) > self._max_entries
+            or (
+                self._max_bytes is not None
+                and sum(entry[2] for entry in self._entries.values()) > self._max_bytes
+            )
+        ):
+            self._entries.popitem(last=False)
+
+    def invalidate(self, key):
+        with self._key_lock(key):
+            self._entries.pop(key, None)
+
+    def cache_clear(self):
+        with self._locks_guard:
+            locks = list(self._locks.values())
+        for lock in locks:
+            with lock:
+                pass
+        self._entries.clear()
+        self._hits = 0
+        self._misses = 0
+
+    def cache_info(self):
+        return _CacheInfo(
+            self._hits,
+            self._misses,
+            len(self._entries),
+            self._max_entries,
+        )
+
+
+def _book_data_path(folder_name: str) -> str:
+    book_dir = os.path.join(BOOKS_DIR, folder_name)
+    json_path = os.path.join(book_dir, "book.json")
+    return json_path if os.path.exists(json_path) else os.path.join(book_dir, "book.pkl")
+
+
+load_book_cached = _SignatureCache(
+    _load_book_uncached,
+    _book_data_path,
+    max_bytes=BOOK_CACHE_MAX_MB * 1024 * 1024,
+    max_entries=100,
+)
+
+
+def _load_book_metadata_uncached(folder_name: str) -> Optional[dict]:
     """Load lightweight metadata for a book without unpickling if possible."""
     meta_path = os.path.join(BOOKS_DIR, folder_name, "book_meta.json")
     if os.path.exists(meta_path):
@@ -373,6 +510,21 @@ def load_book_metadata(folder_name: str) -> Optional[dict]:
         return None
 
     return write_book_metadata(folder_name, book)
+
+
+load_book_metadata = _SignatureCache(
+    _load_book_metadata_uncached,
+    lambda folder_name: os.path.join(BOOKS_DIR, folder_name, "book_meta.json"),
+    max_entries=500,
+)
+
+
+def invalidate_book_caches(book_id: str) -> None:
+    """Invalidate one book without flushing the rest of the library cache."""
+    load_book_cached.invalidate(book_id)
+    load_book_metadata.invalidate(book_id)
+    get_cached_reading_times.invalidate(book_id)
+    clear_rewrite_cache(book_id)
 
 
 def _atomic_write_json(path: str, payload):
@@ -411,8 +563,7 @@ def write_book_metadata(folder_name: str, book: Book) -> dict:
     return metadata
 
 
-@lru_cache(maxsize=200)
-def get_cached_reading_times(book_id: str) -> Optional[dict]:
+def _compute_reading_times_uncached(book_id: str) -> Optional[dict]:
     """Compute and cache per-chapter reading times for a book."""
     book = load_book_cached(book_id)
     if not book:
@@ -445,6 +596,13 @@ def get_cached_reading_times(book_id: str) -> Optional[dict]:
         }
 
     return reading_times
+
+
+get_cached_reading_times = _SignatureCache(
+    _compute_reading_times_uncached,
+    _book_data_path,
+    max_entries=200,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -549,10 +707,57 @@ def _rewrite_reader_content_asset_paths(content: str, book_id: str, book: Book) 
     return result
 
 
-def clear_rewrite_cache() -> None:
-    """Drop all cached rewritten chapter payloads."""
+def clear_rewrite_cache(book_id: Optional[str] = None) -> None:
+    """Drop rewritten payloads for one book, or all books when omitted."""
     with _REWRITE_CACHE_LOCK:
-        _REWRITE_CACHE.clear()
+        if book_id is None:
+            _REWRITE_CACHE.clear()
+            return
+        for key in [key for key in _REWRITE_CACHE if key[0] == book_id]:
+            _REWRITE_CACHE.pop(key, None)
+
+
+_PDF_PAGE_CACHE_LOCK = threading.Lock()
+
+
+def _trim_pdf_page_cache(protected_path: str) -> None:
+    """Evict oldest rendered copy pages until the global cache fits its budget."""
+    budget = PDF_COPY_CACHE_MAX_MB * 1024 * 1024
+    candidates = []
+    total = 0
+    try:
+        with os.scandir(BOOKS_DIR) as books:
+            for book_entry in books:
+                if not book_entry.name.endswith("_data") or not book_entry.is_dir(
+                    follow_symlinks=False
+                ):
+                    continue
+                cache_dir = os.path.join(book_entry.path, "cache", "pdf-pages")
+                if not os.path.isdir(cache_dir):
+                    continue
+                with os.scandir(cache_dir) as files:
+                    for file_entry in files:
+                        if not file_entry.is_file(follow_symlinks=False):
+                            continue
+                        stat = file_entry.stat()
+                        total += stat.st_size
+                        candidates.append((stat.st_mtime_ns, file_entry.path, stat.st_size))
+    except OSError as exc:
+        logger.warning("Could not scan PDF page cache: %s", exc)
+        return
+
+    for _, path, size in sorted(candidates):
+        if total <= budget:
+            break
+        if os.path.abspath(path) == os.path.abspath(protected_path):
+            continue
+        try:
+            os.remove(path)
+            total -= size
+        except FileNotFoundError:
+            total -= size
+        except OSError as exc:
+            logger.warning("Could not evict PDF page cache file %s: %s", path, exc)
 
 
 def _pdf_page_image_cache_path(book_id: str, page_num: int, dpi: int) -> str:
@@ -657,6 +862,8 @@ def _ensure_pdf_page_image_file(
             except OSError:
                 pass
         os.replace(tmp_path, cache_path)
+        with _PDF_PAGE_CACHE_LOCK:
+            _trim_pdf_page_cache(cache_path)
     finally:
         if os.path.exists(tmp_path):
             try:
@@ -751,10 +958,8 @@ def repair_pdf_thumbnails(book_id: str) -> dict:
     except Exception as exc:
         logger.error("Error saving repaired thumbnail metadata for %s: %s", safe_book_id, exc)
 
-    # Invalidate caches after mutating book data.
-    load_book_cached.cache_clear()
-    load_book_metadata.cache_clear()
-    get_cached_reading_times.cache_clear()
+    # Invalidate only the repaired book.
+    invalidate_book_caches(safe_book_id)
 
     return {
         "book_id": safe_book_id,

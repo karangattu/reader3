@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from fastapi.responses import FileResponse
 
 from reader3.api.deps import (
@@ -23,6 +23,13 @@ from reader3.services.library import (
 )
 
 router = APIRouter()
+
+
+def _remove_temp_file(path: str) -> None:
+    try:
+        os.remove(path)
+    except FileNotFoundError:
+        pass
 
 
 @router.get("/api/v1/pdf/{book_id}/page-image/{page_num}")
@@ -325,11 +332,16 @@ async def export_pdf_pages_endpoint(book_id: str, request: Request):
     ) as tmp:
         export_path = tmp.name
 
-    success = export_pdf_pages(
-        book, export_path, start_page, end_page, original_pdf
-    )
+    try:
+        success = await _run_sync(
+            export_pdf_pages, book, export_path, start_page, end_page, original_pdf
+        )
+    except Exception:
+        _remove_temp_file(export_path)
+        raise
 
     if not success:
+        _remove_temp_file(export_path)
         raise HTTPException(
             status_code=500,
             detail="Failed to export PDF pages"
@@ -343,7 +355,8 @@ async def export_pdf_pages_endpoint(book_id: str, request: Request):
         filename=filename,
         headers={
             "Content-Disposition": f"attachment; filename={filename}"
-        }
+        },
+        background=BackgroundTask(_remove_temp_file, export_path),
     )
 
 
