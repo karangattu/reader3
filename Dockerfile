@@ -43,8 +43,12 @@ ENV BOOKS_DIR=/data/books \
     LOG_LEVEL=info \
     HOST=0.0.0.0 \
     PORT=8123 \
-    WEB_CONCURRENCY=2 \
+    WEB_CONCURRENCY=1 \
     IO_WORKERS=4 \
+    PDF_JOB_WORKERS=1 \
+    PDF_MAX_QUEUE=4 \
+    PDF_COPY_CACHE_MAX_MB=512 \
+    BOOK_CACHE_MAX_MB=128 \
     MAX_UPLOAD_MB=200 \
     PYTHONUNBUFFERED=1
 
@@ -56,7 +60,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 CMD ["python", "-m", "uvicorn", "reader3.app:app", \
      "--host", "0.0.0.0", \
      "--port", "8123", \
-     "--workers", "2", \
+     "--workers", "1", \
      "--timeout-keep-alive", "30", \
      "--limit-concurrency", "100", \
      "--log-level", "info"]

@@ -7,7 +7,7 @@ services:
       uvicorn reader3.app:app
       --host 0.0.0.0
       --port $PORT
-      --workers ${WEB_CONCURRENCY:-2}
+      --workers ${WEB_CONCURRENCY:-1}
       --timeout-keep-alive 30
       --limit-concurrency 100
       --log-level info
@@ -20,11 +20,19 @@ services:
       - key: READER3_BOOKS_DIR
         value: /var/data/books
       - key: WEB_CONCURRENCY
-        value: "2"
+        value: "1"
       - key: IO_WORKERS
         value: "4"
+      - key: PDF_JOB_WORKERS
+        value: "1"
+      - key: PDF_MAX_QUEUE
+        value: "4"
+      - key: PDF_COPY_CACHE_MAX_MB
+        value: "512"
+      - key: BOOK_CACHE_MAX_MB
+        value: "128"
       - key: MAX_UPLOAD_MB
-        value: "1024"
+        value: "200"
       - key: LOG_LEVEL
         value: info
     disk:
