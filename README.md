@@ -52,6 +52,17 @@ New PDF imports render display pages as 200 DPI JPEG and lazy-load them. The cop
 
 Existing PDFs keep their current page images until they are reprocessed.
 
+## Performance and deployment settings
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `WEB_CONCURRENCY` | `1` | Uvicorn workers. Keep at 1 until upload state and caches are externalized. |
+| `PDF_JOB_WORKERS` | `1` | Concurrent background book imports. |
+| `PDF_MAX_QUEUE` | `4` | Maximum queued imports before the server returns HTTP 429. |
+| `PDF_COPY_CACHE_MAX_MB` | `512` | Global LRU budget for rendered PDF copy/export pages. |
+| `BOOK_CACHE_MAX_MB` | `128` | Approximate in-memory budget for cached parsed books. |
+| `IO_WORKERS` | `4` | Threads used for blocking file and database work. |
+
 ## Tests
 
 ```bash
